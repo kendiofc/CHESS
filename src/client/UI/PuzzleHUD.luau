@@ -605,7 +605,7 @@ end
 function PuzzleHUD._fitResultCard(self: any)
 	local r = self.result
 	local natural = r.card.AbsoluteSize.Y / math.max(r.scale.Scale, 0.01)
-	local available = r.gui.AbsoluteSize.Y - 24
+	local available = r.dim.AbsoluteSize.Y - 24
 	r.fit = if natural > 0 and available > 0 then math.min(1, available / natural) else 1
 end
 
@@ -872,7 +872,9 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	self.difficultyPill.BackgroundColor3 = Theme.DifficultyColors[snap.difficulty] or Theme.PanelRaised
 	local group = PuzzleDefinitions.byDifficulty[snap.difficulty]
 	self.difficultyPill.Text = string.format("%s  %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
-	self.brandLabel.Text = "ECHO CHESS  ·  " .. string.upper(snap.mode or PLAY_MODES.Journey)
+	-- Narrow headers (phones) only have room for the mode name.
+	local mode = string.upper(snap.mode or PLAY_MODES.Journey)
+	self.brandLabel.Text = if self.parts.header.AbsoluteSize.X < 340 then mode else "ECHO CHESS  ·  " .. mode
 	local daily = snap.mode == PLAY_MODES.Daily
 	self.prevButton.Visible = not daily
 	self.nextButton.Visible = not daily
@@ -1160,14 +1162,15 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 			Anim.tween(r.scale, 0.35, { Scale = r.fit }, Enum.EasingStyle.Back)
 		end)
 		if snap.status == "won" then
-			Anim.burst(r.card, Theme.Gold, 18)
+			-- Sparks go on the overlay: the card's list layout would place them as rows.
+			Anim.burst(r.dim, Theme.Gold, 18)
 			Sound.play("win")
 			Sound.haptic("heavy")
 			if unlocked then
 				task.delay(0.9, function()
 					Sound.play("unlock")
 					Sound.haptic("medium")
-					Anim.burst(r.card, Theme.DifficultyColors[unlocked] or Theme.Gold, 24)
+					Anim.burst(r.dim, Theme.DifficultyColors[unlocked] or Theme.Gold, 24)
 					Anim.pulse(r.bannerScale, 1.18, 0.45)
 				end)
 			end
