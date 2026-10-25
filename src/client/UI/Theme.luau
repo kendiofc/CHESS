@@ -29,7 +29,7 @@ Theme.GoldDeep = Color3.fromRGB(196, 134, 30)
 -- Piece sprite sheet (assets/pieces.png): 6 x 2 cells of PieceCell pixels,
 -- columns K Q B N R P, white row on top. Set to the uploaded image's
 -- "rbxassetid://..." to use it; while empty, PieceArt draws its own shapes.
-Theme.PieceSheet = "rbxassetid://96592185331511"
+Theme.PieceSheet = ""
 Theme.PieceCell = 170
 Theme.PieceSheetColumns = { K = 0, Q = 1, B = 2, N = 3, R = 4, P = 5 }
 
