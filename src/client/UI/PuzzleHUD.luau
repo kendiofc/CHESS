@@ -3,21 +3,32 @@
 -- turns clicks/taps into move intents. Legal-move highlights are computed
 -- locally with the shared rules purely for display; the server re-validates
 -- every move and its snapshot is always what gets drawn.
+--
+-- Input: tap your piece, then tap a square; or (when the drag setting is on)
+-- drag your piece onto a square. A press only becomes a drag after it moves
+-- InputRules.DRAG_THRESHOLD pixels, and taps right after a drag are ignored,
+-- so one press is never read as both. Leaving an attempt with moves in it
+-- (Restart, the puzzle arrows, starting another puzzle) asks first.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BoardState = require(Shared:WaitForChild("BoardState"))
 local ChessRules = require(Shared:WaitForChild("ChessRules"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local InputRules = require(Shared:WaitForChild("InputRules"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
+local TutorialFlow = require(Shared:WaitForChild("TutorialFlow"))
 
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
 local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
+local ConfirmDialog = require(script.Parent:WaitForChild("ConfirmDialog"))
 local PieceArt = require(script.Parent:WaitForChild("PieceArt"))
 local PuzzleMenu = require(script.Parent:WaitForChild("PuzzleMenu"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
+local TutorialCoach = require(script.Parent:WaitForChild("TutorialCoach"))
 
 export type Handlers = {
 	move: (from: number, to: number) -> (),
@@ -26,6 +37,7 @@ export type Handlers = {
 	hint: () -> (),
 	start: (puzzleId: string, mode: string) -> (),
 	settings: (values: { [string]: any }) -> (),
+	tutorial: (outcome: string) -> (),
 }
 
 local PLAY_MODES = GameConfig.PLAY_MODES
@@ -44,6 +56,7 @@ local ERROR_MESSAGES = {
 	not_daily = "That isn't today's Daily Puzzle.",
 	bad_mode = "That mode isn't available.",
 	no_hints = "No hints left for this puzzle.",
+	bad_tutorial = "That wasn't accepted.",
 }
 
 local MARGIN = 12
@@ -52,6 +65,7 @@ local HEADER_HEIGHT = 70
 local STATS_HEIGHT = 62
 local MESSAGE_HEIGHT = 52
 local CONTROLS_HEIGHT = 54
+local COACH_HEIGHT = 84 -- the tutorial card takes the message's place while shown
 local MAX_COLUMN_WIDTH = 720
 
 local PuzzleHUD = {}
@@ -149,19 +163,41 @@ function PuzzleHUD.new(playerGui: Instance, handlers: Handlers)
 	self.pending = false
 	self.squares = {}
 	self.receivedAt = os.clock()
+	self.dragEnabled = GameConfig.DEFAULT_SETTINGS.drag
+	self.press = nil -- the board press being tracked for a drag
+	self.dragEndedAt = 0
+	self.tutorial = nil -- { state: TutorialFlow.State, awaitingStart: boolean }
 	Sound.init()
+	self.dialog = ConfirmDialog.new(playerGui)
 	self:_build(playerGui)
 	self.menu = PuzzleMenu.new(playerGui, {
 		start = function(puzzleId: string, mode: string)
-			self.handlers.start(puzzleId, mode)
+			self:_confirmLeave(function()
+				self.handlers.start(puzzleId, mode)
+			end)
 		end,
 		settings = function(values: { [string]: any })
 			-- Once the player changes a setting, this session keeps their choice.
 			self.settingsTouched = true
+			if type(values.drag) == "boolean" then
+				self:_setDrag(values.drag)
+			end
 			self.handlers.settings(values)
 		end,
+		tutorial = function()
+			self:_confirmLeave(function()
+				self:startTutorial()
+			end)
+		end,
 	})
-	for _, name in ipairs({ "EchoChessHUD", "EchoChessResult", "EchoChessMenu" }) do
+	self.menu.dragEnabled = self.dragEnabled
+	UserInputService.InputChanged:Connect(function(input)
+		self:_pressMoved(input)
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		self:_pressEnded(input)
+	end)
+	for _, name in ipairs({ "EchoChessHUD", "EchoChessResult", "EchoChessMenu", "EchoChessDialog" }) do
 		Sound.watchButtons(playerGui:WaitForChild(name))
 	end
 	-- The home screen is the first thing a player sees; it shows a loading
@@ -281,10 +317,14 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	end)
 	self.prevButton, self.nextButton = prev, nextButton
 	prev.Activated:Connect(function()
-		self:_switchPuzzle(-1)
+		self:_confirmLeave(function()
+			self:_switchPuzzle(-1)
+		end)
 	end)
 	nextButton.Activated:Connect(function()
-		self:_switchPuzzle(1)
+		self:_confirmLeave(function()
+			self:_switchPuzzle(1)
+		end)
 	end)
 
 	-- Stats: moves, captured progress, time.
@@ -435,10 +475,26 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	restartButton.LayoutOrder = 3
 	restartButton.Parent = controls
 	restartButton.Activated:Connect(function()
-		self.handlers.restart()
+		self:_confirmRestart()
 	end)
 
-	self.parts = { header = header, stats = stats, boardArea = boardArea, message = self.messageLabel, controls = controls }
+	self.coach = TutorialCoach.new(container, {
+		skip = function()
+			self:_tutorialEvent("skip")
+		end,
+		next = function()
+			self:_tutorialEvent("next")
+		end,
+	})
+
+	self.parts = {
+		header = header,
+		stats = stats,
+		boardArea = boardArea,
+		message = self.messageLabel,
+		controls = controls,
+		coach = self.coach.frame,
+	}
 	container:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 		self:_layout()
 	end)
@@ -628,6 +684,10 @@ function PuzzleHUD._layout(self: any)
 	local h = size.Y - MARGIN * 2
 	local wide = size.X >= size.Y * 1.3 and size.Y < 640
 	self.layoutMode = if wide then "wide" else "tall"
+	-- The tutorial card replaces the message line while it is shown.
+	local coaching = p.coach.Visible
+	p.message.Visible = not coaching
+	local messageHeight = if coaching then COACH_HEIGHT else MESSAGE_HEIGHT
 	if wide then
 		local sideW = math.clamp(w * 0.4, 260, 380)
 		local boardW = math.min(h, w - sideW - GAP * 2)
@@ -637,7 +697,9 @@ function PuzzleHUD._layout(self: any)
 		place(p.header, sx, MARGIN, sideW, HEADER_HEIGHT)
 		place(p.stats, sx, MARGIN + HEADER_HEIGHT + GAP, sideW, STATS_HEIGHT)
 		local messageY = MARGIN + HEADER_HEIGHT + STATS_HEIGHT + GAP * 2
-		place(p.message, sx, messageY, sideW, h + MARGIN - CONTROLS_HEIGHT - GAP - messageY)
+		local messageSpace = h + MARGIN - CONTROLS_HEIGHT - GAP - messageY
+		place(p.message, sx, messageY, sideW, messageSpace)
+		place(p.coach, sx, messageY, sideW, math.max(messageSpace, 64))
 		place(p.controls, sx, MARGIN + h - CONTROLS_HEIGHT, sideW, CONTROLS_HEIGHT)
 	else
 		local cw = math.min(w, MAX_COLUMN_WIDTH)
@@ -648,7 +710,8 @@ function PuzzleHUD._layout(self: any)
 		place(p.stats, x, MARGIN + HEADER_HEIGHT + GAP, cw, STATS_HEIGHT)
 		place(p.controls, x, bottom - CONTROLS_HEIGHT, cw, CONTROLS_HEIGHT)
 		place(p.message, x, bottom - CONTROLS_HEIGHT - GAP - MESSAGE_HEIGHT, cw, MESSAGE_HEIGHT)
-		place(p.boardArea, x, boardY, cw, bottom - CONTROLS_HEIGHT - MESSAGE_HEIGHT - GAP * 3 - boardY)
+		place(p.coach, x, bottom - CONTROLS_HEIGHT - GAP - COACH_HEIGHT, cw, COACH_HEIGHT)
+		place(p.boardArea, x, boardY, cw, bottom - CONTROLS_HEIGHT - messageHeight - GAP * 3 - boardY)
 	end
 	if self.snapshot then
 		-- Ring thickness depends on the square size.
@@ -778,6 +841,9 @@ function PuzzleHUD._buildSquares(self: any)
 		square.Activated:Connect(function()
 			self:_onSquare(index)
 		end)
+		square.InputBegan:Connect(function(input)
+			self:_pressBegan(index, input)
+		end)
 		self.squares[index] = { button = square, tint = tint, dot = dot, ring = ring, ringStroke = ringStroke }
 	end
 end
@@ -808,6 +874,8 @@ function PuzzleHUD.render(self: any, snap: any)
 	self.snapshot = snap
 	self.receivedAt = os.clock()
 	self.pending = false
+	-- A new snapshot redraws the pieces, so a drag in progress ends here.
+	self.press = nil
 	self.board = BoardState.fromLayout(snap.layout)
 	self.playerSquare = BoardState.findPlayer(self.board)
 
@@ -823,13 +891,18 @@ function PuzzleHUD.render(self: any, snap: any)
 
 	if snap.progress and snap.progress.settings and not self.settingsTouched then
 		Sound.setSettings(snap.progress.settings)
+		if type(snap.progress.settings.drag) == "boolean" then
+			self:_setDrag(snap.progress.settings.drag)
+		end
 	end
 	self.menu:update(snap)
 	self:_renderHeader(snap)
 	self:_renderPieces(snap)
+	self.droppedOn = nil
 	self:_renderHighlights()
 	self:_renderMessage(snap)
 	self:_feedback(snap)
+	self:_trackTutorial(snap)
 	self:_renderResult(snap, previous)
 end
 
@@ -906,6 +979,7 @@ function PuzzleHUD._updateTimer(self: any)
 end
 
 function PuzzleHUD._renderPieces(self: any, snap: any)
+	self.coach:pointAt(nil) -- the pointer may sit on a piece about to be cleared
 	self.pieceLayer:ClearAllChildren()
 	self.playerFrame = nil
 	for index, piece in pairs(self.board.pieces) do
@@ -918,9 +992,12 @@ function PuzzleHUD._renderPieces(self: any, snap: any)
 
 	local move = snap.lastMove
 	if snap.event == "move" and move and self.playerFrame then
-		local target = self.playerFrame.Position
-		self.playerFrame.Position = (self:_squareRect(move.from))
-		Anim.tween(self.playerFrame, 0.18, { Position = target })
+		-- A dragged piece is already where it landed; only taps slide it over.
+		if self.droppedOn ~= move.to then
+			local target = self.playerFrame.Position
+			self.playerFrame.Position = (self:_squareRect(move.from))
+			Anim.tween(self.playerFrame, 0.18, { Position = target })
+		end
 		if move.capturedKind then
 			local ghost = self:_pieceFrame(move.to, move.capturedKind, "black")
 			ghost.ZIndex = 1
@@ -1182,10 +1259,12 @@ end
 
 function PuzzleHUD._onSquare(self: any, index: number)
 	local snap = self.snapshot
-	if not snap or self.pending or snap.status ~= "playing" then
+	if not snap or self.pending or snap.status ~= "playing" or self.dialog:isOpen() then
 		return
 	end
-	local square = self.squares[index]
+	if os.clock() - self.dragEndedAt < InputRules.TAP_SUPPRESS_SECONDS then
+		return -- the release of a drag, not a tap
+	end
 	if index == self.playerSquare then
 		self.selected = if self.selected == index then nil else index
 		local scale = self.playerFrame and self.playerFrame:FindFirstChildOfClass("UIScale")
@@ -1194,20 +1273,36 @@ function PuzzleHUD._onSquare(self: any, index: number)
 			Sound.play("select")
 		end
 		self:_renderHighlights()
+		if self.selected then
+			self:_tutorialEvent("select")
+		end
 		return
 	end
 	if self.selected and self.legal[index] then
-		self.pending = true
-		self.handlers.move(self.selected, index)
-		task.delay(3, function()
-			-- Never leave input locked if a response is lost.
-			if self.snapshot == snap then
-				self.pending = false
-			end
-		end)
+		self:_sendMove(self.selected, index)
 		return
 	end
-	Anim.flash(square.button, Theme.Danger)
+	self:_rejectSquare(index)
+end
+
+function PuzzleHUD._sendMove(self: any, from: number, to: number)
+	local snap = self.snapshot
+	self.pending = true
+	self.handlers.move(from, to)
+	task.delay(3, function()
+		-- Never leave input locked if a response is lost.
+		if self.snapshot == snap then
+			self.pending = false
+		end
+	end)
+end
+
+-- Feedback for a tap or drop on a square the piece can't reach.
+function PuzzleHUD._rejectSquare(self: any, index: number)
+	local square = self.squares[index]
+	if square then
+		Anim.flash(square.button, Theme.Danger)
+	end
 	Sound.play("invalid")
 	local playerPiece = self.playerSquare and self.board.pieces[self.playerSquare]
 	if not self.selected then
@@ -1216,6 +1311,246 @@ function PuzzleHUD._onSquare(self: any, index: number)
 		self.messageLabel.Text = string.format(ERROR_MESSAGES.illegal_move, string.lower(PIECE_NAMES[playerPiece.kind]))
 	end
 	self.messageLabel.TextColor3 = Theme.Danger
+end
+
+-- Drag-to-move --------------------------------------------------------------------
+
+local function isPointer(input: InputObject): boolean
+	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+end
+
+-- Whether `input` continues `press` (the same finger, or the mouse).
+local function continues(press: any, input: InputObject, mouseType: Enum.UserInputType): boolean
+	if press.input.UserInputType == Enum.UserInputType.Touch then
+		return input == press.input
+	end
+	return input.UserInputType == mouseType
+end
+
+function PuzzleHUD._setDrag(self: any, enabled: boolean)
+	self.dragEnabled = enabled
+	if self.menu then
+		self.menu.dragEnabled = enabled
+	end
+	if not enabled then
+		self:_cancelDrag()
+	end
+end
+
+function PuzzleHUD._pressBegan(self: any, index: number, input: InputObject)
+	local snap = self.snapshot
+	if
+		not isPointer(input)
+		or not self.dragEnabled
+		or self.press
+		or not snap
+		or snap.status ~= "playing"
+		or self.pending
+		or self.dialog:isOpen()
+		or index ~= self.playerSquare
+	then
+		return
+	end
+	self.press = { input = input, origin = Vector2.new(input.Position.X, input.Position.Y), dragging = false }
+end
+
+function PuzzleHUD._pressMoved(self: any, input: InputObject)
+	local press = self.press
+	if not press or not continues(press, input, Enum.UserInputType.MouseMovement) then
+		return
+	end
+	local point = Vector2.new(input.Position.X, input.Position.Y)
+	if not press.dragging then
+		local delta = point - press.origin
+		if not InputRules.isDrag(delta.X, delta.Y) then
+			return
+		end
+		press.dragging = true
+		if self.selected ~= self.playerSquare then
+			self.selected = self.playerSquare
+			Sound.play("select")
+			self:_renderHighlights()
+			self:_tutorialEvent("select")
+		end
+		if self.playerFrame then
+			self.playerFrame.ZIndex = 5
+		end
+	end
+	local frame = self.playerFrame
+	if frame then
+		local layer = self.pieceLayer.AbsolutePosition
+		local size = frame.AbsoluteSize
+		frame.Position = UDim2.fromOffset(point.X - layer.X - size.X / 2, point.Y - layer.Y - size.Y / 2)
+	end
+end
+
+function PuzzleHUD._pressEnded(self: any, input: InputObject)
+	local press = self.press
+	if not press or not continues(press, input, Enum.UserInputType.MouseButton1) then
+		return
+	end
+	self.press = nil
+	if not press.dragging then
+		return -- a tap; the square's Activated handles it
+	end
+	self.dragEndedAt = os.clock()
+	local layer = self.squareLayer
+	local size = layer.AbsoluteSize
+	local target = nil
+	if size.X > 0 and size.Y > 0 then
+		local relative = (Vector2.new(input.Position.X, input.Position.Y) - layer.AbsolutePosition) / size
+		target = InputRules.squareAt(self.board, relative.X, relative.Y)
+	end
+	local snap = self.snapshot
+	local playable = snap and snap.status == "playing" and not self.pending and not self.dialog:isOpen()
+	if playable and target and self.playerSquare and self.legal[target] then
+		self.droppedOn = target
+		self:_sendMove(self.playerSquare, target)
+		return
+	end
+	self:_snapBack()
+	if playable and target and target ~= self.playerSquare then
+		self:_rejectSquare(target)
+	end
+end
+
+-- Puts a dragged piece back on its square.
+function PuzzleHUD._snapBack(self: any)
+	local frame = self.playerFrame
+	if frame and self.playerSquare then
+		frame.ZIndex = 2
+		Anim.tween(frame, 0.15, { Position = (self:_squareRect(self.playerSquare)) })
+	end
+end
+
+function PuzzleHUD._cancelDrag(self: any)
+	local press = self.press
+	self.press = nil
+	if press and press.dragging then
+		self.dragEndedAt = os.clock()
+		self:_snapBack()
+	end
+end
+
+-- Confirmation -----------------------------------------------------------------------
+
+-- Runs `action` now, or once the player confirms when it would throw away an
+-- attempt that has moves in it.
+function PuzzleHUD._confirmLeave(self: any, action: () -> ())
+	local snap = self.snapshot
+	if not InputRules.needsConfirm(snap) then
+		action()
+		return
+	end
+	self:_cancelDrag()
+	self.dialog:ask({
+		title = "Leave this puzzle?",
+		body = string.format("Your %d %s on %s will be lost.", snap.moveCount, if snap.moveCount == 1 then "move" else "moves", snap.name),
+		confirm = "Leave",
+		onConfirm = action,
+	})
+end
+
+function PuzzleHUD._confirmRestart(self: any)
+	local snap = self.snapshot
+	if not InputRules.needsConfirm(snap) then
+		self.handlers.restart()
+		return
+	end
+	self:_cancelDrag()
+	self.dialog:ask({
+		title = "Restart puzzle?",
+		body = string.format("Your %d %s on this attempt will be lost.", snap.moveCount, if snap.moveCount == 1 then "move" else "moves"),
+		confirm = "Restart",
+		onConfirm = function()
+			self.handlers.restart()
+		end,
+	})
+end
+
+-- Tutorial ------------------------------------------------------------------------------
+
+-- Starts (or replays) the tutorial on its puzzle in Journey.
+function PuzzleHUD.startTutorial(self: any)
+	self.tutorialOffered = true
+	self.tutorial = { state = TutorialFlow.new(), awaitingStart = true }
+	self.menu:close()
+	self.handlers.start(TutorialFlow.PUZZLE_ID, PLAY_MODES.Journey)
+	self:_renderTutorial()
+end
+
+function PuzzleHUD._tutorialEvent(self: any, event: string)
+	local tutorial = self.tutorial
+	if not tutorial or not TutorialFlow.advance(tutorial.state, event) then
+		return
+	end
+	local finished = tutorial.state.finished
+	if finished then
+		self.tutorial = nil
+		-- An interrupted tutorial isn't saved, so it is offered again next time.
+		if finished ~= "interrupted" then
+			self.handlers.tutorial(finished)
+		end
+	end
+	self:_renderTutorial()
+end
+
+-- Feeds one snapshot to the tutorial, and starts it for new players.
+function PuzzleHUD._trackTutorial(self: any, snap: any)
+	local tutorial = self.tutorial
+	if tutorial then
+		local onPuzzle = snap.puzzleId == TutorialFlow.PUZZLE_ID and snap.mode == PLAY_MODES.Journey
+		if tutorial.awaitingStart then
+			if onPuzzle and snap.event == "start" then
+				tutorial.awaitingStart = false
+			end
+		elseif not onPuzzle then
+			self:_tutorialEvent("leave")
+		elseif snap.status == "won" then
+			self:_tutorialEvent("win")
+		elseif snap.event == "move" and snap.lastMove and snap.lastMove.capturedKind then
+			self:_tutorialEvent("capture")
+		elseif snap.event == "hint" then
+			self:_tutorialEvent("hint")
+		end
+	end
+	-- Only players who have never finished or skipped it and haven't cleared
+	-- a puzzle get it automatically, once per session, after their profile loads.
+	if not self.tutorialOffered and snap.progress and snap.saveStatus ~= "loading" then
+		self.tutorialOffered = true
+		if snap.progress.needsTutorial then
+			self:startTutorial()
+			return
+		end
+	end
+	self:_renderTutorial()
+end
+
+function PuzzleHUD._renderTutorial(self: any)
+	local tutorial = self.tutorial
+	local snap = self.snapshot
+	local step = tutorial and TutorialFlow.current(tutorial.state)
+	local showing = self.coach:isShowing()
+	local show = step ~= nil
+		and snap ~= nil
+		and not tutorial.awaitingStart
+		and snap.puzzleId == TutorialFlow.PUZZLE_ID
+		and snap.status == "playing"
+	if show then
+		self.coach:show(step, tutorial.state.step, #TutorialFlow.STEPS)
+		local target = nil
+		if step.target == "player" then
+			target = self.playerFrame
+		elseif step.target == "hint" then
+			target = self.hintButton
+		end
+		self.coach:pointAt(target)
+	else
+		self.coach:hide()
+	end
+	if showing ~= self.coach:isShowing() then
+		self:_layout()
+	end
 end
 
 -- The puzzle `offset` steps away in the catalogue, or nil when it is past the

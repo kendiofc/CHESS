@@ -8,11 +8,13 @@
 --   * Haptics are used only when HapticService reports the device supports
 --     them; otherwise they do nothing. The game never depends on them: every
 --     haptic goes with a sound and a visual change.
+--   * A sound with `maxSeconds` fades out and stops after that long.
 --   * Buttons click when pressed unless they carry the "Silent" attribute
 --     (board squares and dim overlays, which play their own sounds or none).
 
 local HapticService = game:GetService("HapticService")
 local SoundService = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local SoundConfig = require(script.Parent:WaitForChild("UI"):WaitForChild("SoundConfig"))
@@ -20,10 +22,12 @@ local SoundConfig = require(script.Parent:WaitForChild("UI"):WaitForChild("Sound
 local SoundController = {}
 
 local DEDUPE_SECONDS = 0.08
+local FADE_SECONDS = 0.25
 
 local group: SoundGroup? = nil
 local sounds: { [string]: Sound } = {}
 local lastPlayed: { [string]: number } = {}
+local playCount: { [string]: number } = {} -- tells a stale fade-out from the current play
 local settings = { sound = true, volume = 0.7, haptics = true }
 
 local HAPTICS = {
@@ -87,8 +91,33 @@ function SoundController.play(name: string)
 		return
 	end
 	lastPlayed[name] = now
+	local spec = SoundConfig[name]
+	sound.Volume = spec.volume
 	sound.TimePosition = 0
 	sound:Play()
+	local count = (playCount[name] or 0) + 1
+	playCount[name] = count
+	local maxSeconds = spec.maxSeconds
+	if maxSeconds then
+		task.delay(math.max(0, maxSeconds - FADE_SECONDS), function()
+			if playCount[name] ~= count or not sound.IsPlaying then
+				return
+			end
+			local fade = TweenService:Create(sound, TweenInfo.new(FADE_SECONDS), { Volume = 0 })
+			fade.Completed:Connect(function()
+				if playCount[name] == count then
+					sound:Stop()
+					sound.Volume = spec.volume
+				end
+			end)
+			fade:Play()
+		end)
+	end
+end
+
+-- How many times `name` has started this session (for tests in Studio).
+function SoundController.playCount(name: string): number
+	return playCount[name] or 0
 end
 
 -- The input types that can vibrate on this device right now.

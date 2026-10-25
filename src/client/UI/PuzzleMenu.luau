@@ -7,7 +7,7 @@
 --   Practice  every puzzle, any difficulty, free hints, no rewards
 --   Daily     today's puzzle, its one free hint, the streak and its shield
 --   Stats     the server's numbers for this player, and achievements
---   Settings  sound on/off, volume, haptics
+--   Settings  sound on/off, volume, haptics, drag-to-move, replay tutorial
 --
 -- It opens on join (showing a loading state until the server's first
 -- snapshot) and from the HUD's Menu button. It only draws what the server
@@ -34,6 +34,7 @@ PuzzleMenu.__index = PuzzleMenu
 export type Handlers = {
 	start: (puzzleId: string, mode: string) -> (),
 	settings: (values: { [string]: any }) -> (),
+	tutorial: () -> (),
 }
 
 local function make(className: string, props: { [string]: any }?, children: { Instance }?): any
@@ -97,6 +98,7 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 	self.snapshot = nil
 	self.newlyUnlocked = nil
 	self.receivedAt = os.clock()
+	self.dragEnabled = true -- kept in step by the HUD, which owns the setting
 
 	local gui = make("ScreenGui", {
 		Name = "EchoChessMenu",
@@ -456,6 +458,14 @@ function PuzzleMenu._renderHome(self: any)
 			self:show(view)
 		end)
 	end
+	local tutorialSub = if progress and progress.tutorialDone
+		then "Replay the guided first puzzle"
+		else "A one-minute guided first puzzle"
+	rowButton(self, #rows + 2, "TutorialButton", "How to play", tutorialSub).Activated:Connect(function()
+		if not loading then
+			self.handlers.tutorial()
+		end
+	end)
 end
 
 -- Journey and Practice -----------------------------------------------------------------
@@ -942,6 +952,16 @@ function PuzzleMenu._renderSettings(self: any)
 			end
 		end
 	end)
+	local dragRow = settingRow(self, 4, "DragSetting", "Drag to move", "Drag your piece onto a square. Tapping always works.")
+	pill(dragRow, "DragToggle", if self.dragEnabled then "On" else "Off", self.dragEnabled, true).Activated:Connect(function()
+		change({ drag = not self.dragEnabled })
+	end)
+
+	local tutorialRow = settingRow(self, 5, "TutorialSetting", "Tutorial", "Replay the guided first puzzle")
+	pill(tutorialRow, "ReplayTutorial", "Play", false, true).Activated:Connect(function()
+		self.handlers.tutorial()
+	end)
+
 	text({
 		LayoutOrder = 10,
 		Text = "Settings are saved with your progress.",

@@ -43,7 +43,7 @@ export type Streak = {
 	protectedDay: number, -- the missed day that shield covered (0 = none)
 }
 
-export type Settings = { sound: boolean, volume: number, haptics: boolean }
+export type Settings = { sound: boolean, volume: number, haptics: boolean, drag: boolean }
 
 export type Profile = {
 	version: number,
@@ -56,19 +56,21 @@ export type Profile = {
 	streak: Streak,
 	lastJourney: string?, -- last puzzle cleared in Journey (where Continue resumes)
 	settings: Settings,
+	tutorial: { done: boolean, outcome: string? }, -- "completed" or "skipped"
 	cosmetics: { owned: { [string]: boolean }, equipped: { [string]: string } },
 	applied: { string },
 }
 
 export type Op = {
 	id: string,
-	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings"
+	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings" | "tutorial"
 	puzzleId: string?,
 	mode: string?,
 	moves: number?,
 	seconds: number?,
 	day: number?,
 	settings: { [string]: any }?,
+	outcome: string?, -- tutorial ops
 }
 
 -- What one op paid. `items` lists each part (first clear, daily, achievements).
@@ -97,6 +99,7 @@ function Progression.newProfile(): Profile
 		streak = newStreak(),
 		lastJourney = nil,
 		settings = table.clone(GameConfig.DEFAULT_SETTINGS),
+		tutorial = { done = false, outcome = nil },
 		cosmetics = { owned = {}, equipped = table.clone(GameConfig.COSMETIC_SLOTS) },
 		applied = {},
 	}
@@ -118,6 +121,9 @@ function Progression.applySettings(profile: Profile, values: { [string]: any })
 	end
 	if type(values.haptics) == "boolean" then
 		profile.settings.haptics = values.haptics
+	end
+	if type(values.drag) == "boolean" then
+		profile.settings.drag = values.drag
 	end
 	if type(values.volume) == "number" and values.volume == values.volume then
 		profile.settings.volume = math.clamp(math.floor(values.volume * 20 + 0.5) / 20, 0, 1)
@@ -183,6 +189,13 @@ function Progression.normalize(data: any): Profile
 	if type(data.settings) == "table" then
 		Progression.applySettings(profile, data.settings)
 	end
+	if type(data.tutorial) == "table" and data.tutorial.done == true then
+		local outcome = data.tutorial.outcome
+		profile.tutorial = {
+			done = true,
+			outcome = if outcome == "completed" or outcome == "skipped" then outcome else nil,
+		}
+	end
 	if type(data.cosmetics) == "table" then
 		if type(data.cosmetics.owned) == "table" then
 			for id, owned in pairs(data.cosmetics.owned) do
@@ -234,6 +247,15 @@ local function rollDaily(profile: Profile, day: number)
 	if day > profile.daily.day then
 		profile.daily = { day = day, completed = false, hintUsed = false, rewarded = false }
 	end
+end
+
+-- Tutorial ----------------------------------------------------------------------
+
+-- Whether to start the tutorial automatically: only for players who have
+-- neither finished nor skipped it and haven't cleared any puzzle (so players
+-- from before the tutorial existed aren't interrupted).
+function Progression.needsTutorial(profile: Profile): boolean
+	return not profile.tutorial.done and next(profile.completed) == nil
 end
 
 -- Stars -----------------------------------------------------------------------
@@ -485,6 +507,13 @@ function Progression.apply(profile: Profile, op: Op): (boolean, Reward?)
 		profile.stats.fails += 1
 	elseif op.kind == "restart" then
 		profile.stats.restarts += 1
+	elseif op.kind == "tutorial" then
+		if op.outcome == "completed" or op.outcome == "skipped" then
+			-- A completion is kept over an earlier skip, never the other way.
+			if not (profile.tutorial.done and profile.tutorial.outcome == "completed") then
+				profile.tutorial = { done = true, outcome = op.outcome }
+			end
+		end
 	elseif op.kind == "settings" then
 		if type(op.settings) == "table" then
 			Progression.applySettings(profile, op.settings :: any)
@@ -539,6 +568,8 @@ function Progression.summary(profile: Profile, day: number): { [string]: any }
 		streak = Progression.streakView(profile, day),
 		achievements = earned,
 		settings = table.clone(profile.settings),
+		tutorialDone = profile.tutorial.done,
+		needsTutorial = Progression.needsTutorial(profile),
 		equipped = table.clone(profile.cosmetics.equipped),
 		unlockedIndex = Progression.unlockedIndex(profile),
 		unlockRequirement = GameConfig.UNLOCK_REQUIREMENT,

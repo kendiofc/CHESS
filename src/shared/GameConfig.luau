@@ -80,6 +80,7 @@ GameConfig.DEFAULT_SETTINGS = {
 	sound = true,
 	volume = 0.7,
 	haptics = true,
+	drag = true, -- drag-to-move on top of tap-to-move
 }
 
 -- Remote rate limit per player: a bucket of BURST actions refilled at
@@ -101,7 +102,8 @@ GameConfig.ACTIONS = {
 	Undo = "undo",
 	Restart = "restart",
 	Hint = "hint",
-	Settings = "settings", -- { sound: boolean?, volume: number?, haptics: boolean? }
+	Settings = "settings", -- { sound: boolean?, volume: number?, haptics: boolean?, drag: boolean? }
+	Tutorial = "tutorial", -- { outcome = "completed" | "skipped" }
 	Sync = "sync", -- client asks for the current snapshot (e.g. after it loads)
 }
 

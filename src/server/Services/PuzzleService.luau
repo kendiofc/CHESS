@@ -376,11 +376,19 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 	elseif action == ACTIONS.Settings then
 		-- Progression.applySettings keeps only valid values; nothing else is read.
 		local values = {}
-		for _, key in ipairs({ "sound", "volume", "haptics" }) do
+		for _, key in ipairs({ "sound", "volume", "haptics", "drag" }) do
 			values[key] = data[key]
 		end
 		record(player, { kind = "settings", settings = values })
 		send(player, state, "settings")
+	elseif action == ACTIONS.Tutorial then
+		local outcome = data.outcome
+		if outcome ~= "completed" and outcome ~= "skipped" then
+			send(player, state, "rejected", "bad_tutorial")
+			return
+		end
+		record(player, { kind = "tutorial", outcome = outcome })
+		send(player, state, "tutorial")
 	elseif action == ACTIONS.Sync then
 		-- The first puzzle starts when the player joins, before their client has
 		-- loaded; don't count loading time against an untouched attempt.

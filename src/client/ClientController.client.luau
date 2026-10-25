@@ -55,6 +55,9 @@ local hud = PuzzleHUD.new(playerGui, {
 		actionRemote:FireServer(ACTIONS.Start, { puzzleId = puzzleId, mode = mode })
 	end,
 	settings = sendSettings,
+	tutorial = function(outcome: string)
+		actionRemote:FireServer(ACTIONS.Tutorial, { outcome = outcome })
+	end,
 })
 
 stateRemote.OnClientEvent:Connect(function(snapshot)
