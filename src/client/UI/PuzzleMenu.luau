@@ -1,25 +1,40 @@
 --!strict
--- PuzzleMenu: the puzzle select screen. Three tabs:
---   Journey   difficulties unlock in order; locked rows say what unlocks them
+-- PuzzleMenu: the home screen and everything reached from it.
+--
+--   Home      Continue / Resume, then Journey, Daily, Practice, Stats, Settings
+--   Journey   difficulties unlock in order; rows show clears, stars and what
+--             unlocks the next difficulty
 --   Practice  every puzzle, any difficulty, free hints, no rewards
---   Daily     today's puzzle, with its one free hint
--- It only draws what the server reported (snapshot.progress) and sends start
--- requests; the server checks locks again before starting anything.
+--   Daily     today's puzzle, its one free hint, the streak and its shield
+--   Stats     the server's numbers for this player, and achievements
+--   Settings  sound on/off, volume, haptics
+--
+-- It opens on join (showing a loading state until the server's first
+-- snapshot) and from the HUD's Menu button. It only draws what the server
+-- reported (snapshot.progress) and sends requests; the server checks locks,
+-- rewards and settings again before acting on anything.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Achievements = require(Shared:WaitForChild("Achievements"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
 
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
+local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local PLAY_MODES = GameConfig.PLAY_MODES
-local TABS = { PLAY_MODES.Journey, PLAY_MODES.Practice, PLAY_MODES.Daily }
+local VIEWS = { "Home", "Journey", "Practice", "Daily", "Stats", "Settings" }
 
 local PuzzleMenu = {}
 PuzzleMenu.__index = PuzzleMenu
+
+export type Handlers = {
+	start: (puzzleId: string, mode: string) -> (),
+	settings: (values: { [string]: any }) -> (),
+}
 
 local function make(className: string, props: { [string]: any }?, children: { Instance }?): any
 	local instance = Instance.new(className)
@@ -55,13 +70,33 @@ local function text(props: { [string]: any }): TextLabel
 	return make("TextLabel", defaults)
 end
 
--- start(puzzleId, mode) is called when the player picks a puzzle.
-function PuzzleMenu.new(playerGui: Instance, start: (string, string) -> ())
+-- "★★☆" for a 0-3 rating.
+local function starText(stars: number): string
+	return string.rep("★", stars) .. string.rep("☆", 3 - stars)
+end
+PuzzleMenu.starText = starText
+
+local function dateOf(day: number): string
+	return os.date("!%b %d", day * 86400) :: string
+end
+
+local function duration(seconds: number): string
+	seconds = math.max(0, math.floor(seconds))
+	local hours, minutes = seconds // 3600, (seconds % 3600) // 60
+	if hours > 0 then
+		return string.format("%dh %02dm", hours, minutes)
+	end
+	return string.format("%dm %02ds", minutes, seconds % 60)
+end
+
+function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 	local self = setmetatable({}, PuzzleMenu) :: any
-	self.start = start
-	self.tab = PLAY_MODES.Journey
+	self.handlers = handlers
+	self.view = "Home"
 	self.progress = nil
-	self.currentId = nil
+	self.snapshot = nil
+	self.newlyUnlocked = nil
+	self.receivedAt = os.clock()
 
 	local gui = make("ScreenGui", {
 		Name = "EchoChessMenu",
@@ -76,14 +111,17 @@ function PuzzleMenu.new(playerGui: Instance, start: (string, string) -> ())
 	local dim = make("TextButton", {
 		Name = "Dim",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.35,
+		BackgroundColor3 = Theme.Background,
+		BackgroundTransparency = 0.15,
 		AutoButtonColor = false,
 		Text = "",
 		Parent = gui,
 	})
+	dim:SetAttribute("Silent", true)
 	dim.Activated:Connect(function()
-		self:close()
+		if self:_canClose() then
+			self:close()
+		end
 	end)
 	local panel = make("Frame", {
 		Name = "Panel",
@@ -95,20 +133,35 @@ function PuzzleMenu.new(playerGui: Instance, start: (string, string) -> ())
 	}, {
 		corner(16),
 		make("UIStroke", { Color = Theme.Stroke, Thickness = 1.5 }),
-		make("UISizeConstraint", { MaxSize = Vector2.new(560, 720) }),
+		make("UISizeConstraint", { MaxSize = Vector2.new(560, 760) }),
 	})
 	self.panel = panel
 	self.scale = make("UIScale", { Parent = panel })
 
-	-- Title row: wallet and close button.
-	text({
-		Text = "PUZZLES",
-		FontFace = Theme.FontHeavy,
+	-- Header: back, title, close.
+	self.backButton = make("TextButton", {
+		Name = "BackButton",
+		Position = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(44, 44),
+		BackgroundColor3 = Theme.PanelRaised,
+		FontFace = Theme.FontBold,
+		Text = "<",
+		TextColor3 = Theme.Text,
 		TextSize = 20,
+		Parent = panel,
+	}, { corner(10) })
+	self.backButton.Activated:Connect(function()
+		self:show("Home")
+	end)
+	self.title = text({
+		Name = "Title",
+		FontFace = Theme.FontHeavy,
+		TextSize = 22,
 		TextColor3 = Theme.Gold,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.fromOffset(18, 14),
-		Size = UDim2.new(1, -80, 0, 26),
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Position = UDim2.fromOffset(18, 12),
+		Size = UDim2.new(1, -130, 0, 28),
 		Parent = panel,
 	})
 	self.wallet = text({
@@ -118,14 +171,14 @@ function PuzzleMenu.new(playerGui: Instance, start: (string, string) -> ())
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Position = UDim2.fromOffset(18, 40),
-		Size = UDim2.new(1, -80, 0, 18),
+		Size = UDim2.new(1, -130, 0, 18),
 		Parent = panel,
 	})
-	local close = make("TextButton", {
+	self.closeButton = make("TextButton", {
 		Name = "CloseButton",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -12, 0, 12),
-		Size = UDim2.fromOffset(44, 40),
+		Size = UDim2.fromOffset(44, 44),
 		BackgroundColor3 = Theme.PanelRaised,
 		FontFace = Theme.FontBold,
 		Text = "X",
@@ -133,42 +186,9 @@ function PuzzleMenu.new(playerGui: Instance, start: (string, string) -> ())
 		TextSize = 18,
 		Parent = panel,
 	}, { corner(10) })
-	close.Activated:Connect(function()
+	self.closeButton.Activated:Connect(function()
 		self:close()
 	end)
-
-	-- Tabs.
-	local tabs = make("Frame", {
-		Position = UDim2.fromOffset(12, 66),
-		Size = UDim2.new(1, -24, 0, 40),
-		BackgroundTransparency = 1,
-		Parent = panel,
-	}, {
-		make("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 8),
-		}),
-	})
-	self.tabButtons = {}
-	for order, mode in ipairs(TABS) do
-		local tab = make("TextButton", {
-			Name = mode .. "Tab",
-			LayoutOrder = order,
-			Size = UDim2.new(1 / 3, -6, 1, 0),
-			BackgroundColor3 = Theme.PanelRaised,
-			FontFace = Theme.FontBold,
-			Text = mode,
-			TextColor3 = Theme.Text,
-			TextSize = 16,
-			Parent = tabs,
-		}, { corner(10) })
-		tab.Activated:Connect(function()
-			self.tab = mode
-			self:_render()
-		end)
-		self.tabButtons[mode] = tab
-	end
 
 	self.note = text({
 		Name = "Note",
@@ -176,14 +196,15 @@ function PuzzleMenu.new(playerGui: Instance, start: (string, string) -> ())
 		TextColor3 = Theme.TextMuted,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.fromOffset(18, 112),
-		Size = UDim2.new(1, -36, 0, 34),
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(18, 66),
+		Size = UDim2.new(1, -36, 0, 36),
 		Parent = panel,
 	})
 	self.list = make("ScrollingFrame", {
 		Name = "List",
-		Position = UDim2.fromOffset(12, 150),
-		Size = UDim2.new(1, -24, 1, -162),
+		Position = UDim2.fromOffset(12, 108),
+		Size = UDim2.new(1, -24, 1, -120),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 6,
@@ -192,77 +213,292 @@ function PuzzleMenu.new(playerGui: Instance, start: (string, string) -> ())
 		Parent = panel,
 	}, {
 		make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10) }),
+		make("UIPadding", { PaddingBottom = UDim.new(0, 8) }),
 	})
+
+	-- Keep the Daily countdown ticking while it is on screen.
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			local label = self.countdown
+			if self.gui.Enabled and label and label.Parent and self.snapshot and self.snapshot.nextDailyIn then
+				local left = self.snapshot.nextDailyIn - (os.clock() - self.receivedAt)
+				label.Text = if left <= 0
+					then "A new puzzle is ready. Reopen the menu to load it."
+					else "Next puzzle in " .. duration(left)
+			end
+		end
+	end)
 	return self
 end
 
-function PuzzleMenu.open(self: any, mode: string?)
-	if mode and table.find(TABS, mode) then
-		self.tab = mode
-	end
+-- Close only when there is a puzzle behind the menu to return to.
+function PuzzleMenu._canClose(self: any): boolean
+	return self.snapshot ~= nil
+end
+
+function PuzzleMenu.open(self: any, view: string?)
+	self.view = if view and table.find(VIEWS, view) then view else "Home"
+	local wasOpen = self.gui.Enabled
 	self.gui.Enabled = true
+	self.list.CanvasPosition = Vector2.zero
 	self:_render()
-	self.scale.Scale = 0.92
-	Anim.tween(self.scale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+	if not wasOpen then
+		Sound.play("open")
+		self.scale.Scale = 0.94
+		Anim.tween(self.scale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+	end
+end
+
+function PuzzleMenu.show(self: any, view: string)
+	self.view = view
+	self.list.CanvasPosition = Vector2.zero
+	self:_render()
 end
 
 function PuzzleMenu.close(self: any)
-	self.gui.Enabled = false
+	if not self.gui.Enabled or self.closing then
+		return
+	end
+	self.closing = true
+	Anim.tween(self.scale, 0.12, { Scale = 0.96 }).Completed:Connect(function()
+		self.closing = false
+		self.gui.Enabled = false
+		self.scale.Scale = 1
+	end)
 end
 
 function PuzzleMenu.isOpen(self: any): boolean
-	return self.gui.Enabled
+	return self.gui.Enabled and not self.closing
 end
 
 -- Called with every snapshot so the menu always shows current progress.
 function PuzzleMenu.update(self: any, snap: any)
+	self.snapshot = snap
+	self.receivedAt = os.clock()
 	self.progress = snap.progress
-	self.currentId = snap.puzzleId
 	self.saveStatus = snap.saveStatus
-	if self.gui.Enabled then
+	if self.gui.Enabled and not self.closing then
 		self:_render()
 	end
 end
 
-local function difficultyRow(self: any, order: number, difficulty: string, index: number)
-	local progress = self.progress or { unlockedIndex = 1, completed = {}, unlockRequirement = 4 }
-	local journey = self.tab == PLAY_MODES.Journey
-	local locked = journey and index > progress.unlockedIndex
-	local puzzles = PuzzleDefinitions.byDifficulty[difficulty]
-	-- In Journey only clears that count towards unlocks are shown.
-	local function isCleared(puzzle: any): boolean
-		local record = progress.completed[puzzle.id]
-		return record ~= nil and (not journey or record.credited)
-	end
-	local done = 0
-	for _, puzzle in ipairs(puzzles) do
-		if isCleared(puzzle) then
-			done += 1
-		end
-	end
-	local row = make("Frame", {
-		Name = difficulty,
+-- Marks a difficulty as just unlocked so the Journey list can point it out.
+function PuzzleMenu.markUnlocked(self: any, difficulty: string)
+	self.newlyUnlocked = difficulty
+end
+
+function PuzzleMenu._start(self: any, puzzleId: string, mode: string)
+	self:close()
+	self.handlers.start(puzzleId, mode)
+end
+
+-- Building blocks ------------------------------------------------------------------
+
+local function card(self: any, order: number, height: number, name: string?): Frame
+	return make("Frame", {
+		Name = name or ("Card" .. order),
 		LayoutOrder = order,
-		Size = UDim2.new(1, -8, 0, 96),
+		Size = UDim2.new(1, -8, 0, height),
 		BackgroundColor3 = Theme.PanelRaised,
-		BackgroundTransparency = if locked then 0.5 else 0,
+		Parent = self.list,
+	}, { corner(12) })
+end
+
+-- A full-width button with a title and a muted line under it.
+local function rowButton(self: any, order: number, name: string, title: string, sub: string, color: Color3?): TextButton
+	local button = make("TextButton", {
+		Name = name,
+		LayoutOrder = order,
+		Size = UDim2.new(1, -8, 0, 64),
+		BackgroundColor3 = color or Theme.PanelRaised,
+		AutoButtonColor = true,
+		Text = "",
 		Parent = self.list,
 	}, { corner(12) })
 	text({
-		Text = string.upper(difficulty),
+		Name = "Title",
+		Text = title,
+		FontFace = Theme.FontBold,
+		TextSize = 18,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(16, 10),
+		Size = UDim2.new(1, -48, 0, 22),
+		Parent = button,
+	})
+	text({
+		Name = "Sub",
+		Text = sub,
+		TextSize = 13,
+		TextColor3 = if color then Theme.Text else Theme.TextMuted,
+		TextTransparency = if color then 0.15 else 0,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Position = UDim2.fromOffset(16, 34),
+		Size = UDim2.new(1, -48, 0, 18),
+		Parent = button,
+	})
+	text({
+		Text = ">",
+		FontFace = Theme.FontBold,
+		TextSize = 18,
+		TextColor3 = Theme.TextMuted,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -14, 0.5, 0),
+		Size = UDim2.fromOffset(16, 22),
+		Parent = button,
+	})
+	return button
+end
+
+local function progressBar(parent: Instance, position: UDim2, size: UDim2, fraction: number, color: Color3)
+	local track = make("Frame", {
+		Name = "ProgressBar",
+		Position = position,
+		Size = size,
+		BackgroundColor3 = Theme.Panel,
+		BorderSizePixel = 0,
+		Parent = parent,
+	}, { make("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
+	make("Frame", {
+		Name = "Fill",
+		Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1),
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+		Parent = track,
+	}, { make("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
+end
+
+-- Home ---------------------------------------------------------------------------------
+
+function PuzzleMenu._renderHome(self: any)
+	local progress = self.progress
+	local snap = self.snapshot
+	local loading = progress == nil or self.saveStatus == "loading"
+	local title, sub, action = "Loading your progress...", "One moment.", nil
+	if not loading then
+		local resume = progress.resumeId and PuzzleDefinitions.get(progress.resumeId)
+		if snap and snap.status == "playing" and snap.moveCount > 0 then
+			title = "Resume"
+			sub = string.format("%s  ·  %s  ·  %d moves in", snap.name, snap.mode, snap.moveCount)
+			action = function()
+				self:close()
+			end
+		elseif resume then
+			title = if progress.totals.cleared == 0 then "Start Journey" else "Continue Journey"
+			sub = string.format("%s %d  ·  %s", resume.difficulty, resume.number, resume.name)
+			action = function()
+				self:_start(resume.id, PLAY_MODES.Journey)
+			end
+		else
+			title = "Journey complete"
+			sub = "Every puzzle cleared. Replay any for more stars."
+			action = function()
+				self:show("Journey")
+			end
+		end
+	end
+	local continue = rowButton(self, 1, "ContinueButton", title, sub, if loading then Theme.PanelRaised else Theme.Accent)
+	continue.Size = UDim2.new(1, -8, 0, 72)
+	continue.AutoButtonColor = not loading
+	continue.Activated:Connect(function()
+		if action then
+			action()
+		end
+	end)
+
+	local journeySub = "Five difficulties, unlocked in order"
+	local dailySub = "A new puzzle every day"
+	local statsSub = "Your clears, stars and achievements"
+	if progress then
+		local unlocked = GameConfig.DIFFICULTIES[progress.unlockedIndex] or "Beginner"
+		journeySub = string.format(
+			"%s unlocked  ·  %d/%d cleared  ·  %d★",
+			unlocked,
+			progress.totals.cleared,
+			progress.totals.puzzles,
+			progress.totals.stars
+		)
+		local streak = progress.streak
+		local streakText = if streak.current > 0 then string.format("🔥 %d-day streak", streak.current) else "No streak yet"
+		dailySub = streakText .. "  ·  " .. (if progress.daily.completed then "cleared today ✓" else "not cleared today")
+		local earned = 0
+		for _ in pairs(progress.achievements) do
+			earned += 1
+		end
+		statsSub = string.format(
+			"%d★ of %d  ·  %d/%d achievements",
+			progress.totals.stars,
+			progress.totals.maxStars,
+			earned,
+			#Achievements.list
+		)
+	end
+	local settings = Sound.getSettings()
+	local rows = {
+		{ "Journey", "Journey", journeySub },
+		{ "Daily", "Daily Puzzle", dailySub },
+		{ "Practice", "Practice", "Any puzzle, any difficulty, free hints, no rewards" },
+		{ "Stats", "Statistics", statsSub },
+		{
+			"Settings",
+			"Settings",
+			string.format(
+				"Sound %s  ·  volume %d%%",
+				if settings.sound then "on" else "off",
+				math.floor(settings.volume * 100 + 0.5)
+			),
+		},
+	}
+	for order, row in ipairs(rows) do
+		local view = row[1]
+		rowButton(self, order + 1, view .. "Button", row[2], row[3]).Activated:Connect(function()
+			self:show(view)
+		end)
+	end
+end
+
+-- Journey and Practice -----------------------------------------------------------------
+
+local function difficultyRow(self: any, order: number, difficulty: string, index: number)
+	local progress = self.progress or { unlockedIndex = 1, completed = {}, unlocks = nil }
+	local journey = self.view == PLAY_MODES.Journey
+	local locked = journey and index > progress.unlockedIndex
+	local puzzles = PuzzleDefinitions.byDifficulty[difficulty]
+	-- In Journey only clears that count towards unlocks are shown.
+	local function recordOf(puzzle: any): any
+		local record = progress.completed[puzzle.id]
+		if record and (not journey or record.credited) then
+			return record
+		end
+		return nil
+	end
+	local done, stars = 0, 0
+	for _, puzzle in ipairs(puzzles) do
+		local record = recordOf(puzzle)
+		if record then
+			done += 1
+			stars += record.stars or 0
+		end
+	end
+	local row = card(self, order, if locked then 128 else 106, difficulty)
+	row.BackgroundTransparency = if locked then 0.4 else 0
+	local isNew = journey and self.newlyUnlocked == difficulty
+	text({
+		Text = string.upper(difficulty) .. (if isNew then "  ·  NEW!" else ""),
 		FontFace = Theme.FontBold,
 		TextSize = 14,
-		TextColor3 = Theme.DifficultyColors[difficulty] or Theme.Text,
+		TextColor3 = if isNew then Theme.Gold else (Theme.DifficultyColors[difficulty] or Theme.Text),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Position = UDim2.fromOffset(12, 8),
 		Size = UDim2.new(0.5, 0, 0, 18),
 		Parent = row,
 	})
 	local previous = GameConfig.DIFFICULTIES[index - 1]
+	local unlockRow = progress.unlocks and previous and progress.unlocks[index - 1]
 	text({
-		Text = if locked and previous
-			then string.format("Locked: clear %d %s puzzles", progress.unlockRequirement, previous)
-			else string.format("%d / %d cleared", done, #puzzles),
+		Name = "Summary",
+		Text = if locked then "Locked" else string.format("%d/%d cleared  ·  %d/%d★", done, #puzzles, stars, 3 * #puzzles),
 		TextSize = 13,
 		TextColor3 = Theme.TextMuted,
 		TextXAlignment = Enum.TextXAlignment.Right,
@@ -271,9 +507,25 @@ local function difficultyRow(self: any, order: number, difficulty: string, index
 		Size = UDim2.new(0.6, 0, 0, 18),
 		Parent = row,
 	})
+	if locked and previous then
+		local need = if unlockRow then unlockRow.required else GameConfig.UNLOCK_REQUIREMENT
+		local have = if unlockRow then math.min(unlockRow.credited, need) else 0
+		text({
+			Name = "UnlockNote",
+			Text = string.format("Clear %d %s puzzles to unlock  (%d/%d)", need, previous, have, need),
+			TextSize = 13,
+			TextColor3 = Theme.Text,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Position = UDim2.fromOffset(12, 28),
+			Size = UDim2.new(1, -24, 0, 16),
+			Parent = row,
+		})
+		progressBar(row, UDim2.fromOffset(12, 48), UDim2.new(1, -24, 0, 6), have / need, Theme.DifficultyColors[previous] or Theme.Legal)
+	end
 	local grid = make("Frame", {
-		Position = UDim2.fromOffset(10, 34),
-		Size = UDim2.new(1, -20, 0, 52),
+		Position = UDim2.new(0, 10, 1, -64),
+		Size = UDim2.new(1, -20, 0, 54),
 		BackgroundTransparency = 1,
 		Parent = row,
 	}, {
@@ -284,128 +536,485 @@ local function difficultyRow(self: any, order: number, difficulty: string, index
 		}),
 	})
 	for number, puzzle in ipairs(puzzles) do
-		local cleared = isCleared(puzzle)
-		local current = puzzle.id == self.currentId
+		local record = recordOf(puzzle)
+		local current = self.snapshot and puzzle.id == self.snapshot.puzzleId
 		local cell = make("TextButton", {
 			Name = puzzle.id,
 			LayoutOrder = number,
 			Size = UDim2.new(1 / 6, -5, 1, 0),
-			BackgroundColor3 = if cleared then Theme.Legal elseif current then Theme.Accent else Theme.Panel,
+			BackgroundColor3 = if record then Theme.Legal elseif current then Theme.Accent else Theme.Panel,
 			BackgroundTransparency = if locked then 0.6 else 0,
 			AutoButtonColor = not locked,
-			FontFace = Theme.FontBold,
-			Text = tostring(number),
-			TextColor3 = if cleared then Theme.Background else Theme.Text,
-			TextTransparency = if locked then 0.6 else 0,
-			TextSize = 18,
+			Text = "",
 			Parent = grid,
 		}, { corner(10) })
+		local ink = if record then Theme.Background else Theme.Text
+		text({
+			Text = tostring(number),
+			FontFace = Theme.FontBold,
+			TextSize = 18,
+			TextColor3 = ink,
+			TextTransparency = if locked then 0.6 else 0,
+			Position = UDim2.fromOffset(0, 5),
+			Size = UDim2.new(1, 0, 0, 24),
+			Parent = cell,
+		})
+		text({
+			Name = "Stars",
+			Text = if record and record.stars and record.stars > 0 then starText(record.stars) elseif record then "✓" else "",
+			TextSize = 12,
+			TextColor3 = ink,
+			Position = UDim2.new(0, 0, 1, -21),
+			Size = UDim2.new(1, 0, 0, 16),
+			Parent = cell,
+		})
 		if current then
 			make("UIStroke", { Color = Theme.Selected, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = cell })
 		end
 		cell.Activated:Connect(function()
 			if locked then
+				Sound.play("invalid")
 				Anim.shake(row)
 				return
 			end
-			self:close()
-			self.start(puzzle.id, self.tab)
+			self:_start(puzzle.id, self.view)
 		end)
 	end
 end
 
-local function dailyCard(self: any)
-	local daily = self.progress and self.progress.daily
+-- Daily ----------------------------------------------------------------------------------
+
+function PuzzleMenu._renderDaily(self: any)
+	local progress = self.progress
+	local daily = progress and progress.daily
 	local puzzle = daily and PuzzleDefinitions.get(daily.puzzleId)
-	local card = make("Frame", {
-		Name = "DailyCard",
-		Size = UDim2.new(1, -8, 0, 170),
-		BackgroundColor3 = Theme.PanelRaised,
-		Parent = self.list,
-	}, { corner(12) })
+	local top = card(self, 1, 170, "DailyCard")
 	if not puzzle then
-		text({ Text = "Loading today's puzzle...", Size = UDim2.fromScale(1, 1), Parent = card })
+		text({ Text = "Loading today's puzzle...", Size = UDim2.fromScale(1, 1), Parent = top })
 		return
 	end
 	text({
-		Text = "TODAY'S PUZZLE",
+		Text = "TODAY'S PUZZLE  ·  " .. dateOf(daily.day),
 		FontFace = Theme.FontBold,
 		TextSize = 13,
 		TextColor3 = Theme.Gold,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Position = UDim2.fromOffset(14, 12),
 		Size = UDim2.new(1, -28, 0, 18),
-		Parent = card,
+		Parent = top,
 	})
 	text({
 		Text = puzzle.name,
 		FontFace = Theme.FontBold,
 		TextSize = 24,
 		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 		Position = UDim2.fromOffset(14, 32),
 		Size = UDim2.new(1, -28, 0, 30),
-		Parent = card,
+		Parent = top,
 	})
-	local status = if daily.completed then "Cleared today. Come back tomorrow for a new one." else "Not cleared yet."
+	local record = progress.completed[puzzle.id]
 	text({
+		Name = "Status",
 		Text = string.format(
-			"%s  ·  %s\n%s",
+			"%s  ·  %s  ·  %s%s",
 			puzzle.difficulty,
 			if daily.hintUsed then "hint used" else "1 free hint",
-			status
+			if daily.completed then "cleared today ✓" else "not cleared yet",
+			if record and record.stars and record.stars > 0 then "  ·  " .. starText(record.stars) else ""
 		),
 		TextSize = 14,
 		TextColor3 = Theme.TextMuted,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
 		TextWrapped = true,
 		Position = UDim2.fromOffset(14, 66),
-		Size = UDim2.new(1, -28, 0, 40),
-		Parent = card,
+		Size = UDim2.new(1, -28, 0, 36),
+		Parent = top,
 	})
 	local play = make("TextButton", {
 		Name = "PlayDaily",
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 14, 1, -12),
-		Size = UDim2.new(1, -28, 0, 44),
+		Size = UDim2.new(1, -28, 0, 48),
 		BackgroundColor3 = Theme.Accent,
 		FontFace = Theme.FontBold,
-		Text = if daily.completed then "Play again" else "Play",
+		Text = if daily.completed then "Play again (no reward)" else "Play",
 		TextColor3 = Theme.Text,
 		TextSize = 18,
-		Parent = card,
+		Parent = top,
 	}, { corner(12) })
 	play.Activated:Connect(function()
-		self:close()
-		self.start(puzzle.id, PLAY_MODES.Daily)
+		self:_start(puzzle.id, PLAY_MODES.Daily)
 	end)
+
+	-- Streak and shield.
+	local streak = progress.streak
+	local info = make("Frame", {
+		Name = "StreakCard",
+		LayoutOrder = 2,
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = Theme.PanelRaised,
+		Parent = self.list,
+	}, {
+		corner(12),
+		make("UIPadding", {
+			PaddingTop = UDim.new(0, 12),
+			PaddingBottom = UDim.new(0, 12),
+			PaddingLeft = UDim.new(0, 14),
+			PaddingRight = UDim.new(0, 14),
+		}),
+		make("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }),
+	})
+	local function line(order: number, name: string, value: string, size: number, color: Color3, bold: boolean?): TextLabel
+		return text({
+			Name = name,
+			LayoutOrder = order,
+			Text = value,
+			FontFace = if bold then Theme.FontBold else Theme.Font,
+			TextSize = size,
+			TextColor3 = color,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextWrapped = true,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1, 0, 0, size + 2),
+			Parent = info,
+		})
+	end
+	line(
+		1,
+		"Streak",
+		if streak.current > 0
+			then string.format("🔥 %d-day streak  (best %d)", streak.current, streak.longest)
+			else string.format("🔥 No streak right now  (best %d)", streak.longest),
+		18,
+		Theme.Text,
+		true
+	)
+	local shieldText
+	if streak.atRisk then
+		shieldText = string.format(
+			"🛡 You missed yesterday. Clear today's puzzle and your shield keeps your %d-day streak.",
+			streak.current
+		)
+	elseif streak.shieldReady then
+		shieldText = "🛡 Streak shield ready. If you miss one day, clearing the next day's puzzle keeps your streak. You get one shield every 7 days. The missed day earns no reward."
+	else
+		shieldText = string.format(
+			"🛡 Shield used%s. The next one is ready on %s.",
+			if streak.protectedDay then " to cover " .. dateOf(streak.protectedDay) else "",
+			dateOf(streak.shieldReadyDay)
+		)
+	end
+	line(2, "Shield", shieldText, 14, Theme.TextMuted)
+	local countdown = line(3, "Countdown", "", 14, Theme.Gold)
+	if self.snapshot and self.snapshot.nextDailyIn then
+		countdown.Text = "Next puzzle in " .. duration(self.snapshot.nextDailyIn - (os.clock() - self.receivedAt))
+	end
+	self.countdown = countdown
 end
 
+-- Stats ----------------------------------------------------------------------------------
+
+function PuzzleMenu._renderStats(self: any)
+	local progress = self.progress
+	if not progress then
+		text({ Text = "Loading your statistics...", Size = UDim2.new(1, 0, 0, 40), Parent = self.list })
+		return
+	end
+	local stats, totals, streak = progress.stats, progress.totals, progress.streak
+	local tiles = {
+		{ "Puzzles cleared", string.format("%d / %d", totals.cleared, totals.puzzles) },
+		{ "Stars", string.format("%d / %d", totals.stars, totals.maxStars) },
+		{ "3-star clears", tostring(totals.perfect) },
+		{ "Daily streak", string.format("%d  (best %d)", streak.current, streak.longest) },
+		{ "Dailies cleared", tostring(stats.dailies or 0) },
+		{ "Solves", tostring(stats.solves) },
+		{ "Dead ends", tostring(stats.fails) },
+		{ "Restarts", tostring(stats.restarts) },
+		{ "Hints used", tostring(stats.hints) },
+		{ "Moves played", tostring(stats.moves) },
+		{ "XP", tostring(progress.xp) },
+		{ "Coins", tostring(progress.coins) },
+	}
+	local grid = make("Frame", {
+		Name = "StatTiles",
+		LayoutOrder = 1,
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		Parent = self.list,
+	}, {
+		make("UIGridLayout", {
+			CellSize = UDim2.new(0.5, -5, 0, 58),
+			CellPadding = UDim2.fromOffset(10, 10),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+	})
+	for order, tile in ipairs(tiles) do
+		local frame = make("Frame", {
+			Name = tile[1],
+			LayoutOrder = order,
+			BackgroundColor3 = Theme.PanelRaised,
+			Parent = grid,
+		}, { corner(10) })
+		text({
+			Text = string.upper(tile[1]),
+			FontFace = Theme.FontBold,
+			TextSize = 11,
+			TextColor3 = Theme.TextMuted,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Position = UDim2.fromOffset(10, 8),
+			Size = UDim2.new(1, -20, 0, 14),
+			Parent = frame,
+		})
+		text({
+			Name = "Value",
+			Text = tile[2],
+			FontFace = Theme.FontBold,
+			TextSize = 20,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Position = UDim2.fromOffset(10, 24),
+			Size = UDim2.new(1, -20, 0, 26),
+			Parent = frame,
+		})
+	end
+
+	text({
+		LayoutOrder = 2,
+		Text = "ACHIEVEMENTS",
+		FontFace = Theme.FontHeavy,
+		TextSize = 14,
+		TextColor3 = Theme.Gold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, -8, 0, 20),
+		Parent = self.list,
+	})
+	for order, achievement in ipairs(Achievements.list) do
+		local earned = progress.achievements[achievement.id] == true
+		local row = card(self, 2 + order, 54, achievement.id)
+		row.BackgroundTransparency = if earned then 0 else 0.45
+		text({
+			Text = (if earned then "✓  " else "") .. achievement.name,
+			FontFace = Theme.FontBold,
+			TextSize = 15,
+			TextColor3 = if earned then Theme.Gold else Theme.Text,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Position = UDim2.fromOffset(12, 8),
+			Size = UDim2.new(1, -110, 0, 18),
+			Parent = row,
+		})
+		text({
+			Text = achievement.description,
+			TextSize = 13,
+			TextColor3 = Theme.TextMuted,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Position = UDim2.fromOffset(12, 28),
+			Size = UDim2.new(1, -110, 0, 16),
+			Parent = row,
+		})
+		text({
+			Text = string.format("%s%d coins", if earned then "" else "+", achievement.coins),
+			TextSize = 13,
+			TextColor3 = if earned then Theme.Legal else Theme.TextMuted,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -12, 0.5, 0),
+			Size = UDim2.fromOffset(90, 18),
+			Parent = row,
+		})
+	end
+	text({
+		LayoutOrder = 100,
+		Text = "Coins will unlock board themes, piece skins and effects in a later update. They are cosmetic only and can't be bought.",
+		TextSize = 13,
+		TextColor3 = Theme.TextMuted,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, -8, 0, 16),
+		Parent = self.list,
+	})
+end
+
+-- Settings -------------------------------------------------------------------------------
+
+local function settingRow(self: any, order: number, name: string, label: string, sub: string): Frame
+	local row = card(self, order, 72, name)
+	text({
+		Text = label,
+		FontFace = Theme.FontBold,
+		TextSize = 17,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 12),
+		Size = UDim2.new(1, -160, 0, 22),
+		Parent = row,
+	})
+	text({
+		Name = "Sub",
+		Text = sub,
+		TextSize = 13,
+		TextColor3 = Theme.TextMuted,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextWrapped = true,
+		Position = UDim2.fromOffset(14, 36),
+		Size = UDim2.new(1, -160, 0, 30),
+		Parent = row,
+	})
+	return row
+end
+
+local function pill(parent: Instance, name: string, label: string, on: boolean, enabled: boolean): TextButton
+	return make("TextButton", {
+		Name = name,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.fromOffset(84, 44),
+		BackgroundColor3 = if on then Theme.Legal else Theme.Panel,
+		BackgroundTransparency = if enabled then 0 else 0.5,
+		AutoButtonColor = enabled,
+		FontFace = Theme.FontBold,
+		Text = label,
+		TextColor3 = if on then Theme.Background else Theme.Text,
+		TextTransparency = if enabled then 0 else 0.5,
+		TextSize = 16,
+		Parent = parent,
+	}, { corner(22) })
+end
+
+function PuzzleMenu._renderSettings(self: any)
+	local settings = Sound.getSettings()
+	local function change(values: { [string]: any })
+		Sound.setSettings(values)
+		self.handlers.settings(values)
+		self:_render()
+	end
+
+	local soundRow = settingRow(self, 1, "SoundSetting", "Sound effects", "Moves, captures, wins and buttons")
+	pill(soundRow, "SoundToggle", if settings.sound then "On" else "Off", settings.sound, true).Activated:Connect(function()
+		change({ sound = not settings.sound })
+		if not settings.sound then
+			Sound.play("click") -- just turned on: let the player hear it
+		end
+	end)
+
+	local percent = math.floor(settings.volume * 100 + 0.5)
+	local volumeRow = settingRow(self, 2, "VolumeSetting", "Volume", string.format("%d%%", percent))
+	local function stepper(name: string, label: string, x: number, delta: number)
+		make("TextButton", {
+			Name = name,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, x, 0.5, 0),
+			Size = UDim2.fromOffset(52, 44),
+			BackgroundColor3 = Theme.Panel,
+			FontFace = Theme.FontBold,
+			Text = label,
+			TextColor3 = Theme.Text,
+			TextSize = 22,
+			Parent = volumeRow,
+		}, { corner(10) }).Activated:Connect(function()
+			local volume = math.clamp(math.floor((settings.volume + delta) * 10 + 0.5) / 10, 0, 1)
+			change({ volume = volume })
+		end)
+	end
+	stepper("VolumeDown", "-", -72, -0.1)
+	stepper("VolumeUp", "+", -12, 0.1)
+	progressBar(volumeRow, UDim2.new(0, 60, 0, 41), UDim2.new(1, -196, 0, 6), settings.volume, Theme.Accent)
+
+	local supported = Sound.hapticsSupported()
+	local hapticRow = settingRow(
+		self,
+		3,
+		"HapticsSetting",
+		"Vibration",
+		if supported then "Short buzz on captures, wins and invalid moves" else "Not supported on this device"
+	)
+	local on = supported and settings.haptics
+	pill(hapticRow, "HapticsToggle", if on then "On" elseif supported then "Off" else "N/A", on, supported).Activated:Connect(function()
+		if supported then
+			change({ haptics = not settings.haptics })
+			if not settings.haptics then
+				Sound.haptic("medium")
+			end
+		end
+	end)
+	text({
+		LayoutOrder = 10,
+		Text = "Settings are saved with your progress.",
+		TextSize = 13,
+		TextColor3 = Theme.TextMuted,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, -8, 0, 18),
+		Parent = self.list,
+	})
+end
+
+-- Rendering --------------------------------------------------------------------------------
+
 local NOTES = {
-	Journey = "Clear %d puzzles of a difficulty to unlock the next. First clears earn XP and coins.",
-	Practice = "Play any puzzle at any difficulty. Hints are free. Practice earns no rewards and doesn't unlock difficulties.",
-	Daily = "A new puzzle every day (UTC). You get one free hint per day, and the reward once per day.",
+	Home = "",
+	Journey = "Clear %d puzzles of a difficulty to unlock the next. First clears earn XP and coins. Clear within par for 3 stars.",
+	Practice = "Play any puzzle at any difficulty. Hints are free. Practice earns no rewards or stars and doesn't unlock difficulties.",
+	Daily = "A new puzzle every day at 00:00 UTC. One free hint and one reward per day.",
+	Stats = "Your numbers, as saved on the server.",
+	Settings = "",
+}
+
+local TITLES = {
+	Home = "ECHO CHESS",
+	Journey = "JOURNEY",
+	Practice = "PRACTICE",
+	Daily = "DAILY PUZZLE",
+	Stats = "STATISTICS",
+	Settings = "SETTINGS",
 }
 
 function PuzzleMenu._render(self: any)
-	for mode, tab in pairs(self.tabButtons) do
-		local active = mode == self.tab
-		tab.BackgroundColor3 = if active then Theme.Accent else Theme.PanelRaised
-	end
+	local home = self.view == "Home"
+	self.backButton.Visible = not home
+	self.title.Text = TITLES[self.view]
+	self.title.Position = UDim2.fromOffset(if home then 18 else 66, 12)
+	self.wallet.Position = UDim2.fromOffset(if home then 18 else 66, 40)
+	self.closeButton.Visible = self:_canClose()
+
 	local progress = self.progress
-	local wallet = if progress then string.format("%d XP  ·  %d coins", progress.xp, progress.coins) else "Loading progress..."
+	local wallet = "Loading progress..."
+	if progress then
+		wallet = string.format("%d XP  ·  %d coins", progress.xp, progress.coins)
+		if progress.streak and progress.streak.current > 0 then
+			wallet ..= string.format("  ·  🔥 %d", progress.streak.current)
+		end
+	end
 	if self.saveStatus == "offline" then
 		wallet ..= "  ·  not saving"
 	end
 	self.wallet.Text = wallet
-	self.note.Text = string.format(NOTES[self.tab], if progress then progress.unlockRequirement else 4)
+
+	local note = string.format(NOTES[self.view], if progress then progress.unlockRequirement else GameConfig.UNLOCK_REQUIREMENT)
+	self.note.Text = note
+	self.note.Visible = note ~= ""
+	local top = if note ~= "" then 108 else 70
+	self.list.Position = UDim2.fromOffset(12, top)
+	self.list.Size = UDim2.new(1, -24, 1, -(top + 12))
+
+	self.countdown = nil
 	for _, child in ipairs(self.list:GetChildren()) do
-		if not child:IsA("UIListLayout") then
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
 			child:Destroy()
 		end
 	end
-	if self.tab == PLAY_MODES.Daily then
-		dailyCard(self)
+	if home then
+		self:_renderHome()
+	elseif self.view == "Daily" then
+		self:_renderDaily()
+	elseif self.view == "Stats" then
+		self:_renderStats()
+	elseif self.view == "Settings" then
+		self:_renderSettings()
 	else
 		for index, difficulty in ipairs(GameConfig.DIFFICULTIES) do
 			difficultyRow(self, index, difficulty, index)

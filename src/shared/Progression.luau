@@ -12,8 +12,12 @@
 --     applied, so an op that reaches the store twice only counts once;
 --   * rewards are keyed ("journey:<puzzle id>", the daily day number), so a
 --     puzzle's reward is paid at most once ever and the daily reward at most
---     once per day, whichever server applies it.
+--     once per day, whichever server applies it. Achievements pay under
+--     "ach:<id>" the same way;
+--   * the Daily streak only moves forward: an op for a day at or before the
+--     last counted day changes nothing.
 
+local Achievements = require(script.Parent.Achievements)
 local GameConfig = require(script.Parent.GameConfig)
 local PuzzleDefinitions = require(script.Parent.PuzzleDefinitions)
 
@@ -28,46 +32,96 @@ export type Completion = {
 	bestSeconds: number,
 	solves: number,
 	credited: boolean, -- solved in Journey or Daily: counts towards unlocks
+	stars: number, -- best star rating from a Journey or Daily clear (0 = none)
 }
+
+export type Streak = {
+	current: number, -- consecutive Daily clears ending on lastDay
+	longest: number,
+	lastDay: number, -- last UTC day a Daily was cleared (0 = never)
+	shieldUsedOn: number, -- day a shield last covered a missed day
+	protectedDay: number, -- the missed day that shield covered (0 = none)
+}
+
+export type Settings = { sound: boolean, volume: number, haptics: boolean }
 
 export type Profile = {
 	version: number,
 	completed: { [string]: Completion },
-	stats: { solves: number, fails: number, restarts: number, hints: number, moves: number },
+	stats: { solves: number, fails: number, restarts: number, hints: number, moves: number, dailies: number },
 	xp: number,
 	coins: number,
 	rewards: { [string]: boolean },
 	daily: { day: number, completed: boolean, hintUsed: boolean, rewarded: boolean },
+	streak: Streak,
+	lastJourney: string?, -- last puzzle cleared in Journey (where Continue resumes)
+	settings: Settings,
+	cosmetics: { owned: { [string]: boolean }, equipped: { [string]: string } },
 	applied: { string },
 }
 
 export type Op = {
 	id: string,
-	kind: string, -- "win" | "fail" | "restart" | "hint"
+	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings"
 	puzzleId: string?,
 	mode: string?,
 	moves: number?,
 	seconds: number?,
 	day: number?,
+	settings: { [string]: any }?,
 }
 
-export type Reward = { xp: number, coins: number, reason: string }
+-- What one op paid. `items` lists each part (first clear, daily, achievements).
+export type Reward = {
+	xp: number,
+	coins: number,
+	reason: string,
+	items: { { xp: number, coins: number, reason: string, achievement: string? } },
+}
+
+local NO_SHIELD = -NONE -- shieldUsedOn before any shield was used
+
+local function newStreak(): Streak
+	return { current = 0, longest = 0, lastDay = 0, shieldUsedOn = NO_SHIELD, protectedDay = 0 }
+end
 
 function Progression.newProfile(): Profile
 	return {
 		version = Progression.VERSION,
 		completed = {},
-		stats = { solves = 0, fails = 0, restarts = 0, hints = 0, moves = 0 },
+		stats = { solves = 0, fails = 0, restarts = 0, hints = 0, moves = 0, dailies = 0 },
 		xp = 0,
 		coins = 0,
 		rewards = {},
 		daily = { day = 0, completed = false, hintUsed = false, rewarded = false },
+		streak = newStreak(),
+		lastJourney = nil,
+		settings = table.clone(GameConfig.DEFAULT_SETTINGS),
+		cosmetics = { owned = {}, equipped = table.clone(GameConfig.COSMETIC_SLOTS) },
 		applied = {},
 	}
 end
 
 local function number(value: any, default: number): number
 	return if type(value) == "number" and value == value then value else default
+end
+
+local function wholeNumber(value: any, default: number, low: number, high: number): number
+	return math.clamp(math.floor(number(value, default)), low, high)
+end
+
+-- Copies the valid fields of `values` into the profile's settings; anything
+-- else (wrong types, out of range, unknown keys) is ignored.
+function Progression.applySettings(profile: Profile, values: { [string]: any })
+	if type(values.sound) == "boolean" then
+		profile.settings.sound = values.sound
+	end
+	if type(values.haptics) == "boolean" then
+		profile.settings.haptics = values.haptics
+	end
+	if type(values.volume) == "number" and values.volume == values.volume then
+		profile.settings.volume = math.clamp(math.floor(values.volume * 20 + 0.5) / 20, 0, 1)
+	end
 end
 
 -- Turns whatever was stored (nil, an older or damaged record) into a valid
@@ -85,6 +139,7 @@ function Progression.normalize(data: any): Profile
 					bestSeconds = number(record.bestSeconds, NONE),
 					solves = number(record.solves, 1),
 					credited = record.credited == true,
+					stars = if record.credited == true then wholeNumber(record.stars, 0, 0, 3) else 0,
 				}
 			end
 		end
@@ -110,6 +165,41 @@ function Progression.normalize(data: any): Profile
 			hintUsed = data.daily.hintUsed == true,
 			rewarded = data.daily.rewarded == true,
 		}
+	end
+	if type(data.streak) == "table" then
+		local streak = data.streak
+		profile.streak = {
+			current = wholeNumber(streak.current, 0, 0, NONE),
+			longest = wholeNumber(streak.longest, 0, 0, NONE),
+			lastDay = wholeNumber(streak.lastDay, 0, 0, NONE),
+			shieldUsedOn = wholeNumber(streak.shieldUsedOn, NO_SHIELD, NO_SHIELD, NONE),
+			protectedDay = wholeNumber(streak.protectedDay, 0, 0, NONE),
+		}
+		profile.streak.longest = math.max(profile.streak.longest, profile.streak.current)
+	end
+	if type(data.lastJourney) == "string" and PuzzleDefinitions.get(data.lastJourney) then
+		profile.lastJourney = data.lastJourney
+	end
+	if type(data.settings) == "table" then
+		Progression.applySettings(profile, data.settings)
+	end
+	if type(data.cosmetics) == "table" then
+		if type(data.cosmetics.owned) == "table" then
+			for id, owned in pairs(data.cosmetics.owned) do
+				if type(id) == "string" and owned == true then
+					profile.cosmetics.owned[id] = true
+				end
+			end
+		end
+		if type(data.cosmetics.equipped) == "table" then
+			for slot, default in pairs(GameConfig.COSMETIC_SLOTS) do
+				local id = data.cosmetics.equipped[slot]
+				-- Only defaults or owned items can be equipped.
+				if type(id) == "string" and (id == default or profile.cosmetics.owned[id]) then
+					profile.cosmetics.equipped[slot] = id
+				end
+			end
+		end
 	end
 	if type(data.applied) == "table" then
 		for _, id in ipairs(data.applied) do
@@ -146,6 +236,77 @@ local function rollDaily(profile: Profile, day: number)
 	end
 end
 
+-- Stars -----------------------------------------------------------------------
+
+-- Most moves that still earn 2 stars on `puzzle`.
+function Progression.twoStarMoves(puzzle: PuzzleDefinitions.Puzzle): number
+	local override = (puzzle :: any).twoStarMoves
+	if type(override) == "number" then
+		return override
+	end
+	return puzzle.par + (GameConfig.STAR_SLACK[puzzle.difficulty] or 2)
+end
+
+-- Star rating for clearing `puzzle` in `moves` moves. Hints never count.
+function Progression.starsFor(puzzle: PuzzleDefinitions.Puzzle, moves: number): number
+	if moves <= puzzle.par then
+		return 3
+	elseif moves <= Progression.twoStarMoves(puzzle) then
+		return 2
+	end
+	return 1
+end
+
+-- Daily streak ------------------------------------------------------------------
+
+local function shieldReady(streak: Streak, day: number): boolean
+	return day - streak.shieldUsedOn >= GameConfig.STREAK_SHIELD_DAYS
+end
+
+-- Counts a Daily clear on `day`. Returns whether a shield was used.
+local function advanceStreak(profile: Profile, day: number): boolean
+	local streak = profile.streak
+	if day <= streak.lastDay then
+		return false -- already counted, or a late op for an earlier day
+	end
+	local gap = day - streak.lastDay
+	local shielded = false
+	if streak.lastDay > 0 and gap == 1 then
+		streak.current += 1
+	elseif streak.lastDay > 0 and gap == 2 and streak.current > 0 and shieldReady(streak, day) then
+		-- One missed day, covered by the shield. The missed day pays nothing.
+		streak.current += 1
+		streak.shieldUsedOn = day
+		streak.protectedDay = day - 1
+		shielded = true
+	else
+		streak.current = 1
+	end
+	streak.lastDay = day
+	streak.longest = math.max(streak.longest, streak.current)
+	return shielded
+end
+
+-- The streak as it stands on `day`, for display. `current` is 0 once the
+-- streak can no longer be continued; `atRisk` means yesterday was missed and
+-- clearing today will use the shield.
+function Progression.streakView(profile: Profile, day: number): { [string]: any }
+	local streak = profile.streak
+	local gap = day - streak.lastDay
+	local alive = streak.lastDay > 0 and streak.current > 0 and (gap <= 1 or (gap == 2 and shieldReady(streak, day)))
+	local readyDay = streak.shieldUsedOn + GameConfig.STREAK_SHIELD_DAYS
+	return {
+		current = if alive then streak.current else 0,
+		longest = streak.longest,
+		clearedToday = streak.lastDay == day,
+		atRisk = alive and gap == 2,
+		shieldReady = shieldReady(streak, day),
+		shieldReadyDay = if readyDay > day then readyDay else day,
+		shieldUsedOn = if streak.shieldUsedOn > 0 then streak.shieldUsedOn else nil,
+		protectedDay = if streak.protectedDay > 0 then streak.protectedDay else nil,
+	}
+end
+
 -- Unlocks ---------------------------------------------------------------------
 
 -- Highest difficulty index the player may play in Journey (1 = Beginner).
@@ -165,6 +326,47 @@ function Progression.unlockedIndex(profile: Profile): number
 		unlocked = index + 1
 	end
 	return unlocked
+end
+
+-- Credited clears per difficulty and what each needs to unlock the next.
+function Progression.unlockProgress(profile: Profile): { { [string]: any } }
+	local unlocked = Progression.unlockedIndex(profile)
+	local rows = {}
+	for index, difficulty in ipairs(GameConfig.DIFFICULTIES) do
+		local credited = 0
+		for _, puzzle in ipairs(PuzzleDefinitions.byDifficulty[difficulty]) do
+			local record = profile.completed[puzzle.id]
+			if record and record.credited then
+				credited += 1
+			end
+		end
+		table.insert(rows, {
+			difficulty = difficulty,
+			credited = credited,
+			total = #PuzzleDefinitions.byDifficulty[difficulty],
+			required = GameConfig.UNLOCK_REQUIREMENT,
+			unlocked = index <= unlocked,
+		})
+	end
+	return rows
+end
+
+-- The Journey puzzle Continue should open: the first puzzle after the last
+-- Journey clear (in catalogue order, wrapping round) that is unlocked and not
+-- yet cleared in Journey or Daily. nil once every unlocked puzzle is cleared.
+function Progression.nextJourneyPuzzle(profile: Profile): PuzzleDefinitions.Puzzle?
+	local list = PuzzleDefinitions.list
+	local unlocked = Progression.unlockedIndex(profile)
+	local last = profile.lastJourney and PuzzleDefinitions.get(profile.lastJourney)
+	local start = if last then (table.find(list, last) or 0) else 0
+	for step = 1, #list do
+		local puzzle = list[(start + step - 1) % #list + 1]
+		local record = profile.completed[puzzle.id]
+		if puzzle.difficultyIndex <= unlocked and not (record and record.credited) then
+			return puzzle
+		end
+	end
+	return nil
 end
 
 -- Whether `puzzle` may be started in `mode` today. Returns ok, error code.
@@ -213,24 +415,29 @@ local function applyWin(profile: Profile, op: Op): Reward?
 	end
 	local moves, seconds = number(op.moves, NONE), number(op.seconds, NONE)
 	local credited = op.mode == GameConfig.PLAY_MODES.Journey or op.mode == GameConfig.PLAY_MODES.Daily
+	-- Stars come from the server's own move count, and only credited clears keep them.
+	local stars = if credited then Progression.starsFor(puzzle, moves) else 0
 	local record = profile.completed[puzzle.id]
 	if record then
 		record.bestMoves = math.min(record.bestMoves, moves)
 		record.bestSeconds = math.min(record.bestSeconds, seconds)
 		record.solves += 1
 		record.credited = record.credited or credited
+		record.stars = math.max(record.stars, stars)
 	else
-		profile.completed[puzzle.id] = { bestMoves = moves, bestSeconds = seconds, solves = 1, credited = credited }
+		profile.completed[puzzle.id] =
+			{ bestMoves = moves, bestSeconds = seconds, solves = 1, credited = credited, stars = stars }
 	end
 	profile.stats.solves += 1
 	profile.stats.moves += math.min(moves, 10000)
 
-	local reward: Reward? = nil
+	local items = {}
 	if op.mode == GameConfig.PLAY_MODES.Journey then
+		profile.lastJourney = puzzle.id
 		local key = "journey:" .. puzzle.id
 		if not profile.rewards[key] then
 			profile.rewards[key] = true
-			reward = { xp = puzzle.reward.xp, coins = puzzle.reward.coins, reason = "first clear" }
+			table.insert(items, { xp = puzzle.reward.xp, coins = puzzle.reward.coins, reason = "first clear" })
 		end
 	elseif op.mode == GameConfig.PLAY_MODES.Daily and op.day then
 		rollDaily(profile, op.day)
@@ -238,14 +445,31 @@ local function applyWin(profile: Profile, op: Op): Reward?
 			profile.daily.completed = true
 			if not profile.daily.rewarded then
 				profile.daily.rewarded = true
-				reward = { xp = GameConfig.DAILY_REWARD.xp, coins = GameConfig.DAILY_REWARD.coins, reason = "daily puzzle" }
+				profile.stats.dailies += 1
+				advanceStreak(profile, op.day)
+				table.insert(items, { xp = GameConfig.DAILY_REWARD.xp, coins = GameConfig.DAILY_REWARD.coins, reason = "daily puzzle" })
 			end
 		end
 	end
-	if reward then
-		profile.xp += reward.xp
-		profile.coins += reward.coins
+	if credited then
+		for _, achievement in ipairs(Achievements.list) do
+			local key = Achievements.rewardKey(achievement.id)
+			if not profile.rewards[key] and achievement.check(profile) then
+				profile.rewards[key] = true
+				table.insert(items, { xp = 0, coins = achievement.coins, reason = achievement.name, achievement = achievement.id })
+			end
+		end
 	end
+	if #items == 0 then
+		return nil
+	end
+	local reward: Reward = { xp = 0, coins = 0, reason = items[1].reason, items = items }
+	for _, item in ipairs(items) do
+		reward.xp += item.xp
+		reward.coins += item.coins
+	end
+	profile.xp += reward.xp
+	profile.coins += reward.coins
 	return reward
 end
 
@@ -261,6 +485,10 @@ function Progression.apply(profile: Profile, op: Op): (boolean, Reward?)
 		profile.stats.fails += 1
 	elseif op.kind == "restart" then
 		profile.stats.restarts += 1
+	elseif op.kind == "settings" then
+		if type(op.settings) == "table" then
+			Progression.applySettings(profile, op.settings :: any)
+		end
 	elseif op.kind == "hint" then
 		profile.stats.hints += 1
 		if op.mode == GameConfig.PLAY_MODES.Daily and op.day then
@@ -276,11 +504,42 @@ end
 -- What the client needs to draw menus and progress. Never trusted back.
 function Progression.summary(profile: Profile, day: number): { [string]: any }
 	local completed = {}
+	local cleared = 0
 	for id, record in pairs(profile.completed) do
-		completed[id] = { bestMoves = record.bestMoves, credited = record.credited }
+		completed[id] = {
+			bestMoves = record.bestMoves,
+			bestSeconds = if record.bestSeconds < NONE then record.bestSeconds else nil,
+			credited = record.credited,
+			stars = record.stars,
+			solves = record.solves,
+		}
+		if record.credited then
+			cleared += 1
+		end
 	end
+	local earned = {}
+	for _, achievement in ipairs(Achievements.list) do
+		if profile.rewards[Achievements.rewardKey(achievement.id)] then
+			earned[achievement.id] = true
+		end
+	end
+	local stars, perfect = Achievements.starTotals(profile)
+	local resume = Progression.nextJourneyPuzzle(profile)
 	local today = profile.daily.day == day
 	return {
+		resumeId = resume and resume.id,
+		unlocks = Progression.unlockProgress(profile),
+		totals = {
+			cleared = cleared,
+			puzzles = #PuzzleDefinitions.list,
+			stars = stars,
+			maxStars = 3 * #PuzzleDefinitions.list,
+			perfect = perfect,
+		},
+		streak = Progression.streakView(profile, day),
+		achievements = earned,
+		settings = table.clone(profile.settings),
+		equipped = table.clone(profile.cosmetics.equipped),
 		unlockedIndex = Progression.unlockedIndex(profile),
 		unlockRequirement = GameConfig.UNLOCK_REQUIREMENT,
 		completed = completed,

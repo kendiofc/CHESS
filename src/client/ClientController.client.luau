@@ -21,6 +21,23 @@ local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 -- the hidden avatar from moving.)
 GuiService.TouchControlsEnabled = false
 
+-- Settings changes are batched so tapping volume +/- quickly sends one request.
+local pendingSettings: { [string]: any }? = nil
+local function sendSettings(values: { [string]: any })
+	local first = pendingSettings == nil
+	pendingSettings = pendingSettings or {}
+	for key, value in pairs(values) do
+		(pendingSettings :: any)[key] = value
+	end
+	if first then
+		task.delay(0.6, function()
+			local batch = pendingSettings
+			pendingSettings = nil
+			actionRemote:FireServer(ACTIONS.Settings, batch)
+		end)
+	end
+end
+
 local hud = PuzzleHUD.new(playerGui, {
 	move = function(from: number, to: number)
 		actionRemote:FireServer(ACTIONS.Move, { from = from, to = to })
@@ -37,6 +54,7 @@ local hud = PuzzleHUD.new(playerGui, {
 	start = function(puzzleId: string, mode: string)
 		actionRemote:FireServer(ACTIONS.Start, { puzzleId = puzzleId, mode = mode })
 	end,
+	settings = sendSettings,
 })
 
 stateRemote.OnClientEvent:Connect(function(snapshot)

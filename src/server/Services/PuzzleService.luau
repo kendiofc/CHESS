@@ -38,7 +38,10 @@ type PlayerState = {
 	finishedAt: number?,
 	hintsUsed: number,
 	hint: string?,
+	hintSquare: number?,
 	reward: any,
+	result: any, -- the win summary for the result card (stars, best, unlock, streak)
+	userStarted: boolean, -- the player picked a puzzle themselves
 	tokens: number,
 	refilledAt: number,
 	throttled: boolean,
@@ -188,6 +191,9 @@ local function snapshot(player: Player, state: PlayerState, event: string, err: 
 		mode = state.mode,
 		number = puzzle.number,
 		hint = if event == "hint" then state.hint else nil,
+		hintSquare = if event == "hint" then state.hintSquare else nil,
+		result = if event == "move" then state.result else nil,
+		nextDailyIn = (today() + 1) * 86400 - os.time(),
 		hintsUsed = state.hintsUsed,
 		hintsLeft = (function()
 			local left = Progression.hintsLeft(profileOf(player), state.mode, state.hintsUsed, state.day)
@@ -203,7 +209,7 @@ local function send(player: Player, state: PlayerState, event: string, err: stri
 	stateRemote:FireClient(player, snapshot(player, state, event, err))
 end
 
-local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle, mode: string, day: number)
+local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle, mode: string, day: number, byPlayer: boolean?)
 	local now = os.clock()
 	local previous = states[player]
 	local state: PlayerState = {
@@ -214,7 +220,10 @@ local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle, mod
 		finishedAt = nil,
 		hintsUsed = 0,
 		hint = nil,
+		hintSquare = nil,
 		reward = nil,
+		result = nil,
+		userStarted = byPlayer == true or (previous ~= nil and previous.userStarted),
 		tokens = if previous then previous.tokens else GameConfig.RATE_LIMIT.BURST,
 		refilledAt = if previous then previous.refilledAt else now,
 		throttled = false,
@@ -264,7 +273,7 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			send(player, state, "rejected", why)
 			return
 		end
-		startPuzzle(player, puzzle, mode, day)
+		startPuzzle(player, puzzle, mode, day, true)
 	elseif action == ACTIONS.Move then
 		local session = state.session
 		local wasPlaying = session.status == "playing"
@@ -274,6 +283,7 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			return
 		end
 		state.reward = nil
+		state.result = nil
 		if session.status == "won" then
 			state.finishedAt = os.clock()
 			-- Re-check the win from the server's own move log before recording it.
@@ -283,6 +293,14 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			end
 			local valid, why = PuzzleValidator.validateSolution(session.puzzle.layout, log)
 			if valid then
+				-- Compare the profile before and after so the card shows what changed.
+				local profile = profileOf(player)
+				local puzzleId = session.puzzle.id
+				local before = profile.completed[puzzleId]
+				local bestBefore = if before then before.bestMoves else nil
+				local starsBefore = if before then before.stars else 0
+				local unlockedBefore = Progression.unlockedIndex(profile)
+				local shieldBefore = profile.streak.shieldUsedOn
 				state.reward = record(player, {
 					kind = "win",
 					puzzleId = session.puzzle.id,
@@ -291,6 +309,20 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 					moves = session.moveCount,
 					seconds = math.floor(elapsed(state) * 10) / 10,
 				})
+				profile = profileOf(player)
+				local unlockedAfter = Progression.unlockedIndex(profile)
+				local credited = state.mode ~= PLAY_MODES.Practice
+				state.result = {
+					stars = Progression.starsFor(session.puzzle, session.moveCount),
+					starsSaved = credited,
+					bestStars = if profile.completed[puzzleId] then profile.completed[puzzleId].stars else 0,
+					newStars = credited and Progression.starsFor(session.puzzle, session.moveCount) > starsBefore,
+					previousBest = bestBefore,
+					newBest = bestBefore ~= nil and session.moveCount < bestBefore,
+					twoStarMoves = Progression.twoStarMoves(session.puzzle),
+					unlocked = if unlockedAfter > unlockedBefore then GameConfig.DIFFICULTIES[unlockedAfter] else nil,
+					shieldUsed = profile.streak.shieldUsedOn ~= shieldBefore,
+				}
 				requestSave(player)
 			else
 				warn("[PuzzleService] win by " .. player.Name .. " failed the replay check: " .. tostring(why))
@@ -329,7 +361,7 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 		end
 		if session.status == "failed" then
 			-- Pointing out a dead end is free: it costs no hint.
-			state.hint = PuzzleHints.forLevel(session.puzzle, session.board, session.status, 1)
+			state.hint, state.hintSquare = PuzzleHints.forLevel(session.puzzle, session.board, session.status, 1)
 			send(player, state, "hint")
 			return
 		end
@@ -338,9 +370,17 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			return
 		end
 		state.hintsUsed += 1
-		state.hint = PuzzleHints.forLevel(session.puzzle, session.board, session.status, state.hintsUsed)
+		state.hint, state.hintSquare = PuzzleHints.forLevel(session.puzzle, session.board, session.status, state.hintsUsed)
 		record(player, { kind = "hint", puzzleId = session.puzzle.id, mode = state.mode, day = state.day })
 		send(player, state, "hint")
+	elseif action == ACTIONS.Settings then
+		-- Progression.applySettings keeps only valid values; nothing else is read.
+		local values = {}
+		for _, key in ipairs({ "sound", "volume", "haptics" }) do
+			values[key] = data[key]
+		end
+		record(player, { kind = "settings", settings = values })
+		send(player, state, "settings")
 	elseif action == ACTIONS.Sync then
 		-- The first puzzle starts when the player joins, before their client has
 		-- loaded; don't count loading time against an untouched attempt.
@@ -360,7 +400,15 @@ function PuzzleService.Start()
 		startPuzzle(player, PuzzleDefinitions.list[1], PLAY_MODES.Journey, today())
 		profiles:load(player.UserId)
 		local state = states[player]
-		if state and player.Parent then
+		if not (state and player.Parent) then
+			return
+		end
+		-- Returning players resume their Journey instead of Beginner 1, unless
+		-- they already picked something while the profile was loading.
+		local resume = Progression.nextJourneyPuzzle(profileOf(player))
+		if not state.userStarted and state.session.moveCount == 0 and resume and resume ~= state.session.puzzle then
+			startPuzzle(player, resume, PLAY_MODES.Journey, today())
+		else
 			send(player, state, "sync")
 		end
 	end

@@ -14,6 +14,7 @@ local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
 
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
+local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local PieceArt = require(script.Parent:WaitForChild("PieceArt"))
 local PuzzleMenu = require(script.Parent:WaitForChild("PuzzleMenu"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
@@ -24,6 +25,7 @@ export type Handlers = {
 	restart: () -> (),
 	hint: () -> (),
 	start: (puzzleId: string, mode: string) -> (),
+	settings: (values: { [string]: any }) -> (),
 }
 
 local PLAY_MODES = GameConfig.PLAY_MODES
@@ -46,7 +48,7 @@ local ERROR_MESSAGES = {
 
 local MARGIN = 12
 local GAP = 10
-local HEADER_HEIGHT = 62
+local HEADER_HEIGHT = 70
 local STATS_HEIGHT = 62
 local MESSAGE_HEIGHT = 52
 local CONTROLS_HEIGHT = 54
@@ -147,10 +149,24 @@ function PuzzleHUD.new(playerGui: Instance, handlers: Handlers)
 	self.pending = false
 	self.squares = {}
 	self.receivedAt = os.clock()
+	Sound.init()
 	self:_build(playerGui)
-	self.menu = PuzzleMenu.new(playerGui, function(puzzleId: string, mode: string)
-		self.handlers.start(puzzleId, mode)
-	end)
+	self.menu = PuzzleMenu.new(playerGui, {
+		start = function(puzzleId: string, mode: string)
+			self.handlers.start(puzzleId, mode)
+		end,
+		settings = function(values: { [string]: any })
+			-- Once the player changes a setting, this session keeps their choice.
+			self.settingsTouched = true
+			self.handlers.settings(values)
+		end,
+	})
+	for _, name in ipairs({ "EchoChessHUD", "EchoChessResult", "EchoChessMenu" }) do
+		Sound.watchButtons(playerGui:WaitForChild(name))
+	end
+	-- The home screen is the first thing a player sees; it shows a loading
+	-- state until the server's first snapshot arrives.
+	self.menu:open("Home")
 
 	RunService.Heartbeat:Connect(function()
 		self:_updateTimer()
@@ -240,28 +256,28 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	local switcher = make("Frame", {
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, 0, 0, 26),
-		Size = UDim2.fromOffset(150, 36),
+		Size = UDim2.fromOffset(150, 44),
 		BackgroundTransparency = 1,
 		Parent = header,
 	})
 	local prev = button("<", false)
 	prev.Name = "PrevPuzzle"
-	prev.Size = UDim2.fromOffset(44, 36)
+	prev.Size = UDim2.fromOffset(44, 44)
 	prev.Parent = switcher
 	local nextButton = button(">", false)
 	nextButton.Name = "NextPuzzle"
 	nextButton.AnchorPoint = Vector2.new(1, 0)
 	nextButton.Position = UDim2.fromScale(1, 0)
-	nextButton.Size = UDim2.fromOffset(44, 36)
+	nextButton.Size = UDim2.fromOffset(44, 44)
 	nextButton.Parent = switcher
-	local menuButton = button("Puzzles", false)
+	local menuButton = button("Menu", false)
 	menuButton.Name = "MenuButton"
 	menuButton.Position = UDim2.fromOffset(48, 0)
 	menuButton.Size = UDim2.new(1, -96, 1, 0)
-	menuButton.TextSize = 13
+	menuButton.TextSize = 14
 	menuButton.Parent = switcher
 	menuButton.Activated:Connect(function()
-		self.menu:open(self.snapshot and self.snapshot.mode)
+		self.menu:open("Home")
 	end)
 	self.prevButton, self.nextButton = prev, nextButton
 	prev.Activated:Connect(function()
@@ -451,50 +467,76 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 		ZIndex = 10,
 		Parent = gui,
 	})
+	dim:SetAttribute("Silent", true)
+	-- The card grows with its lines (AutomaticSize) and is scaled down to fit
+	-- short screens (see _fitResultCard).
 	local card = make("Frame", {
 		Name = "Card",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(0.9, 0, 0, 290),
+		Size = UDim2.new(0.9, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = Theme.Panel,
 		ZIndex = 11,
 		Parent = dim,
 	}, {
 		corner(18),
-		make("UISizeConstraint", { MaxSize = Vector2.new(400, 290) }),
+		make("UISizeConstraint", { MaxSize = Vector2.new(420, math.huge) }),
+		make("UIPadding", {
+			PaddingTop = UDim.new(0, 22),
+			PaddingBottom = UDim.new(0, 20),
+			PaddingLeft = UDim.new(0, 20),
+			PaddingRight = UDim.new(0, 20),
+		}),
+		make("UIListLayout", {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			Padding = UDim.new(0, 8),
+		}),
 	})
 	local cardStroke = stroke(Theme.Gold, 2)
 	cardStroke.Parent = card
 	local cardScale = make("UIScale", { Parent = card })
-	local title = label({
-		FontFace = Theme.FontHeavy,
-		TextSize = 30,
-		Position = UDim2.fromOffset(20, 26),
-		Size = UDim2.new(1, -40, 0, 38),
-		ZIndex = 12,
-		Parent = card,
-	})
+	local function line(order: number, name: string, props: { [string]: any }): TextLabel
+		local defaults: { [string]: any } = {
+			Name = name,
+			LayoutOrder = order,
+			TextWrapped = true,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1, 0, 0, 0),
+			ZIndex = 12,
+			Parent = card,
+		}
+		for key, value in pairs(props) do
+			defaults[key] = value
+		end
+		return label(defaults)
+	end
+	local title = line(1, "Title", { FontFace = Theme.FontHeavy, TextSize = 30 })
 	local titleGradient = make("UIGradient", { Parent = title })
-	local subtitle = label({
-		TextSize = 15,
-		TextColor3 = Theme.TextMuted,
-		Position = UDim2.fromOffset(24, 68),
-		Size = UDim2.new(1, -48, 0, 40),
+	local stars = line(2, "Stars", { FontFace = Theme.FontBold, TextSize = 38, TextColor3 = Theme.Gold })
+	local subtitle = line(3, "Subtitle", { TextSize = 15, TextColor3 = Theme.TextMuted })
+	local statsLine = line(4, "Stats", { FontFace = Theme.FontBold, TextSize = 18 })
+	local detail = line(5, "Detail", { TextSize = 13, TextColor3 = Theme.TextMuted })
+	local rewardLine = line(6, "Reward", { FontFace = Theme.FontBold, TextSize = 15, TextColor3 = Theme.Legal })
+	local banner = make("TextLabel", {
+		Name = "UnlockBanner",
+		LayoutOrder = 7,
+		Size = UDim2.new(1, 0, 0, 40),
+		BackgroundColor3 = Theme.Gold,
+		FontFace = Theme.FontHeavy,
+		TextSize = 17,
+		TextColor3 = Theme.Background,
+		Visible = false,
 		ZIndex = 12,
 		Parent = card,
-	})
-	local statsLine = label({
-		FontFace = Theme.FontBold,
-		TextSize = 18,
-		Position = UDim2.fromOffset(20, 114),
-		Size = UDim2.new(1, -40, 0, 88),
-		ZIndex = 12,
-		Parent = card,
-	})
+	}, { corner(12) })
+	local bannerScale = make("UIScale", { Parent = banner })
+	local progressLine = line(8, "Progress", { TextSize = 14, TextColor3 = Theme.Text })
 	local buttons = make("Frame", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -22),
-		Size = UDim2.new(1, -40, 0, 52),
+		Name = "Buttons",
+		LayoutOrder = 9,
+		Size = UDim2.new(1, 0, 0, 52),
 		BackgroundTransparency = 1,
 		ZIndex = 12,
 		Parent = card,
@@ -525,12 +567,8 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 			return
 		end
 		if snap.status == "won" then
-			local nextPuzzle = self:_neighbour(1)
-			if nextPuzzle then
-				self.handlers.start(nextPuzzle.id, snap.mode)
-			else
-				self.menu:open(snap.mode)
-			end
+			local _, action = self:_nextAfterWin()
+			action()
 		elseif snap.status == "failed" then
 			self.pending = true
 			self.handlers.undo()
@@ -541,17 +579,34 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 	end)
 
 	self.result = {
+		gui = gui,
 		dim = dim,
 		card = card,
 		stroke = cardStroke,
 		scale = cardScale,
+		fit = 1,
 		title = title,
 		gradient = titleGradient,
+		stars = stars,
 		subtitle = subtitle,
 		stats = statsLine,
+		detail = detail,
+		reward = rewardLine,
+		banner = banner,
+		bannerScale = bannerScale,
+		progress = progressLine,
 		primary = primary,
 		secondary = secondary,
 	}
+end
+
+-- Scale the card down when its natural height doesn't fit the screen
+-- (phones in landscape).
+function PuzzleHUD._fitResultCard(self: any)
+	local r = self.result
+	local natural = r.card.AbsoluteSize.Y / math.max(r.scale.Scale, 0.01)
+	local available = r.gui.AbsoluteSize.Y - 24
+	r.fit = if natural > 0 and available > 0 then math.min(1, available / natural) else 1
 end
 
 -- Layout -----------------------------------------------------------------------
@@ -719,6 +774,7 @@ function PuzzleHUD._buildSquares(self: any)
 				Parent = square,
 			})
 		end
+		square:SetAttribute("Silent", true) -- squares play their own sounds
 		square.Activated:Connect(function()
 			self:_onSquare(index)
 		end)
@@ -765,12 +821,50 @@ function PuzzleHUD.render(self: any, snap: any)
 		self.selected = nil
 	end
 
+	if snap.progress and snap.progress.settings and not self.settingsTouched then
+		Sound.setSettings(snap.progress.settings)
+	end
 	self.menu:update(snap)
 	self:_renderHeader(snap)
 	self:_renderPieces(snap)
 	self:_renderHighlights()
 	self:_renderMessage(snap)
+	self:_feedback(snap)
 	self:_renderResult(snap, previous)
+end
+
+-- Sound, haptics and the hint highlight for one snapshot. Each snapshot
+-- arrives once, so each event plays once.
+function PuzzleHUD._feedback(self: any, snap: any)
+	if snap.error then
+		Sound.play("invalid")
+		Sound.haptic("light")
+		return
+	end
+	if snap.event == "hint" then
+		Sound.play("hint")
+		local square = snap.hintSquare and self.squares[snap.hintSquare]
+		if square then
+			Anim.flash(square.button, Theme.Selected, 0.7)
+			task.delay(0.75, function()
+				if square.button.Parent then
+					Anim.flash(square.button, Theme.Selected, 0.7)
+				end
+			end)
+		end
+	elseif snap.event == "move" then
+		if snap.status == "failed" then
+			Sound.play("fail")
+			Sound.haptic("medium")
+		elseif snap.lastMove and snap.lastMove.capturedKind then
+			Sound.play("capture")
+			Sound.haptic("light")
+		else
+			Sound.play("move")
+		end
+	elseif snap.event == "undo" then
+		Sound.play("move")
+	end
 end
 
 function PuzzleHUD._renderHeader(self: any, snap: any)
@@ -916,6 +1010,88 @@ function PuzzleHUD._renderMessage(self: any, snap: any)
 	self.messageLabel.TextColor3 = color
 end
 
+-- The win card's lines about stars.
+local function starDetail(snap: any, result: any): string
+	local parts = {}
+	if result.stars == 3 then
+		table.insert(parts, "Cleared at par: top rating.")
+	elseif result.stars == 2 then
+		table.insert(parts, string.format("Clear in %d moves for 3 stars.", snap.par))
+	else
+		table.insert(parts, string.format("%d moves or fewer for 2 stars, %d for 3.", result.twoStarMoves or snap.par, snap.par))
+	end
+	if result.previousBest then
+		table.insert(parts, string.format("Best before: %d moves.", result.previousBest))
+	end
+	if not result.starsSaved then
+		table.insert(parts, "Practice stars aren't saved.")
+	elseif result.newStars and result.bestStars and result.bestStars > 0 then
+		table.insert(parts, "New star record saved.")
+	end
+	return table.concat(parts, " ")
+end
+
+local function rewardText(snap: any): string
+	local reward = snap.reward
+	if reward then
+		local lines = {}
+		local xp, coins = 0, 0
+		for _, item in ipairs(reward.items or { reward }) do
+			if item.achievement then
+				table.insert(lines, string.format("Achievement: %s  +%d coins", item.reason, item.coins))
+			else
+				xp += item.xp
+				coins += item.coins
+			end
+		end
+		if xp > 0 or coins > 0 then
+			table.insert(lines, 1, string.format("+%d XP   +%d coins", xp, coins))
+		end
+		return table.concat(lines, "\n")
+	end
+	if snap.mode == PLAY_MODES.Practice then
+		return "Practice: no rewards"
+	elseif snap.mode == PLAY_MODES.Daily then
+		return "Today's reward was already collected."
+	end
+	return "Reward already collected. Replays can still earn stars."
+end
+
+-- Where the player stands after a win: unlock progress in Journey, the
+-- streak in Daily.
+local function progressText(snap: any, result: any): string
+	local progress = snap.progress
+	if not progress then
+		return ""
+	end
+	if snap.mode == PLAY_MODES.Daily then
+		local streak = progress.streak
+		local text = string.format("🔥 %d-day Daily streak", streak.current)
+		if result.shieldUsed then
+			text ..= "\n🛡 Your streak shield covered the day you missed."
+		end
+		return text
+	elseif snap.mode == PLAY_MODES.Journey and progress.unlocks then
+		local index = table.find(GameConfig.DIFFICULTIES, snap.difficulty)
+		local here = index and progress.unlocks[index]
+		local nextRow = index and progress.unlocks[index + 1]
+		if result.unlocked then
+			return result.unlocked .. " puzzles are now open in Journey."
+		elseif here and nextRow and not nextRow.unlocked then
+			return string.format(
+				"%s: %d/%d clears to unlock %s",
+				snap.difficulty,
+				math.min(here.credited, here.required),
+				here.required,
+				nextRow.difficulty
+			)
+		elseif here then
+			return string.format("%s: %d/%d cleared", snap.difficulty, here.credited, here.total)
+		end
+	end
+	return ""
+end
+
 function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 	local r = self.result
 	if snap.status == "playing" then
@@ -924,6 +1100,8 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 	end
 	local wasShowing = r.dim.Visible and previous and previous.status == snap.status
 	r.dim.Visible = true
+	local result = snap.result
+	local unlocked = nil
 	if snap.status == "won" then
 		r.title.Text = "PUZZLE CLEARED"
 		r.title.TextColor3 = Color3.new(1, 1, 1)
@@ -934,32 +1112,65 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 			ColorSequenceKeypoint.new(1, Theme.GoldDeep),
 		})
 		r.stroke.Color = Theme.Gold
-		r.subtitle.Text = snap.name .. " solved."
-		local parNote = if snap.moveCount <= snap.par then "  (par!)" else string.format("  (par %d)", snap.par)
-		local rewardLine = if snap.reward
-			then string.format("\n+%d XP   +%d coins", snap.reward.xp, snap.reward.coins)
-			elseif snap.mode == PLAY_MODES.Practice then "\nPractice: no rewards"
-			else ""
-		r.stats.Text = string.format("Moves  %d%s\nTime  %s%s", snap.moveCount, parNote, formatTime(snap.elapsed), rewardLine)
-		r.primary.Text = if self:_neighbour(1) then "Next puzzle" else "Puzzles"
+		r.subtitle.Text = snap.name .. " solved." .. (if result and result.newBest then "  New best!" else "")
+		r.stats.Text = string.format("Moves %d (par %d)    Time %s", snap.moveCount, snap.par, formatTime(snap.elapsed))
+		r.stars.Visible = result ~= nil
+		r.detail.Visible = result ~= nil
+		if result then
+			r.stars.Text = PuzzleMenu.starText(result.stars)
+			r.detail.Text = starDetail(snap, result)
+			unlocked = result.unlocked
+		end
+		r.reward.Visible = true
+		r.reward.Text = rewardText(snap)
+		r.reward.TextColor3 = if snap.reward then Theme.Legal else Theme.TextMuted
+		local progressLine = if result then progressText(snap, result) else ""
+		r.progress.Text = progressLine
+		r.progress.Visible = progressLine ~= ""
+		r.primary.Text = (self:_nextAfterWin())
 		r.secondary.Text = "Play again"
 	else
 		r.title.Text = "NO WAY THROUGH"
 		r.title.TextColor3 = Theme.Danger
 		r.gradient.Enabled = false
 		r.stroke.Color = Theme.Danger
+		r.stars.Visible = false
 		r.subtitle.Text = "The pieces left can't all be captured from here."
-		r.stats.Text = string.format("Moves  %d\nCaptured  %d / %d", snap.moveCount, snap.targetsTotal - snap.targetsLeft, snap.targetsTotal)
+		r.stats.Text = string.format("Moves %d    Captured %d / %d", snap.moveCount, snap.targetsTotal - snap.targetsLeft, snap.targetsTotal)
+		r.detail.Visible = true
+		r.detail.Text = "Undo your last capture and try another, or tap Hint for a free explanation."
+		r.reward.Visible = false
+		r.progress.Visible = false
 		r.primary.Text = "Undo move"
 		r.secondary.Text = "Restart"
+	end
+	r.banner.Visible = unlocked ~= nil
+	if unlocked then
+		r.banner.Text = string.upper(unlocked) .. " UNLOCKED!"
+		r.banner.BackgroundColor3 = Theme.DifficultyColors[unlocked] or Theme.Gold
+		self.menu:markUnlocked(unlocked)
 	end
 	if not wasShowing then
 		r.dim.BackgroundTransparency = 1
 		Anim.tween(r.dim, 0.25, { BackgroundTransparency = 0.4 })
 		r.scale.Scale = 0.85
-		Anim.tween(r.scale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+		task.defer(function()
+			self:_fitResultCard()
+			r.scale.Scale = r.fit * 0.85
+			Anim.tween(r.scale, 0.35, { Scale = r.fit }, Enum.EasingStyle.Back)
+		end)
 		if snap.status == "won" then
 			Anim.burst(r.card, Theme.Gold, 18)
+			Sound.play("win")
+			Sound.haptic("heavy")
+			if unlocked then
+				task.delay(0.9, function()
+					Sound.play("unlock")
+					Sound.haptic("medium")
+					Anim.burst(r.card, Theme.DifficultyColors[unlocked] or Theme.Gold, 24)
+					Anim.pulse(r.bannerScale, 1.18, 0.45)
+				end)
+			end
 		end
 	end
 end
@@ -977,6 +1188,7 @@ function PuzzleHUD._onSquare(self: any, index: number)
 		local scale = self.playerFrame and self.playerFrame:FindFirstChildOfClass("UIScale")
 		if scale and self.selected then
 			Anim.pulse(scale, 1.12, 0.25)
+			Sound.play("select")
 		end
 		self:_renderHighlights()
 		return
@@ -993,6 +1205,7 @@ function PuzzleHUD._onSquare(self: any, index: number)
 		return
 	end
 	Anim.flash(square.button, Theme.Danger)
+	Sound.play("invalid")
 	local playerPiece = self.playerSquare and self.board.pieces[self.playerSquare]
 	if not self.selected then
 		self.messageLabel.Text = "Tap your white piece first."
@@ -1032,10 +1245,41 @@ function PuzzleHUD._switchPuzzle(self: any, offset: number)
 	if target then
 		self.handlers.start(target.id, snap.mode)
 	elseif offset > 0 and snap.mode == PLAY_MODES.Journey then
-		self.messageLabel.Text = "The next difficulty is locked. Open Puzzles to see what unlocks it."
+		self.messageLabel.Text = "The next difficulty is locked. Open Menu > Journey to see what unlocks it."
 		self.messageLabel.TextColor3 = Theme.TextMuted
 	else
 		self.menu:open(snap.mode)
+	end
+end
+
+-- What the win card's main button does: Journey goes to the next unsolved
+-- puzzle (the server's resume pick), Practice to the next in the catalogue,
+-- Daily back to the Daily page.
+function PuzzleHUD._nextAfterWin(self: any): (string, () -> ())
+	local snap = self.snapshot
+	if snap.mode == PLAY_MODES.Journey then
+		local nextId = snap.progress and snap.progress.resumeId
+		if nextId then
+			return "Next puzzle", function()
+				self.handlers.start(nextId, PLAY_MODES.Journey)
+			end
+		end
+		return "Menu", function()
+			self.menu:open("Journey")
+		end
+	elseif snap.mode == PLAY_MODES.Practice then
+		local nextPuzzle = self:_neighbour(1)
+		if nextPuzzle then
+			return "Next puzzle", function()
+				self.handlers.start(nextPuzzle.id, PLAY_MODES.Practice)
+			end
+		end
+		return "Menu", function()
+			self.menu:open("Practice")
+		end
+	end
+	return "Menu", function()
+		self.menu:open("Daily")
 	end
 end
 

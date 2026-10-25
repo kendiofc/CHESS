@@ -984,6 +984,341 @@ test("hints: a live hint is a capture some solution makes next", function()
 	end
 end)
 
+-- Phase 4: stars, achievements, streaks, resume, settings -------------------------------
+
+local Achievements = require(Shared.Achievements)
+
+local function winIn(puzzleId: string, mode: string, moves: number, day: number?): any
+	return { id = opId(), kind = "win", puzzleId = puzzleId, mode = mode, moves = moves, seconds = 30, day = day }
+end
+
+local function clearAll(profile: any, difficulty: string, mode: string)
+	for _, puzzle in ipairs(PuzzleDefinitions.byDifficulty[difficulty]) do
+		Progression.apply(profile, winIn(puzzle.id, mode, puzzle.par))
+	end
+end
+
+test("stars: 3 within par, 2 within the difficulty's slack, 1 beyond", function()
+	for _, puzzle in ipairs(PuzzleDefinitions.list) do
+		local slack = GameConfig.STAR_SLACK[puzzle.difficulty]
+		assert(slack and slack >= 1, "slack for " .. puzzle.difficulty)
+		eq(Progression.starsFor(puzzle, puzzle.par), 3, puzzle.id)
+		eq(Progression.starsFor(puzzle, puzzle.par + 1), 2, puzzle.id)
+		eq(Progression.starsFor(puzzle, puzzle.par + slack), 2, puzzle.id)
+		eq(Progression.starsFor(puzzle, puzzle.par + slack + 1), 1, puzzle.id)
+		eq(Progression.starsFor(puzzle, puzzle.par + slack + 1), Progression.starsFor(puzzle, puzzle.par + slack + 1), "deterministic")
+	end
+	local custom = table.clone(PuzzleDefinitions.list[1]) :: any
+	custom.twoStarMoves = custom.par + 10
+	eq(Progression.starsFor(custom, custom.par + 10), 2, "per-puzzle override")
+	eq(Progression.starsFor(custom, custom.par + 11), 1)
+end)
+
+test("stars: best rating is kept, saved only from Journey and Daily, and replays pay nothing", function()
+	local profile = Progression.newProfile()
+	local puzzle = PuzzleDefinitions.byDifficulty.Beginner[2]
+	Progression.apply(profile, winIn(puzzle.id, MODES.Practice, puzzle.par))
+	eq(profile.completed[puzzle.id].stars, 0, "practice saves no stars")
+	local _, first = Progression.apply(profile, winIn(puzzle.id, MODES.Journey, puzzle.par + 50))
+	eq(profile.completed[puzzle.id].stars, 1)
+	eq(first.coins, puzzle.reward.coins)
+	local _, better = Progression.apply(profile, winIn(puzzle.id, MODES.Journey, puzzle.par))
+	eq(profile.completed[puzzle.id].stars, 3, "improved")
+	eq(better, nil, "a better replay pays nothing")
+	Progression.apply(profile, winIn(puzzle.id, MODES.Journey, puzzle.par + 50))
+	eq(profile.completed[puzzle.id].stars, 3, "a worse replay keeps the best")
+	eq(profile.coins, puzzle.reward.coins)
+end)
+
+test("stars: hints never lower the rating", function()
+	local profile = Progression.newProfile()
+	local puzzle = PuzzleDefinitions.byDifficulty.Beginner[3]
+	for _ = 1, 5 do
+		Progression.apply(profile, { id = opId(), kind = "hint", puzzleId = puzzle.id, mode = MODES.Journey })
+	end
+	Progression.apply(profile, winIn(puzzle.id, MODES.Journey, puzzle.par))
+	eq(profile.completed[puzzle.id].stars, 3)
+	eq(profile.stats.hints, 5)
+end)
+
+test("achievements: paid once, never from Practice, never twice for the same op", function()
+	local profile = Progression.newProfile()
+	clearAll(profile, "Beginner", MODES.Practice)
+	eq(profile.rewards[Achievements.rewardKey("beginner_clear")], nil, "practice clears don't count")
+	eq(profile.coins, 0)
+	local beginners = PuzzleDefinitions.byDifficulty.Beginner
+	for i = 1, #beginners - 1 do
+		Progression.apply(profile, winIn(beginners[i].id, MODES.Journey, beginners[i].par))
+	end
+	local last = winIn(beginners[#beginners].id, MODES.Journey, beginners[#beginners].par)
+	local _, reward = Progression.apply(profile, last)
+	local paid = 0
+	for _, item in ipairs(reward.items) do
+		if item.achievement == "beginner_clear" then
+			paid += item.coins
+		end
+	end
+	eq(paid, Achievements.byId.beginner_clear.coins)
+	eq(reward.coins, beginners[#beginners].reward.coins + paid, "items add up")
+	local coins = profile.coins
+	Progression.apply(profile, last)
+	clearAll(profile, "Beginner", MODES.Journey)
+	eq(profile.coins, coins, "replays and repeated ops pay nothing more")
+	local expected = 0
+	for _, puzzle in ipairs(beginners) do
+		expected += puzzle.reward.coins
+	end
+	eq(profile.coins, expected + paid)
+end)
+
+test("achievements: two servers paying the same achievement store it once", function()
+	local store = FakeStore.new()
+	local a = makeStore(store)
+	local b = makeStore(store)
+	a:load(40)
+	b:load(40)
+	local beginners = PuzzleDefinitions.byDifficulty.Beginner
+	for _, profiles in ipairs({ a, b }) do
+		for _, puzzle in ipairs(beginners) do
+			profiles:record(40, winIn(puzzle.id, MODES.Journey, puzzle.par))
+		end
+	end
+	assert(a:save(40))
+	assert(b:save(40))
+	local expected = Achievements.byId.beginner_clear.coins
+	for _, puzzle in ipairs(beginners) do
+		expected += puzzle.reward.coins
+	end
+	eq(store.data.player_40.coins, expected)
+	eq(store.data.player_40.stats.solves, 12)
+end)
+
+test("every achievement can be reached and has coins", function()
+	local profile = Progression.newProfile()
+	for _, difficulty in ipairs(GameConfig.DIFFICULTIES) do
+		clearAll(profile, difficulty, MODES.Journey)
+	end
+	local day = 30000
+	for i = 0, 9 do
+		Progression.apply(profile, winIn(Progression.dailyPuzzle(day + i).id, MODES.Daily, 99, day + i))
+	end
+	for _, achievement in ipairs(Achievements.list) do
+		assert(achievement.coins > 0, achievement.id)
+		assert(profile.rewards[Achievements.rewardKey(achievement.id)], "not reached: " .. achievement.id)
+	end
+end)
+
+local function daily(profile: any, day: number): any
+	local _, reward = Progression.apply(profile, winIn(Progression.dailyPuzzle(day).id, MODES.Daily, 30, day))
+	return reward
+end
+
+test("streak: consecutive days count, replays and late ops do not", function()
+	local profile = Progression.newProfile()
+	local day = 20400
+	eq(Progression.streakView(profile, day).current, 0)
+	daily(profile, day)
+	daily(profile, day + 1)
+	eq(profile.streak.current, 2)
+	eq(daily(profile, day + 1), nil, "same-day replay pays nothing")
+	eq(profile.streak.current, 2, "same-day replay doesn't count")
+	daily(profile, day) -- a late op for an earlier day
+	eq(profile.streak.current, 2)
+	eq(profile.stats.dailies, 2)
+	local op = winIn(Progression.dailyPuzzle(day + 2).id, MODES.Daily, 30, day + 2)
+	Progression.apply(profile, op)
+	Progression.apply(profile, op)
+	eq(profile.streak.current, 3, "a doubled op counts once")
+	eq(profile.streak.longest, 3)
+end)
+
+test("streak: the shield covers one missed day once per rolling 7 days", function()
+	local profile = Progression.newProfile()
+	local day = 20500
+	daily(profile, day)
+	daily(profile, day + 1)
+	local view = Progression.streakView(profile, day + 3)
+	eq(view.current, 2, "yesterday missed, streak still alive")
+	eq(view.atRisk, true)
+	eq(view.shieldReady, true)
+	-- Miss day+2, clear day+3: the shield is used.
+	local reward = daily(profile, day + 3)
+	eq(reward.items[1].reason, "daily puzzle", "only today's reward")
+	eq(profile.streak.current, 3)
+	eq(profile.streak.shieldUsedOn, day + 3)
+	eq(profile.streak.protectedDay, day + 2)
+	eq(profile.daily.day, day + 3)
+	eq(profile.stats.dailies, 3, "the missed day is not counted as cleared")
+	eq(profile.xp, 3 * GameConfig.DAILY_REWARD.xp, "the missed day paid nothing")
+	-- A second miss inside the same 7 days breaks the streak.
+	eq(Progression.streakView(profile, day + 5).shieldReady, false)
+	eq(Progression.streakView(profile, day + 5).current, 0, "no shield: broken")
+	daily(profile, day + 5)
+	eq(profile.streak.current, 1, "reset")
+	eq(profile.streak.longest, 3)
+	eq(profile.streak.shieldUsedOn, day + 3, "no second shield")
+	-- Seven days after the shield was used, a new one is ready.
+	for d = day + 6, day + 9 do
+		daily(profile, d)
+	end
+	eq(Progression.streakView(profile, day + 9).shieldReady, false, "day+9 is 6 days after")
+	eq(Progression.streakView(profile, day + 10).shieldReady, true, "day+10 is 7 days after")
+	daily(profile, day + 11) -- missed day+10
+	eq(profile.streak.current, 6, "second shield, a week later")
+	eq(profile.streak.shieldUsedOn, day + 11)
+end)
+
+test("streak: two missed days always reset, and a fresh start has nothing to shield", function()
+	local profile = Progression.newProfile()
+	local day = 20600
+	daily(profile, day)
+	daily(profile, day + 1)
+	eq(Progression.streakView(profile, day + 4).current, 0)
+	daily(profile, day + 4)
+	eq(profile.streak.current, 1)
+	eq(profile.streak.shieldUsedOn < 0, true, "the shield was not spent on a lost streak")
+	local fresh = Progression.newProfile()
+	daily(fresh, day + 2)
+	eq(fresh.streak.current, 1)
+	eq(fresh.streak.shieldUsedOn < 0, true)
+end)
+
+test("streak: practice and journey clears of the daily puzzle don't count", function()
+	local profile = Progression.newProfile()
+	local day = 20700
+	local puzzle = Progression.dailyPuzzle(day)
+	Progression.apply(profile, winIn(puzzle.id, MODES.Practice, 30, day))
+	Progression.apply(profile, winIn(puzzle.id, MODES.Journey, 30, day))
+	eq(profile.streak.current, 0)
+	eq(profile.stats.dailies, 0)
+	-- A Daily op naming another puzzle is ignored.
+	Progression.apply(profile, winIn(PuzzleDefinitions.list[1].id, MODES.Daily, 30, day))
+	eq(profile.streak.current, 0)
+end)
+
+test("resume: Continue opens the next unsolved unlocked Journey puzzle", function()
+	local profile = Progression.newProfile()
+	local list = PuzzleDefinitions.list
+	eq(Progression.nextJourneyPuzzle(profile).id, list[1].id, "new player")
+	Progression.apply(profile, winIn(list[1].id, MODES.Journey, 3))
+	Progression.apply(profile, winIn(list[2].id, MODES.Journey, 4))
+	eq(Progression.nextJourneyPuzzle(profile).id, list[3].id)
+	-- Skipping ahead resumes after the latest clear, then wraps to what was skipped.
+	Progression.apply(profile, winIn(list[5].id, MODES.Journey, 6))
+	eq(Progression.nextJourneyPuzzle(profile).id, list[6].id)
+	Progression.apply(profile, winIn(list[6].id, MODES.Journey, 6))
+	eq(Progression.unlockedIndex(profile), 2, "4 clears unlock Easy")
+	eq(Progression.nextJourneyPuzzle(profile).id, list[7].id, "on into Easy")
+	-- Practice clears neither move Continue nor count as done.
+	Progression.apply(profile, winIn(list[7].id, MODES.Practice, 6))
+	eq(Progression.nextJourneyPuzzle(profile).id, list[7].id)
+	-- Locked difficulties are never offered.
+	local fresh = Progression.newProfile()
+	for _, puzzle in ipairs(PuzzleDefinitions.byDifficulty.Beginner) do
+		if puzzle.number <= 3 then
+			Progression.apply(fresh, winIn(puzzle.id, MODES.Journey, 9))
+		end
+	end
+	fresh.lastJourney = list[3].id
+	eq(Progression.nextJourneyPuzzle(fresh).id, list[4].id)
+	local done = Progression.newProfile()
+	for _, difficulty in ipairs(GameConfig.DIFFICULTIES) do
+		clearAll(done, difficulty, MODES.Journey)
+	end
+	eq(Progression.nextJourneyPuzzle(done), nil, "everything cleared")
+end)
+
+test("unlock progress counts credited clears per difficulty", function()
+	local profile = Progression.newProfile()
+	local beginners = PuzzleDefinitions.byDifficulty.Beginner
+	for i = 1, 3 do
+		Progression.apply(profile, winIn(beginners[i].id, MODES.Journey, 9))
+	end
+	Progression.apply(profile, winIn(beginners[4].id, MODES.Practice, 9))
+	local rows = Progression.unlockProgress(profile)
+	eq(#rows, #GameConfig.DIFFICULTIES)
+	eq(rows[1].credited, 3)
+	eq(rows[1].required, GameConfig.UNLOCK_REQUIREMENT)
+	eq(rows[1].unlocked, true)
+	eq(rows[2].unlocked, false)
+	Progression.apply(profile, winIn(beginners[4].id, MODES.Journey, 9))
+	eq(Progression.unlockProgress(profile)[2].unlocked, true)
+end)
+
+test("settings: valid values are stored, junk is ignored", function()
+	local profile = Progression.newProfile()
+	eq(profile.settings.sound, GameConfig.DEFAULT_SETTINGS.sound)
+	Progression.apply(profile, { id = opId(), kind = "settings", settings = { sound = false, volume = 0.33, haptics = false } })
+	eq(profile.settings.sound, false)
+	eq(profile.settings.volume, 0.35, "rounded to 5% steps")
+	eq(profile.settings.haptics, false)
+	Progression.apply(profile, { id = opId(), kind = "settings", settings = { sound = "yes", volume = 7, extra = 1 } })
+	eq(profile.settings.sound, false)
+	eq(profile.settings.volume, 1, "clamped")
+	eq((profile.settings :: any).extra, nil)
+	Progression.apply(profile, { id = opId(), kind = "settings", settings = { volume = 0 / 0 } })
+	eq(profile.settings.volume, 1, "NaN ignored")
+	Progression.apply(profile, { id = opId(), kind = "settings", settings = "loud" })
+	eq(profile.settings.volume, 1)
+end)
+
+test("phase 3 profiles load with the new fields defaulted", function()
+	local old = {
+		version = 1,
+		completed = { ["beginner-01"] = { bestMoves = 3, bestSeconds = 20, solves = 2, credited = true } },
+		stats = { solves = 2, fails = 1, restarts = 0, hints = 0, moves = 6 },
+		xp = 20,
+		coins = 5,
+		rewards = { ["journey:beginner-01"] = true },
+		daily = { day = 20000, completed = true, hintUsed = false, rewarded = true },
+		applied = { "x" },
+	}
+	local profile = Progression.normalize(old)
+	eq(profile.completed["beginner-01"].stars, 0, "no stars until replayed")
+	eq(profile.stats.dailies, 0)
+	eq(profile.streak.current, 0)
+	eq(profile.lastJourney, nil)
+	eq(profile.settings.volume, GameConfig.DEFAULT_SETTINGS.volume)
+	eq(profile.cosmetics.equipped.board, GameConfig.COSMETIC_SLOTS.board)
+	eq(profile.xp, 20)
+	eq(Progression.nextJourneyPuzzle(profile).id, "beginner-02")
+	local damaged = Progression.normalize({
+		completed = { ["beginner-01"] = { stars = 9, credited = true }, ["beginner-02"] = { stars = 3 } },
+		streak = { current = "many", longest = -4, lastDay = 1.5, shieldUsedOn = "x" },
+		lastJourney = "nope",
+		settings = { volume = "max" },
+		cosmetics = { owned = { gold = true, bad = 1 }, equipped = { board = "gold", pieces = "stolen" } },
+	})
+	eq(damaged.completed["beginner-01"].stars, 3, "clamped")
+	eq(damaged.completed["beginner-02"].stars, 0, "uncredited records hold no stars")
+	eq(damaged.streak.current, 0)
+	eq(damaged.streak.longest, 0)
+	eq(damaged.streak.lastDay, 1)
+	eq(damaged.lastJourney, nil)
+	eq(damaged.cosmetics.equipped.board, "gold", "owned item")
+	eq(damaged.cosmetics.equipped.pieces, GameConfig.COSMETIC_SLOTS.pieces, "unowned item refused")
+	eq(damaged.cosmetics.owned.bad, nil)
+end)
+
+test("summary carries what the menus draw", function()
+	local profile = Progression.newProfile()
+	local puzzle = PuzzleDefinitions.list[1]
+	Progression.apply(profile, winIn(puzzle.id, MODES.Journey, puzzle.par))
+	local summary = Progression.summary(profile, 20800)
+	eq(summary.resumeId, PuzzleDefinitions.list[2].id)
+	eq(summary.completed[puzzle.id].stars, 3)
+	eq(summary.completed[puzzle.id].bestSeconds, 30)
+	eq(summary.totals.cleared, 1)
+	eq(summary.totals.stars, 3)
+	eq(summary.totals.maxStars, 90)
+	eq(summary.totals.perfect, 1)
+	eq(#summary.unlocks, 5)
+	eq(summary.streak.current, 0)
+	eq(summary.stats.dailies, 0)
+	eq(summary.settings.sound, true)
+	eq(next(summary.achievements), nil)
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then
 	error("test failures")

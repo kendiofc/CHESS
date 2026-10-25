@@ -46,6 +46,42 @@ GameConfig.UNLOCK_REQUIREMENT = 4
 GameConfig.DAILY_DIFFICULTIES = { "Easy", "Medium", "Hard" }
 GameConfig.DAILY_REWARD = { xp = 60, coins = 15 }
 
+-- Star rating for a clear, decided by moves only (hints never cost stars):
+--   3 stars  within par (par is the proven minimum)
+--   2 stars  at most `slack` moves over par
+--   1 star   any other clear
+-- A puzzle can override the 2-star limit with `twoStarMoves` in its catalogue
+-- entry. Stars are saved from Journey and Daily clears; Practice shows them on
+-- the result card but does not save them.
+GameConfig.STAR_SLACK = {
+	Beginner = 1,
+	Easy = 2,
+	Medium = 3,
+	Hard = 4,
+	Expert = 5,
+}
+
+-- Daily streak protection: one shield per rolling 7 days. A shield covers a
+-- single missed day (clearing on day N+2 after a clear on day N keeps the
+-- streak) and pays nothing for the missed day. Days are UTC day numbers.
+GameConfig.STREAK_SHIELD_DAYS = 7
+
+-- Cosmetics are earned with coins later (board themes, piece skins, effects).
+-- Nothing is for sale yet; this lists the slots and the free defaults so saved
+-- profiles already have a place for them. Cosmetics never change gameplay.
+GameConfig.COSMETIC_SLOTS = {
+	board = "classic",
+	pieces = "classic",
+	effect = "none",
+}
+
+-- Player settings the server stores. Volume is 0..1.
+GameConfig.DEFAULT_SETTINGS = {
+	sound = true,
+	volume = 0.7,
+	haptics = true,
+}
+
 -- Remote rate limit per player: a bucket of BURST actions refilled at
 -- PER_SECOND tokens per second.
 GameConfig.RATE_LIMIT = {
@@ -65,6 +101,7 @@ GameConfig.ACTIONS = {
 	Undo = "undo",
 	Restart = "restart",
 	Hint = "hint",
+	Settings = "settings", -- { sound: boolean?, volume: number?, haptics: boolean? }
 	Sync = "sync", -- client asks for the current snapshot (e.g. after it loads)
 }
 
