@@ -24,6 +24,7 @@ type PlayerState = {
 	finishedAt: number?,
 	tokens: number,
 	refilledAt: number,
+	throttled: boolean,
 }
 
 local PuzzleService = {}
@@ -121,6 +122,7 @@ local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle)
 		finishedAt = nil,
 		tokens = if previous then previous.tokens else GameConfig.RATE_LIMIT.BURST,
 		refilledAt = if previous then previous.refilledAt else now,
+		throttled = false,
 	}
 	states[player] = state
 	send(player, state, "start")
@@ -132,9 +134,14 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 		return
 	end
 	if not consumeToken(state) then
-		send(player, state, "rejected", "rate_limited")
+		-- Tell the client once per throttled burst; don't answer every spammed call.
+		if not state.throttled then
+			state.throttled = true
+			send(player, state, "rejected", "rate_limited")
+		end
 		return
 	end
+	state.throttled = false
 	if type(action) ~= "string" then
 		return
 	end

@@ -24,8 +24,13 @@ function AnimationController.pulse(scale: UIScale, peak: number, seconds: number
 	AnimationController.tween(scale, seconds, { Scale = 1 }, Enum.EasingStyle.Back)
 end
 
--- Quick horizontal shake used for rejected input.
+-- Quick horizontal shake used for rejected input. Overlapping calls are
+-- ignored so the frame always returns to its true resting position.
 function AnimationController.shake(frame: GuiObject)
+	if frame:GetAttribute("Shaking") then
+		return
+	end
+	frame:SetAttribute("Shaking", true)
 	local origin = frame.Position
 	task.spawn(function()
 		for _, dx in ipairs({ 8, -7, 5, -3, 0 }) do
@@ -33,6 +38,7 @@ function AnimationController.shake(frame: GuiObject)
 			task.wait(0.035)
 		end
 		frame.Position = origin
+		frame:SetAttribute("Shaking", nil)
 	end)
 end
 
