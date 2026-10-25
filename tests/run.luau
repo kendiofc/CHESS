@@ -6,6 +6,8 @@ local ChessRules = require(Shared.ChessRules)
 local PuzzleValidator = require(Shared.PuzzleValidator)
 local PuzzleSession = require(Shared.PuzzleSession)
 local PuzzleDefinitions = require(Shared.PuzzleDefinitions)
+local ReferenceSolver = require(Shared.ReferenceSolver)
+local BoardGen = require(Shared.BoardGen)
 
 local passed, failed = 0, 0
 
@@ -220,6 +222,199 @@ test("minimumMoves on small boards", function()
 	eq(PuzzleValidator.minimumMoves(BoardState.fromLayout({ "P", "r" })), nil)
 end)
 
+-- Solver against the rules and the Phase 2 solver ---------------------------------
+-- ReferenceSolver is the original, unoptimised solver kept as an oracle. These
+-- tests are the proof that the faster solver kept the exact rules.
+
+local function namesOf(board, moves): { { string } }
+	local names = {}
+	for _, pair in ipairs(moves) do
+		table.insert(names, { BoardState.squareName(board, pair[1]), BoardState.squareName(board, pair[2]) })
+	end
+	return names
+end
+
+local function randomBoard(seed: number): (any, { string })
+	local width, height = 2 + seed % 5, 2 + (seed // 5) % 5
+	local targets = math.min(1 + seed % 8, width * height - 2)
+	local layout = BoardGen.layout(seed, width, height, targets, (seed % 4) * 8)
+	return BoardState.fromLayout(layout), layout
+end
+
+test("solver move tables match ChessRules for every piece on every square", function()
+	for seed = 1, 150 do
+		local board = randomBoard(seed)
+		local player = assert(BoardState.findPlayer(board))
+		board.pieces[player] = nil
+		for _, kind in ipairs({ "K", "Q", "R", "B", "N", "P" }) do
+			for square = 1, board.width * board.height do
+				if not board.pieces[square] and not board.blocked[square] then
+					board.pieces[square] = { kind = kind, color = "white" }
+					local compiled = PuzzleValidator.compiledMoves(board, square)
+					local count = 0
+					for _, move in ipairs(ChessRules.getLegalMoves(board, square)) do
+						count += 1
+						eq(compiled[move.to], move.capture, "seed " .. seed .. " " .. kind)
+					end
+					local compiledCount = 0
+					for _ in pairs(compiled) do
+						compiledCount += 1
+					end
+					eq(compiledCount, count, "move count, seed " .. seed .. " " .. kind)
+					board.pieces[square] = nil
+				end
+			end
+		end
+	end
+end)
+
+test("solver agrees with the Phase 2 solver on 600 random boards", function()
+	for seed = 1, 600 do
+		local board, layout = randomBoard(seed)
+		local result = PuzzleValidator.solve(board)
+		eq(result.status == "solved", ReferenceSolver.isSolvable(board), "solvable, seed " .. seed)
+		if result.solution then
+			local ok, err = PuzzleValidator.validateSolution(layout, namesOf(board, result.solution))
+			assert(ok, "seed " .. seed .. ": " .. tostring(err))
+		end
+	end
+end)
+
+test("solver agrees with the Phase 2 solver on larger 8x8 boards", function()
+	for seed = 1, 24 do
+		local layout = BoardGen.layout(seed * 31 + 5, 8, 8, 9 + seed % 3, 4 + seed % 16)
+		local board = BoardState.fromLayout(layout)
+		local result = PuzzleValidator.solve(board)
+		eq(result.status == "solved", ReferenceSolver.isSolvable(board), "8x8 seed " .. seed)
+		if result.solution then
+			assert(PuzzleValidator.validateSolution(layout, namesOf(board, result.solution)))
+		end
+	end
+end)
+
+test("shortest solution equals the Phase 2 full-position BFS", function()
+	for seed = 1, 600 do
+		local board, layout = randomBoard(seed)
+		if BoardState.countColor(board, "black") <= 6 then
+			local length, moves = PuzzleValidator.shortestSolution(board)
+			eq(length, (ReferenceSolver.shortestSolution(board)), "par, seed " .. seed)
+			if moves then
+				eq(#moves, length)
+				assert(PuzzleValidator.validateSolution(layout, namesOf(board, moves)))
+			end
+		end
+	end
+end)
+
+test("countOrders matches plain enumeration of capture orders", function()
+	-- Unmemoised count straight from the rules: try every capture reachable by
+	-- quiet moves, recurse, and count finished and stuck orders.
+	local function naive(board, square): (number, number)
+		if PuzzleValidator.isCleared(board) then
+			return 1, 0
+		end
+		local kind = board.pieces[square].kind
+		local seen, queue, head, from = { [square] = true }, { square }, 1, {}
+		local scratch = BoardState.clone(board)
+		scratch.pieces[square] = nil
+		while head <= #queue do
+			local at = queue[head]
+			head += 1
+			scratch.pieces[at] = { kind = kind, color = "white" }
+			for _, move in ipairs(ChessRules.getLegalMoves(scratch, at)) do
+				if move.capture then
+					from[move.to] = from[move.to] or at
+				elseif not seen[move.to] then
+					seen[move.to] = true
+					table.insert(queue, move.to)
+				end
+			end
+			scratch.pieces[at] = nil
+		end
+		local wins, stuck, any = 0, 0, false
+		for target, at in pairs(from) do
+			any = true
+			local nextBoard = BoardState.clone(board)
+			nextBoard.pieces[square] = nil
+			nextBoard.pieces[at] = { kind = kind, color = "white" }
+			ChessRules.applyMove(nextBoard, at, target, true)
+			local w, s = naive(nextBoard, target)
+			wins += w
+			stuck += s
+		end
+		return wins, if any then stuck else 1
+	end
+	for seed = 1, 300 do
+		local board = randomBoard(seed)
+		if BoardState.countColor(board, "black") <= 6 then
+			local wins, stuck = PuzzleValidator.countOrders(board)
+			local expectWins, expectStuck = naive(board, assert(BoardState.findPlayer(board)))
+			eq(wins, expectWins, "wins, seed " .. seed)
+			eq(stuck, expectStuck, "dead ends, seed " .. seed)
+		end
+	end
+end)
+
+test("a state budget gives 'unknown', never a wrong answer", function()
+	local board = BoardState.fromLayout(PuzzleDefinitions.get("proto-03").layout)
+	eq(PuzzleValidator.solve(board, { maxStates = 2 }).status, "unknown")
+	eq(PuzzleValidator.solve(board, { maxStates = 1000 }).status, "solved")
+	for seed = 1, 300 do
+		local random = randomBoard(seed)
+		local truth = PuzzleValidator.solve(random).status
+		local limited = PuzzleValidator.solve(random, { maxStates = 1 }).status
+		assert(limited == "unknown" or limited == truth, "seed " .. seed)
+	end
+end)
+
+test("no target limit: 39 targets solve and replay", function()
+	local layout = { "rrrrrrrr", "rrrrrrrr", "rrrrrrrr", "rrrrrrrr", "Rrrrrrrr" }
+	local board = BoardState.fromLayout(layout)
+	local result = PuzzleValidator.solve(board)
+	eq(result.status, "solved")
+	assert(PuzzleValidator.validateSolution(layout, namesOf(board, assert(result.solution))))
+	-- A second white-free row of knights the rook can never reach: unsolvable.
+	local stuck = BoardState.fromLayout({ "n#n#n#n#", "########", "Rrrrrrrr" })
+	eq(PuzzleValidator.solve(stuck).status, "unsolvable")
+end)
+
+test("session status after every move matches a full solver check", function()
+	-- Random play on random boards, with undos. The session skips the solver
+	-- after reversible quiet moves and on undo; this checks that shortcut.
+	local roll = 12345
+	local function nextRoll(n: number): number
+		roll = (roll * 48271) % 2147483647
+		return roll % n + 1
+	end
+	for seed = 1, 200 do
+		local start, layout = randomBoard(seed)
+		-- Shipped puzzles always start solvable (checked above), and the
+		-- session relies on that, so only those boards are used here.
+		local session = PuzzleSession.new({ layout = layout })
+		for _ = 1, if PuzzleValidator.isSolvable(start) then 12 else 0 do
+			if session.status == "won" then
+				break
+			end
+			if session.status == "failed" or nextRoll(5) == 1 then
+				session:undo()
+			else
+				local player = assert(BoardState.findPlayer(session.board))
+				local moves = ChessRules.getLegalMoves(session.board, player)
+				if #moves == 0 then
+					break
+				end
+				local move = moves[nextRoll(#moves)]
+				assert(session:tryMove(move.from, move.to))
+			end
+			local expected = if PuzzleValidator.isCleared(session.board)
+				then "won"
+				elseif PuzzleValidator.isSolvable(session.board) then "playing"
+				else "failed"
+			eq(session.status, expected, "seed " .. seed)
+		end
+	end
+end)
+
 -- Puzzle catalogue -------------------------------------------------------------------
 
 for _, puzzle in ipairs(PuzzleDefinitions.list) do
@@ -239,10 +434,6 @@ for _, puzzle in ipairs(PuzzleDefinitions.list) do
 		end
 		eq(whites, 1, "exactly one player piece")
 		assert(BoardState.countColor(board, "black") >= 1, "has targets")
-		assert(
-			BoardState.countColor(board, "black") <= PuzzleValidator.MAX_SOLVER_TARGETS,
-			"too many targets for the live solver"
-		)
 	end)
 
 	test("puzzle " .. puzzle.id .. ": stored solution is valid", function()

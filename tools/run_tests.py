@@ -2,8 +2,10 @@
 """Run the pure-Luau test suite outside Roblox.
 
 Shared modules use Roblox-style `require(script.Parent.X)`. This script bundles
-every module in src/shared into one chunk with a tiny `script`/`require` shim,
-appends tests/run.luau, and executes it with the standalone `luau` CLI.
+every module in src/shared and tests/lib into one chunk with a tiny
+`script`/`require` shim, appends tests/run.luau (or the given test file), and
+executes it with the standalone `luau` CLI. Test-only helpers in tests/lib sit
+beside the shared modules, so `script.Parent.X` reaches both.
 
 Usage: python3 tools/run_tests.py [path/to/luau] [test file]
 """
@@ -15,6 +17,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SHARED = ROOT / "src" / "shared"
+TEST_LIB = ROOT / "tests" / "lib"
 TESTS = ROOT / "tests" / "run.luau"
 
 PRELUDE = """
@@ -35,7 +38,7 @@ local Shared = __folder
 def main() -> int:
     luau = sys.argv[1] if len(sys.argv) > 1 else "luau"
     parts = [PRELUDE]
-    for path in sorted(SHARED.glob("*.luau")):
+    for path in sorted(SHARED.glob("*.luau")) + sorted(TEST_LIB.glob("*.luau")):
         # `export type` is only legal at a chunk's top level, so demote it inside the wrapper.
         source = re.sub(r"^export type ", "type ", path.read_text(), flags=re.M).replace("--!strict", "", 1)
         parts.append(f'__defs["{path.stem}"] = function(script)\n{source}\nend\n')
