@@ -10,18 +10,23 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BoardState = require(Shared:WaitForChild("BoardState"))
 local ChessRules = require(Shared:WaitForChild("ChessRules"))
+local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
 
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
 local PieceArt = require(script.Parent:WaitForChild("PieceArt"))
+local PuzzleMenu = require(script.Parent:WaitForChild("PuzzleMenu"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 export type Handlers = {
 	move: (from: number, to: number) -> (),
 	undo: () -> (),
 	restart: () -> (),
-	start: (puzzleId: string) -> (),
+	hint: () -> (),
+	start: (puzzleId: string, mode: string) -> (),
 }
+
+local PLAY_MODES = GameConfig.PLAY_MODES
 
 local PIECE_NAMES = ChessRules.PIECE_NAMES
 
@@ -33,13 +38,17 @@ local ERROR_MESSAGES = {
 	cannot_undo = "Nothing to undo.",
 	unknown_puzzle = "That puzzle isn't available.",
 	bad_square = "That move wasn't accepted.",
+	locked = "That difficulty is still locked. Clear more puzzles to open it.",
+	not_daily = "That isn't today's Daily Puzzle.",
+	bad_mode = "That mode isn't available.",
+	no_hints = "No hints left for this puzzle.",
 }
 
 local MARGIN = 12
 local GAP = 10
 local HEADER_HEIGHT = 62
 local STATS_HEIGHT = 62
-local MESSAGE_HEIGHT = 40
+local MESSAGE_HEIGHT = 52
 local CONTROLS_HEIGHT = 54
 local MAX_COLUMN_WIDTH = 720
 
@@ -113,7 +122,7 @@ end
 -- Bottom-row button: shares the row's width but never grows past MaxSize.
 local function controlButton(text: string, primary: boolean): TextButton
 	local b = button(text, primary)
-	b.Size = UDim2.new(0.5, -6, 1, 0)
+	b.Size = UDim2.new(1 / 3, -8, 1, 0)
 	make("UISizeConstraint", { MaxSize = Vector2.new(170, math.huge), Parent = b })
 	return b
 end
@@ -139,6 +148,9 @@ function PuzzleHUD.new(playerGui: Instance, handlers: Handlers)
 	self.squares = {}
 	self.receivedAt = os.clock()
 	self:_build(playerGui)
+	self.menu = PuzzleMenu.new(playerGui, function(puzzleId: string, mode: string)
+		self.handlers.start(puzzleId, mode)
+	end)
 
 	RunService.Heartbeat:Connect(function()
 		self:_updateTimer()
@@ -196,7 +208,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		BackgroundTransparency = 1,
 		Parent = container,
 	})
-	label({
+	self.brandLabel = label({
 		Text = "ECHO CHESS",
 		FontFace = Theme.FontHeavy,
 		TextSize = 13,
@@ -242,13 +254,16 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	nextButton.Position = UDim2.fromScale(1, 0)
 	nextButton.Size = UDim2.fromOffset(44, 36)
 	nextButton.Parent = switcher
-	self.indexLabel = label({
-		Position = UDim2.fromOffset(44, 0),
-		Size = UDim2.new(1, -88, 1, 0),
-		TextColor3 = Theme.TextMuted,
-		TextSize = 14,
-		Parent = switcher,
-	})
+	local menuButton = button("Puzzles", false)
+	menuButton.Name = "MenuButton"
+	menuButton.Position = UDim2.fromOffset(48, 0)
+	menuButton.Size = UDim2.new(1, -96, 1, 0)
+	menuButton.TextSize = 13
+	menuButton.Parent = switcher
+	menuButton.Activated:Connect(function()
+		self.menu:open(self.snapshot and self.snapshot.mode)
+	end)
+	self.prevButton, self.nextButton = prev, nextButton
 	prev.Activated:Connect(function()
 		self:_switchPuzzle(-1)
 	end)
@@ -389,9 +404,19 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			self.handlers.undo()
 		end
 	end)
+	self.hintButton = controlButton("Hint", false)
+	self.hintButton.Name = "HintButton"
+	self.hintButton.LayoutOrder = 2
+	self.hintButton.Parent = controls
+	self.hintButton.Activated:Connect(function()
+		local snap = self.snapshot
+		if snap and snap.status ~= "won" and not self.pending then
+			self.handlers.hint()
+		end
+	end)
 	local restartButton = controlButton("Restart", true)
 	restartButton.Name = "RestartButton"
-	restartButton.LayoutOrder = 2
+	restartButton.LayoutOrder = 3
 	restartButton.Parent = controls
 	restartButton.Activated:Connect(function()
 		self.handlers.restart()
@@ -461,8 +486,8 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 	local statsLine = label({
 		FontFace = Theme.FontBold,
 		TextSize = 18,
-		Position = UDim2.fromOffset(20, 118),
-		Size = UDim2.new(1, -40, 0, 60),
+		Position = UDim2.fromOffset(20, 114),
+		Size = UDim2.new(1, -40, 0, 88),
 		ZIndex = 12,
 		Parent = card,
 	})
@@ -500,7 +525,12 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 			return
 		end
 		if snap.status == "won" then
-			self.handlers.start(PuzzleDefinitions.nextAfter(snap.puzzleId).id)
+			local nextPuzzle = self:_neighbour(1)
+			if nextPuzzle then
+				self.handlers.start(nextPuzzle.id, snap.mode)
+			else
+				self.menu:open(snap.mode)
+			end
 		elseif snap.status == "failed" then
 			self.pending = true
 			self.handlers.undo()
@@ -735,6 +765,7 @@ function PuzzleHUD.render(self: any, snap: any)
 		self.selected = nil
 	end
 
+	self.menu:update(snap)
 	self:_renderHeader(snap)
 	self:_renderPieces(snap)
 	self:_renderHighlights()
@@ -744,9 +775,18 @@ end
 
 function PuzzleHUD._renderHeader(self: any, snap: any)
 	self.titleLabel.Text = snap.name
-	self.difficultyPill.Text = string.upper(snap.difficulty)
 	self.difficultyPill.BackgroundColor3 = Theme.DifficultyColors[snap.difficulty] or Theme.PanelRaised
-	self.indexLabel.Text = string.format("%d / %d", snap.puzzleIndex, snap.puzzleCount)
+	local group = PuzzleDefinitions.byDifficulty[snap.difficulty]
+	self.difficultyPill.Text = string.format("%s  %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
+	self.brandLabel.Text = "ECHO CHESS  ·  " .. string.upper(snap.mode or PLAY_MODES.Journey)
+	local daily = snap.mode == PLAY_MODES.Daily
+	self.prevButton.Visible = not daily
+	self.nextButton.Visible = not daily
+	local hintsLeft = snap.hintsLeft or 0
+	local hintsOn = hintsLeft ~= 0 and snap.status ~= "won"
+	self.hintButton.Text = if hintsLeft > 0 then string.format("Hint (%d)", hintsLeft) else "Hint"
+	self.hintButton.BackgroundTransparency = if hintsOn then 0 else 0.6
+	self.hintButton.TextTransparency = if hintsOn then 0 else 0.5
 	self.movesValue.Text = tostring(snap.moveCount)
 	self.parLabel.Text = "Par " .. tostring(snap.par)
 	local captured = snap.targetsTotal - snap.targetsLeft
@@ -848,6 +888,9 @@ function PuzzleHUD._renderMessage(self: any, snap: any)
 		text = string.format(ERROR_MESSAGES[snap.error] or "That action wasn't accepted.", string.lower(playerName))
 		color = Theme.Danger
 		Anim.shake(self.boardFrame)
+	elseif snap.event == "hint" and snap.hint then
+		text = "Hint: " .. snap.hint
+		color = Theme.Selected
 	elseif snap.status == "won" then
 		text = "Board cleared!"
 		color = Theme.Gold
@@ -893,8 +936,12 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 		r.stroke.Color = Theme.Gold
 		r.subtitle.Text = snap.name .. " solved."
 		local parNote = if snap.moveCount <= snap.par then "  (par!)" else string.format("  (par %d)", snap.par)
-		r.stats.Text = string.format("Moves  %d%s\nTime  %s", snap.moveCount, parNote, formatTime(snap.elapsed))
-		r.primary.Text = "Next puzzle"
+		local rewardLine = if snap.reward
+			then string.format("\n+%d XP   +%d coins", snap.reward.xp, snap.reward.coins)
+			elseif snap.mode == PLAY_MODES.Practice then "\nPractice: no rewards"
+			else ""
+		r.stats.Text = string.format("Moves  %d%s\nTime  %s%s", snap.moveCount, parNote, formatTime(snap.elapsed), rewardLine)
+		r.primary.Text = if self:_neighbour(1) then "Next puzzle" else "Puzzles"
 		r.secondary.Text = "Play again"
 	else
 		r.title.Text = "NO WAY THROUGH"
@@ -955,14 +1002,41 @@ function PuzzleHUD._onSquare(self: any, index: number)
 	self.messageLabel.TextColor3 = Theme.Danger
 end
 
+-- The puzzle `offset` steps away in the catalogue, or nil when it is past the
+-- end, the current mode has no neighbours (Daily), or Journey has it locked.
+function PuzzleHUD._neighbour(self: any, offset: number): any
+	local snap = self.snapshot
+	if not snap or snap.mode == PLAY_MODES.Daily then
+		return nil
+	end
+	local list = PuzzleDefinitions.list
+	local current = PuzzleDefinitions.get(snap.puzzleId)
+	local index = current and table.find(list, current)
+	local candidate = index and list[index + offset]
+	if not candidate then
+		return nil
+	end
+	local unlocked = snap.progress and snap.progress.unlockedIndex or 1
+	if snap.mode == PLAY_MODES.Journey and candidate.difficultyIndex > unlocked then
+		return nil
+	end
+	return candidate
+end
+
 function PuzzleHUD._switchPuzzle(self: any, offset: number)
 	local snap = self.snapshot
 	if not snap then
 		return
 	end
-	local list = PuzzleDefinitions.list
-	local index = ((snap.puzzleIndex - 1 + offset) % #list) + 1
-	self.handlers.start(list[index].id)
+	local target = self:_neighbour(offset)
+	if target then
+		self.handlers.start(target.id, snap.mode)
+	elseif offset > 0 and snap.mode == PLAY_MODES.Journey then
+		self.messageLabel.Text = "The next difficulty is locked. Open Puzzles to see what unlocks it."
+		self.messageLabel.TextColor3 = Theme.TextMuted
+	else
+		self.menu:open(snap.mode)
+	end
 end
 
 return PuzzleHUD

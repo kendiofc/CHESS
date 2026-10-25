@@ -1,27 +1,44 @@
 --!strict
 -- PuzzleService: the authoritative puzzle state for every player.
 --
--- Clients only send intents (start / move / undo / restart). The server owns a
--- PuzzleSession per player, validates every move with the shared rules, decides
--- win/failure, times the attempt with its own clock, and sends back a full
--- snapshot after every action. Nothing the client says about legality,
--- completion or time is trusted.
+-- Clients only send intents (start / move / undo / restart / hint). The
+-- server owns a PuzzleSession per player, validates every move with the shared
+-- rules, decides win/failure, times the attempt with its own clock, checks
+-- unlocks and hint allowances, pays rewards, and sends back a full snapshot
+-- after every action. Nothing the client says about legality, completion,
+-- time, unlocks or rewards is trusted.
+--
+-- Progress is kept by ProfileStore (DataStore). A win is re-checked by
+-- replaying the server's own move log before it is recorded.
 
+local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BoardState = require(Shared:WaitForChild("BoardState"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local Progression = require(Shared:WaitForChild("Progression"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
+local PuzzleHints = require(Shared:WaitForChild("PuzzleHints"))
 local PuzzleSession = require(Shared:WaitForChild("PuzzleSession"))
+local PuzzleValidator = require(Shared:WaitForChild("PuzzleValidator"))
+local ProfileStore = require(script.Parent:WaitForChild("ProfileStore"))
 
 local ACTIONS = GameConfig.ACTIONS
+local PLAY_MODES = GameConfig.PLAY_MODES
+local DATASTORE_NAME = "EchoChessProfiles_v1"
 
 type PlayerState = {
 	session: PuzzleSession.PuzzleSession,
+	mode: string,
+	day: number, -- UTC day the attempt started (decides the Daily Puzzle)
 	startedAt: number,
 	finishedAt: number?,
+	hintsUsed: number,
+	hint: string?,
+	reward: any,
 	tokens: number,
 	refilledAt: number,
 	throttled: boolean,
@@ -30,6 +47,7 @@ type PlayerState = {
 local PuzzleService = {}
 
 local states: { [Player]: PlayerState } = {}
+local profiles: any
 local stateRemote: RemoteEvent
 local actionRemote: RemoteEvent
 
@@ -72,7 +90,68 @@ local function elapsed(state: PlayerState): number
 	return (state.finishedAt or os.clock()) - state.startedAt
 end
 
-local function snapshot(state: PlayerState, event: string, err: string?)
+local function today(): number
+	return Progression.dayNumber(os.time())
+end
+
+-- A DataStore that always fails, used when DataStores are unavailable (an
+-- unpublished place, or Studio without API access). ProfileStore treats it
+-- like an outage: the player plays offline and nothing is written.
+local unavailableStore = {
+	GetAsync = function()
+		error("DataStores are not available in this place")
+	end,
+	UpdateAsync = function()
+		error("DataStores are not available in this place")
+	end,
+}
+
+local function createProfiles()
+	local ok, store = pcall(function()
+		return DataStoreService:GetDataStore(DATASTORE_NAME)
+	end)
+	if not ok then
+		warn("[PuzzleService] DataStore unavailable, progress will not be saved: " .. tostring(store))
+		store = unavailableStore
+	end
+	profiles = ProfileStore.new({
+		store = store,
+		progression = Progression,
+		now = os.clock,
+		wait = function(seconds: number)
+			task.wait(seconds)
+		end,
+		newId = function()
+			return HttpService:GenerateGUID(false)
+		end,
+		budget = if ok
+			then function(requestType: string): number
+				local enum = if requestType == "GetAsync"
+					then Enum.DataStoreRequestType.GetAsync
+					else Enum.DataStoreRequestType.UpdateAsync
+				return DataStoreService:GetRequestBudgetForRequestType(enum)
+			end
+			else nil,
+		log = warn,
+	})
+end
+
+local function profileOf(player: Player): any
+	return profiles:get(player.UserId) or Progression.newProfile()
+end
+
+local function record(player: Player, op: any): any
+	local reward = profiles:record(player.UserId, op)
+	return reward
+end
+
+local function requestSave(player: Player)
+	task.spawn(function()
+		profiles:save(player.UserId)
+	end)
+end
+
+local function snapshot(player: Player, state: PlayerState, event: string, err: string?)
 	local session = state.session
 	local puzzle = session.puzzle
 	local last = session:lastMove()
@@ -106,20 +185,36 @@ local function snapshot(state: PlayerState, event: string, err: string?)
 		canUndo = session.status ~= "won" and #session.history > 0,
 		elapsed = elapsed(state),
 		lastMove = lastMove,
+		mode = state.mode,
+		number = puzzle.number,
+		hint = if event == "hint" then state.hint else nil,
+		hintsUsed = state.hintsUsed,
+		hintsLeft = (function()
+			local left = Progression.hintsLeft(profileOf(player), state.mode, state.hintsUsed, state.day)
+			return if left == math.huge then -1 else left
+		end)(),
+		reward = if event == "move" then state.reward else nil,
+		progress = Progression.summary(profileOf(player), today()),
+		saveStatus = profiles:status(player.UserId) or "loading",
 	}
 end
 
 local function send(player: Player, state: PlayerState, event: string, err: string?)
-	stateRemote:FireClient(player, snapshot(state, event, err))
+	stateRemote:FireClient(player, snapshot(player, state, event, err))
 end
 
-local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle)
+local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle, mode: string, day: number)
 	local now = os.clock()
 	local previous = states[player]
 	local state: PlayerState = {
 		session = PuzzleSession.new(puzzle),
+		mode = mode,
+		day = day,
 		startedAt = now,
 		finishedAt = nil,
+		hintsUsed = 0,
+		hint = nil,
+		reward = nil,
 		tokens = if previous then previous.tokens else GameConfig.RATE_LIMIT.BURST,
 		refilledAt = if previous then previous.refilledAt else now,
 		throttled = false,
@@ -148,30 +243,71 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 	local data = if type(payload) == "table" then payload :: { [any]: any } else {}
 
 	if action == ACTIONS.Start then
-		local puzzle = PuzzleDefinitions.get(data.puzzleId)
+		local mode = data.mode
+		if mode == nil then
+			mode = PLAY_MODES.Journey
+		end
+		if type(mode) ~= "string" or not PLAY_MODES[mode] then
+			send(player, state, "rejected", "bad_mode")
+			return
+		end
+		local day = today()
+		local puzzle = if mode == PLAY_MODES.Daily
+			then Progression.dailyPuzzle(day)
+			else PuzzleDefinitions.get(data.puzzleId)
 		if not puzzle then
 			send(player, state, "rejected", "unknown_puzzle")
 			return
 		end
-		startPuzzle(player, puzzle)
+		local allowed, why = Progression.canStart(profileOf(player), puzzle, mode, day)
+		if not allowed then
+			send(player, state, "rejected", why)
+			return
+		end
+		startPuzzle(player, puzzle, mode, day)
 	elseif action == ACTIONS.Move then
 		local session = state.session
+		local wasPlaying = session.status == "playing"
 		local ok, err = session:tryMove(data.from, data.to)
 		if not ok then
 			send(player, state, "rejected", err)
 			return
 		end
+		state.reward = nil
 		if session.status == "won" then
 			state.finishedAt = os.clock()
+			-- Re-check the win from the server's own move log before recording it.
+			local log = {}
+			for _, move in ipairs(session.history) do
+				table.insert(log, { BoardState.squareName(session.board, move.from), BoardState.squareName(session.board, move.to) })
+			end
+			local valid, why = PuzzleValidator.validateSolution(session.puzzle.layout, log)
+			if valid then
+				state.reward = record(player, {
+					kind = "win",
+					puzzleId = session.puzzle.id,
+					mode = state.mode,
+					day = state.day,
+					moves = session.moveCount,
+					seconds = math.floor(elapsed(state) * 10) / 10,
+				})
+				requestSave(player)
+			else
+				warn("[PuzzleService] win by " .. player.Name .. " failed the replay check: " .. tostring(why))
+			end
 			print(
 				string.format(
-					"[PuzzleService] %s cleared %s in %d moves (%.1fs)",
+					"[PuzzleService] %s cleared %s (%s) in %d moves (%.1fs)%s",
 					player.Name,
 					session.puzzle.id,
+					state.mode,
 					session.moveCount,
-					elapsed(state)
+					elapsed(state),
+					if state.reward then string.format(", +%d xp", state.reward.xp) else ""
 				)
 			)
+		elseif wasPlaying and session.status == "failed" then
+			record(player, { kind = "fail", puzzleId = session.puzzle.id, mode = state.mode })
 		end
 		send(player, state, "move")
 	elseif action == ACTIONS.Undo then
@@ -181,7 +317,30 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 		end
 		send(player, state, "undo")
 	elseif action == ACTIONS.Restart then
-		startPuzzle(player, state.session.puzzle)
+		if state.session.moveCount > 0 then
+			record(player, { kind = "restart", puzzleId = state.session.puzzle.id, mode = state.mode })
+		end
+		startPuzzle(player, state.session.puzzle, state.mode, state.day)
+	elseif action == ACTIONS.Hint then
+		local session = state.session
+		if session.status == "won" then
+			send(player, state, "rejected", "not_playing")
+			return
+		end
+		if session.status == "failed" then
+			-- Pointing out a dead end is free: it costs no hint.
+			state.hint = PuzzleHints.forLevel(session.puzzle, session.board, session.status, 1)
+			send(player, state, "hint")
+			return
+		end
+		if Progression.hintsLeft(profileOf(player), state.mode, state.hintsUsed, state.day) < 1 then
+			send(player, state, "rejected", "no_hints")
+			return
+		end
+		state.hintsUsed += 1
+		state.hint = PuzzleHints.forLevel(session.puzzle, session.board, session.status, state.hintsUsed)
+		record(player, { kind = "hint", puzzleId = session.puzzle.id, mode = state.mode, day = state.day })
+		send(player, state, "hint")
 	elseif action == ACTIONS.Sync then
 		-- The first puzzle starts when the player joins, before their client has
 		-- loaded; don't count loading time against an untouched attempt.
@@ -194,10 +353,16 @@ end
 
 function PuzzleService.Start()
 	ensureRemotes()
+	createProfiles()
 	actionRemote.OnServerEvent:Connect(onAction)
 
 	local function onPlayerAdded(player: Player)
-		startPuzzle(player, PuzzleDefinitions.list[1])
+		startPuzzle(player, PuzzleDefinitions.list[1], PLAY_MODES.Journey, today())
+		profiles:load(player.UserId)
+		local state = states[player]
+		if state and player.Parent then
+			send(player, state, "sync")
+		end
 	end
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -205,7 +370,36 @@ function PuzzleService.Start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		states[player] = nil
+		profiles:release(player.UserId)
 	end)
+
+	-- Autosave: ops are also saved soon after every win.
+	task.spawn(function()
+		while true do
+			task.wait(ProfileStore.AUTOSAVE_INTERVAL)
+			for _, userId in ipairs(profiles:userIds()) do
+				task.spawn(function()
+					profiles:save(userId)
+				end)
+			end
+		end
+	end)
+end
+
+-- Saves everyone before the server shuts down (game:BindToClose).
+function PuzzleService.Shutdown()
+	local userIds = profiles:userIds()
+	local remaining = #userIds
+	for _, userId in ipairs(userIds) do
+		task.spawn(function()
+			profiles:release(userId)
+			remaining -= 1
+		end)
+	end
+	local deadline = os.clock() + 25
+	while remaining > 0 and os.clock() < deadline do
+		task.wait(0.2)
+	end
 end
 
 return PuzzleService

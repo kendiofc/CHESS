@@ -31,8 +31,11 @@ local hud = PuzzleHUD.new(playerGui, {
 	restart = function()
 		actionRemote:FireServer(ACTIONS.Restart)
 	end,
-	start = function(puzzleId: string)
-		actionRemote:FireServer(ACTIONS.Start, { puzzleId = puzzleId })
+	hint = function()
+		actionRemote:FireServer(ACTIONS.Hint)
+	end,
+	start = function(puzzleId: string, mode: string)
+		actionRemote:FireServer(ACTIONS.Start, { puzzleId = puzzleId, mode = mode })
 	end,
 })
 

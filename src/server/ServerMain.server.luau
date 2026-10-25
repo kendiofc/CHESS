@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local PuzzleService = require(script.Parent:WaitForChild("Services"):WaitForChild("PuzzleService"))
 
 PuzzleService.Start()
+game:BindToClose(PuzzleService.Shutdown)
 
 -- Until the lobby exists the game is GUI-only: keep avatars still so keyboard
 -- input meant for the board doesn't walk an invisible character around.
