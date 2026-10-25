@@ -687,6 +687,7 @@ function PuzzleHUD._layout(self: any)
 	-- The tutorial card replaces the message line while it is shown.
 	local coaching = p.coach.Visible
 	p.message.Visible = not coaching
+	p.stats.Visible = true
 	local messageHeight = if coaching then COACH_HEIGHT else MESSAGE_HEIGHT
 	if wide then
 		local sideW = math.clamp(w * 0.4, 260, 380)
@@ -699,7 +700,15 @@ function PuzzleHUD._layout(self: any)
 		local messageY = MARGIN + HEADER_HEIGHT + STATS_HEIGHT + GAP * 2
 		local messageSpace = h + MARGIN - CONTROLS_HEIGHT - GAP - messageY
 		place(p.message, sx, messageY, sideW, messageSpace)
-		place(p.coach, sx, messageY, sideW, math.clamp(messageSpace, 64, 130))
+		if coaching and messageSpace < COACH_HEIGHT then
+			-- Short landscape screens: the card also takes the stats row
+			-- while the tutorial runs, so its text has room.
+			local statsY = MARGIN + HEADER_HEIGHT + GAP
+			p.stats.Visible = false
+			place(p.coach, sx, statsY, sideW, math.min(messageY + messageSpace - statsY, 160))
+		else
+			place(p.coach, sx, messageY, sideW, math.clamp(messageSpace, 64, 130))
+		end
 		place(p.controls, sx, MARGIN + h - CONTROLS_HEIGHT, sideW, CONTROLS_HEIGHT)
 	else
 		local cw = math.min(w, MAX_COLUMN_WIDTH)
