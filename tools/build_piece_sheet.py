@@ -2,7 +2,12 @@
 """Cut the reference piece drawing into a transparent sprite sheet for Roblox.
 
 Input:  assets/source/pieces-reference.jpg (two rows: white then black; columns K Q B N R P)
-Output: assets/pieces.png, a 6 x 2 grid of CELL-pixel cells in the same order.
+Output: assets/pieces.png, a 6 x 2 grid of CELL-pixel cells in the same order,
+        and assets/pieces.rgba, the same pixels as raw RGBA bytes (row-major,
+        no header). Studio can't decode PNGs from Luau, so tools/studio_sync
+        style import code reads the raw file into an EditableImage and
+        publishes it with AssetService:CreateAssetAsync. 1020x340 keeps it
+        under the 1024px EditableImage limit.
 
 The white background is removed by flood-filling light pixels from the image
 border, so the white fill inside each white piece (and the white detail lines
@@ -19,7 +24,8 @@ from PIL import Image
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "source" / "pieces-reference.jpg"
 OUTPUT = ROOT / "assets" / "pieces.png"
-CELL = 256
+RAW = ROOT / "assets" / "pieces.rgba"
+CELL = 170
 LIGHT = 200  # pixels at least this bright can be background
 SEAL = 2  # pixels of stroke thickening used to seal outline gaps
 
@@ -111,6 +117,7 @@ def main() -> None:
             py = r * CELL + round(CELL * 0.93) - piece.height
             sheet.alpha_composite(piece, (px, py))
     sheet.save(OUTPUT)
+    RAW.write_bytes(sheet.tobytes())
     print(f"wrote {OUTPUT} ({sheet.width}x{sheet.height})")
 
 
