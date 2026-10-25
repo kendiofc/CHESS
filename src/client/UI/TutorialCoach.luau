@@ -15,6 +15,10 @@ local Theme = require(script.Parent:WaitForChild("Theme"))
 local TutorialCoach = {}
 TutorialCoach.__index = TutorialCoach
 
+-- Buttons meet the 44 px touch-target guideline. They stack in a column when
+-- the card is tall enough, and otherwise sit side by side.
+local BUTTON_W, BUTTON_H, BUTTON_GAP = 72, 44, 6
+
 export type Callbacks = { skip: () -> (), next: () -> () }
 
 local function make(className: string, props: { [string]: any }?, children: { Instance }?): any
@@ -40,7 +44,7 @@ end
 local function smallButton(name: string, label: string, primary: boolean): TextButton
 	return make("TextButton", {
 		Name = name,
-		Size = UDim2.fromOffset(76, 34),
+		Size = UDim2.fromOffset(BUTTON_W, BUTTON_H),
 		BackgroundColor3 = if primary then Theme.Accent else Theme.PanelRaised,
 		AutoButtonColor = true,
 		FontFace = Theme.FontBold,
@@ -95,16 +99,17 @@ function TutorialCoach.new(parent: Instance, callbacks: Callbacks)
 		Name = "Buttons",
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -8, 0.5, 0),
-		Size = UDim2.fromOffset(76, 74),
 		BackgroundTransparency = 1,
 		ZIndex = 21,
 		Parent = frame,
-	}, {
-		make("UIListLayout", {
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-			Padding = UDim.new(0, 6),
-		}),
+	})
+	self.buttons = buttons
+	self.buttonLayout = make("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		Padding = UDim.new(0, BUTTON_GAP),
+		Parent = buttons,
 	})
 	self.nextButton = smallButton("NextStep", "Next", true)
 	self.nextButton.LayoutOrder = 1
@@ -114,6 +119,9 @@ function TutorialCoach.new(parent: Instance, callbacks: Callbacks)
 	self.skipButton.Parent = buttons
 	self.nextButton.Activated:Connect(callbacks.next)
 	self.skipButton.Activated:Connect(callbacks.skip)
+	frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		self:_arrange()
+	end)
 
 	-- The pointer ring. Its pulse runs forever; it is simply hidden when unused.
 	local ring = make("Frame", {
@@ -142,6 +150,21 @@ function TutorialCoach.show(self: any, step: any, index: number, total: number)
 	self.count.Text = string.format("HOW TO PLAY  ·  %d/%d", index, total)
 	self.text.Text = step.text
 	self.nextButton.Visible = step.waitFor == "next"
+	self:_arrange()
+end
+
+-- Places the buttons for the card's current size and leaves the rest of the
+-- width to the text.
+function TutorialCoach._arrange(self: any)
+	local count = if self.nextButton.Visible then 2 else 1
+	local column = self.frame.AbsoluteSize.Y >= count * BUTTON_H + (count - 1) * BUTTON_GAP + 12
+	self.buttonLayout.FillDirection = if column then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal
+	local width = if column then BUTTON_W else count * BUTTON_W + (count - 1) * BUTTON_GAP
+	local height = if column then count * BUTTON_H + (count - 1) * BUTTON_GAP else BUTTON_H
+	self.buttons.Size = UDim2.fromOffset(width, height)
+	local textWidth = -(width + 28)
+	self.count.Size = UDim2.new(1, textWidth, 0, 14)
+	self.text.Size = UDim2.new(1, textWidth, 1, -28)
 end
 
 function TutorialCoach.hide(self: any)

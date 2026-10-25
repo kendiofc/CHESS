@@ -65,7 +65,7 @@ local HEADER_HEIGHT = 70
 local STATS_HEIGHT = 62
 local MESSAGE_HEIGHT = 52
 local CONTROLS_HEIGHT = 54
-local COACH_HEIGHT = 84 -- the tutorial card takes the message's place while shown
+local COACH_HEIGHT = 100 -- the tutorial card takes the message's place while shown
 local MAX_COLUMN_WIDTH = 720
 
 local PuzzleHUD = {}
@@ -699,7 +699,7 @@ function PuzzleHUD._layout(self: any)
 		local messageY = MARGIN + HEADER_HEIGHT + STATS_HEIGHT + GAP * 2
 		local messageSpace = h + MARGIN - CONTROLS_HEIGHT - GAP - messageY
 		place(p.message, sx, messageY, sideW, messageSpace)
-		place(p.coach, sx, messageY, sideW, math.max(messageSpace, 64))
+		place(p.coach, sx, messageY, sideW, math.clamp(messageSpace, 64, 130))
 		place(p.controls, sx, MARGIN + h - CONTROLS_HEIGHT, sideW, CONTROLS_HEIGHT)
 	else
 		local cw = math.min(w, MAX_COLUMN_WIDTH)

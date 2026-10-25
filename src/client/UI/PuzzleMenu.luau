@@ -385,7 +385,13 @@ function PuzzleMenu._renderHome(self: any)
 		local resume = progress.resumeId and PuzzleDefinitions.get(progress.resumeId)
 		if snap and snap.status == "playing" and snap.moveCount > 0 then
 			title = "Resume"
-			sub = string.format("%s  ·  %s  ·  %d moves in", snap.name, snap.mode, snap.moveCount)
+			sub = string.format(
+				"%s  ·  %s  ·  %d %s in",
+				snap.name,
+				snap.mode,
+				snap.moveCount,
+				if snap.moveCount == 1 then "move" else "moves"
+			)
 			action = function()
 				self:close()
 			end
