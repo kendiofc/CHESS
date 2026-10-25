@@ -1262,8 +1262,11 @@ function PuzzleHUD._onSquare(self: any, index: number)
 	if not snap or self.pending or snap.status ~= "playing" or self.dialog:isOpen() then
 		return
 	end
-	if os.clock() - self.dragEndedAt < InputRules.TAP_SUPPRESS_SECONDS then
-		return -- the release of a drag, not a tap
+	-- The release of a drag, not a tap. A button's Activated can fire before
+	-- or after UserInputService.InputEnded, so check both the live drag and
+	-- one that just ended.
+	if (self.press and self.press.dragging) or os.clock() - self.dragEndedAt < InputRules.TAP_SUPPRESS_SECONDS then
+		return
 	end
 	if index == self.playerSquare then
 		self.selected = if self.selected == index then nil else index

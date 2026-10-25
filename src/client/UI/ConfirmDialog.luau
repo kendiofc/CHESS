@@ -7,7 +7,8 @@
 --   * Both buttons ignore presses for InputRules.DIALOG_ARM_SECONDS after it
 --     opens, so the press that opened it (or a fast double tap) can't answer
 --     it. Tapping the dim does nothing.
---   * Keyboard and gamepad: Escape, Backspace or B cancels; Enter confirms.
+--   * Keyboard and gamepad: Backspace or B cancels; Enter confirms. (Escape
+--     is kept by Roblox for its own menu and never reaches the game.)
 --   * The answer runs once; the dialog closes before the callback runs.
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -196,7 +197,7 @@ function ConfirmDialog.ask(self: any, request: Request)
 			self:answer(false)
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.Escape, Enum.KeyCode.Backspace, Enum.KeyCode.ButtonB)
+	end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.Backspace, Enum.KeyCode.ButtonB)
 	ContextActionService:BindActionAtPriority(CONFIRM_ACTION, function(_, state)
 		if state == Enum.UserInputState.Begin and self:_armed() then
 			self:answer(true)

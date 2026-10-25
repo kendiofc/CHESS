@@ -126,11 +126,11 @@ function TutorialCoach.new(parent: Instance, callbacks: Callbacks)
 		Visible = false,
 		ZIndex = 20,
 	}, { make("UICorner", { CornerRadius = UDim.new(0, 12) }) })
-	local ringStroke = make("UIStroke", { Color = Theme.Gold, Thickness = 4, Parent = ring })
+	local ringStroke = make("UIStroke", { Color = Theme.Gold, Thickness = 5, Parent = ring })
 	TweenService:Create(
 		ringStroke,
 		TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-		{ Transparency = 0.75 }
+		{ Transparency = 0.55 }
 	):Play()
 	self.ring = ring
 	return self

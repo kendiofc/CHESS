@@ -280,7 +280,10 @@ function PuzzleMenu.update(self: any, snap: any)
 	self.receivedAt = os.clock()
 	self.progress = snap.progress
 	self.saveStatus = snap.saveStatus
-	if self.gui.Enabled and not self.closing then
+	-- The Settings view already shows the player's own changes; redrawing it
+	-- when the server confirms them would rebuild buttons mid-click.
+	local echo = snap.event == "settings" and self.view == "Settings"
+	if self.gui.Enabled and not self.closing and not echo then
 		self:_render()
 	end
 end
@@ -928,7 +931,17 @@ function PuzzleMenu._renderSettings(self: any)
 			Parent = volumeRow,
 		}, { corner(10) }).Activated:Connect(function()
 			local volume = math.clamp(math.floor((settings.volume + delta) * 10 + 0.5) / 10, 0, 1)
-			change({ volume = volume })
+			settings.volume = volume
+			Sound.setSettings({ volume = volume })
+			self.handlers.settings({ volume = volume })
+			-- Updated in place, not re-rendered: a rebuilt button under a still
+			-- mouse misses the next click, so fast +/- presses were lost.
+			local sub = volumeRow:FindFirstChild("Sub") :: TextLabel
+			sub.Text = string.format("%d%%", math.floor(volume * 100 + 0.5))
+			local fill = volumeRow:FindFirstChild("ProgressBar") and volumeRow.ProgressBar:FindFirstChild("Fill")
+			if fill then
+				fill.Size = UDim2.fromScale(volume, 1)
+			end
 		end)
 	end
 	stepper("VolumeDown", "-", -72, -0.1)
