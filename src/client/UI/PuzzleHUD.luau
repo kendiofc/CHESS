@@ -79,6 +79,7 @@ local function label(props: { [string]: any }): TextLabel
 		TextColor3 = Theme.Text,
 		TextSize = 16,
 		TextWrapped = true,
+		Text = "",
 	}
 	for key, value in pairs(props) do
 		defaults[key] = value
@@ -221,9 +222,11 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		Parent = header,
 	})
 	local prev = button("<", false)
+	prev.Name = "PrevPuzzle"
 	prev.Size = UDim2.fromOffset(38, 30)
 	prev.Parent = switcher
 	local nextButton = button(">", false)
+	nextButton.Name = "NextPuzzle"
 	nextButton.AnchorPoint = Vector2.new(1, 0)
 	nextButton.Position = UDim2.fromScale(1, 0)
 	nextButton.Size = UDim2.fromOffset(38, 30)
@@ -373,6 +376,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		}),
 	})
 	self.undoButton = button("Undo", false)
+	self.undoButton.Name = "UndoButton"
 	self.undoButton.LayoutOrder = 1
 	self.undoButton.Parent = controls
 	self.undoButton.Activated:Connect(function()
@@ -382,13 +386,22 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		end
 	end)
 	local restartButton = button("Restart", true)
+	restartButton.Name = "RestartButton"
 	restartButton.LayoutOrder = 2
 	restartButton.Parent = controls
 	restartButton.Activated:Connect(function()
 		self.handlers.restart()
 	end)
 
-	self:_buildResultCard(gui)
+	-- The result card gets its own full-bleed ScreenGui so the dim covers the top bar too.
+	self:_buildResultCard(make("ScreenGui", {
+		Name = "EchoChessResult",
+		IgnoreGuiInset = true,
+		ResetOnSpawn = false,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		DisplayOrder = 2,
+		Parent = playerGui,
+	}))
 end
 
 function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
@@ -459,11 +472,13 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 		}),
 	})
 	local primary = button("", true)
+	primary.Name = "PrimaryButton"
 	primary.LayoutOrder = 1
 	primary.Size = UDim2.new(0.5, -6, 1, 0)
 	primary.ZIndex = 12
 	primary.Parent = buttons
 	local secondary = button("", false)
+	secondary.Name = "SecondaryButton"
 	secondary.LayoutOrder = 2
 	secondary.Size = UDim2.new(0.5, -6, 1, 0)
 	secondary.ZIndex = 12
@@ -670,7 +685,7 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	self.titleLabel.Text = snap.name
 	self.difficultyPill.Text = string.upper(snap.difficulty)
 	self.difficultyPill.BackgroundColor3 = Theme.DifficultyColors[snap.difficulty] or Theme.PanelRaised
-	self.indexLabel.Text = string.format("Puzzle %d / %d", snap.puzzleIndex, snap.puzzleCount)
+	self.indexLabel.Text = string.format("%d / %d", snap.puzzleIndex, snap.puzzleCount)
 	self.movesValue.Text = tostring(snap.moveCount)
 	self.parLabel.Text = "Par " .. tostring(snap.par)
 	local captured = snap.targetsTotal - snap.targetsLeft
@@ -747,7 +762,7 @@ function PuzzleHUD._renderHighlights(self: any)
 		square.dot.Visible = legal ~= nil and not legal.capture
 		square.ring.Visible = legal ~= nil and legal.capture
 		if square.ring.Visible then
-			square.ringStroke.Thickness = math.max(3, square.button.AbsoluteSize.X * 0.07)
+			square.ringStroke.Thickness = math.max(3, square.button.AbsoluteSize.X * 0.05)
 		end
 		if index == self.selected then
 			square.tint.BackgroundColor3 = Theme.Selected
