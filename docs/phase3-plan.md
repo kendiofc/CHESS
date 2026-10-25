@@ -1,5 +1,13 @@
 # Phase 3 plan: puzzle collection, difficulty, hints, validation
 
+> **Status (2026-10-25): implemented.** The README describes what was built.
+> Kendi decided the open questions below:
+> - Hints are free in Practice. The Daily Puzzle gets one free hint per day. Competitive modes get none.
+> - Difficulties unlock in order in the main mode. Practice can pick any difficulty.
+> - Progress is saved with DataStore in this phase.
+>
+> This note is kept as the record of the plan.
+
 Phase 2 was audited on 2026-10-25 (see the PR for the test log). This note sets
 out what Phase 3 builds on and the order to build it in. Multiplayer,
 monetization and other modes stay out of scope.
