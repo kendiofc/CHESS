@@ -1,8 +1,10 @@
 --!strict
--- PieceArt: original 2D chess piece silhouettes built from GUI primitives, so
--- they stay crisp at any size and need no uploaded images. (Roblox fonts do not
--- include the Unicode chess glyphs.)
+-- PieceArt: chess piece graphics. When Theme.PieceSheet is set, pieces come
+-- from that sprite sheet. Otherwise they are drawn from GUI primitives, which
+-- needs no uploaded image. (Roblox fonts do not include the Unicode chess
+-- glyphs, so text can't be used.)
 --
+-- Drawn fallback:
 -- Each shape is { x, y, w, h, corner, rotation?, detail? } in scale units of
 -- the piece's square box: (x, y) is the shape's centre, corner is a UICorner
 -- scale (0.5 = fully round), detail shapes are drawn in the contrast colour.
@@ -92,8 +94,27 @@ local function addShape(parent: Instance, shape: Shape, color: Color3, grow: num
 	frame.Parent = parent
 end
 
--- Returns a transparent Frame (Size 1,1) holding the piece drawing.
-function PieceArt.create(kind: string, color: "white" | "black"): Frame
+local function fromSheet(kind: string, color: "white" | "black"): ImageLabel
+	local cell = Theme.PieceCell
+	local image = Instance.new("ImageLabel")
+	image.Name = "Piece"
+	image.BackgroundTransparency = 1
+	image.Size = UDim2.fromScale(1, 1)
+	image.Image = Theme.PieceSheet
+	image.ImageRectSize = Vector2.new(cell, cell)
+	image.ImageRectOffset = Vector2.new(
+		(Theme.PieceSheetColumns[kind] or 5) * cell,
+		if color == "white" then 0 else cell
+	)
+	image.ScaleType = Enum.ScaleType.Fit
+	return image
+end
+
+-- Returns a transparent GuiObject (Size 1,1) holding the piece graphic.
+function PieceArt.create(kind: string, color: "white" | "black"): GuiObject
+	if Theme.PieceSheet ~= "" then
+		return fromSheet(kind, color)
+	end
 	local palette = if color == "white" then Theme.PieceWhite else Theme.PieceBlack
 	local root = Instance.new("Frame")
 	root.Name = "Piece"

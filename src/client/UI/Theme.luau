@@ -26,6 +26,13 @@ Theme.Danger = Color3.fromRGB(232, 84, 84)
 Theme.Gold = Color3.fromRGB(246, 198, 72)
 Theme.GoldDeep = Color3.fromRGB(196, 134, 30)
 
+-- Piece sprite sheet (assets/pieces.png): 6 x 2 cells of PieceCell pixels,
+-- columns K Q B N R P, white row on top. Set to the uploaded image's
+-- "rbxassetid://..." to use it; while empty, PieceArt draws its own shapes.
+Theme.PieceSheet = ""
+Theme.PieceCell = 170
+Theme.PieceSheetColumns = { K = 0, Q = 1, B = 2, N = 3, R = 4, P = 5 }
+
 Theme.PieceWhite = { fill = Color3.fromRGB(250, 247, 238), outline = Color3.fromRGB(28, 30, 30) }
 Theme.PieceBlack = { fill = Color3.fromRGB(36, 38, 42), outline = Color3.fromRGB(232, 226, 210) }
 

@@ -730,7 +730,9 @@ function PuzzleHUD._renderPieces(self: any, snap: any)
 			local ghostScale = ghost:FindFirstChildOfClass("UIScale") :: UIScale
 			Anim.tween(ghostScale, 0.3, { Scale = 1.35 })
 			for _, part in ipairs(ghost:GetDescendants()) do
-				if part:IsA("Frame") then
+				if part:IsA("ImageLabel") then
+					Anim.tween(part, 0.3, { ImageTransparency = 1 })
+				elseif part:IsA("Frame") then
 					Anim.tween(part, 0.3, { BackgroundTransparency = 1 })
 				end
 			end
