@@ -14,21 +14,12 @@ local remotes = ReplicatedStorage:WaitForChild(GameConfig.REMOTES.Folder)
 local actionRemote = remotes:WaitForChild(GameConfig.REMOTES.Action) :: RemoteEvent
 local stateRemote = remotes:WaitForChild(GameConfig.REMOTES.State) :: RemoteEvent
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- The game is played entirely in the GUI for now, so hide the mobile
--- thumbstick/jump buttons (they sat on top of Undo/Restart) and stop the
--- hidden avatar from walking around on keyboard input.
+-- thumbstick/jump buttons; they sat on top of Undo/Restart. (ServerMain keeps
+-- the hidden avatar from moving.)
 GuiService.TouchControlsEnabled = false
-task.spawn(function()
-	local ok, playerModule = pcall(function()
-		return require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule") :: ModuleScript) :: any
-	end)
-	if ok and playerModule then
-		playerModule:GetControls():Disable()
-	end
-end)
 
 local hud = PuzzleHUD.new(playerGui, {
 	move = function(from: number, to: number)
