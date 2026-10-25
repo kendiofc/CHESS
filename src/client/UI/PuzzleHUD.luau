@@ -35,6 +35,14 @@ local ERROR_MESSAGES = {
 	bad_square = "That move wasn't accepted.",
 }
 
+local MARGIN = 12
+local GAP = 10
+local HEADER_HEIGHT = 62
+local STATS_HEIGHT = 62
+local MESSAGE_HEIGHT = 40
+local CONTROLS_HEIGHT = 54
+local MAX_COLUMN_WIDTH = 720
+
 local PuzzleHUD = {}
 PuzzleHUD.__index = PuzzleHUD
 
@@ -102,6 +110,14 @@ local function button(text: string, primary: boolean): TextButton
 	})
 end
 
+-- Bottom-row button: shares the row's width but never grows past MaxSize.
+local function controlButton(text: string, primary: boolean): TextButton
+	local b = button(text, primary)
+	b.Size = UDim2.new(0.5, -6, 1, 0)
+	make("UISizeConstraint", { MaxSize = Vector2.new(170, math.huge), Parent = b })
+	return b
+end
+
 local function formatTime(seconds: number): string
 	seconds = math.max(0, math.floor(seconds))
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
@@ -160,28 +176,23 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	})
 	self.gui = gui
 
+	-- Children are placed by _layout() from the container's size, so the
+	-- screen can switch between a stacked (portrait/desktop) and a
+	-- side-by-side (short landscape, e.g. phones) arrangement.
 	local container = make("Frame", {
 		Name = "Container",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(1, -24, 1, -20),
+		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Parent = gui,
-	}, {
-		make("UISizeConstraint", { MaxSize = Vector2.new(720, math.huge) }),
-		make("UIListLayout", {
-			FillDirection = Enum.FillDirection.Vertical,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 10),
-		}),
 	})
+	self.container = container
 
 	-- Header: brand, puzzle name, difficulty and puzzle switcher.
 	local header = make("Frame", {
 		Name = "Header",
-		LayoutOrder = 1,
-		Size = UDim2.new(1, 0, 0, 58),
+		Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
 		BackgroundTransparency = 1,
 		Parent = container,
 	})
@@ -191,7 +202,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		TextSize = 13,
 		TextColor3 = Theme.Gold,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Size = UDim2.new(1, -150, 0, 18),
+		Size = UDim2.new(1, -160, 0, 18),
 		Parent = header,
 	})
 	self.titleLabel = label({
@@ -201,13 +212,13 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		TextWrapped = false,
 		Position = UDim2.fromOffset(0, 20),
-		Size = UDim2.new(1, -150, 0, 34),
+		Size = UDim2.new(1, -160, 0, 34),
 		Parent = header,
 	})
 	self.difficultyPill = make("TextLabel", {
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, 0, 0, 0),
-		Size = UDim2.fromOffset(140, 22),
+		Size = UDim2.fromOffset(150, 22),
 		BackgroundColor3 = Theme.PanelRaised,
 		FontFace = Theme.FontBold,
 		TextSize = 13,
@@ -216,24 +227,24 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	}, { round() })
 	local switcher = make("Frame", {
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, 0, 0, 28),
-		Size = UDim2.fromOffset(140, 30),
+		Position = UDim2.new(1, 0, 0, 26),
+		Size = UDim2.fromOffset(150, 36),
 		BackgroundTransparency = 1,
 		Parent = header,
 	})
 	local prev = button("<", false)
 	prev.Name = "PrevPuzzle"
-	prev.Size = UDim2.fromOffset(38, 30)
+	prev.Size = UDim2.fromOffset(44, 36)
 	prev.Parent = switcher
 	local nextButton = button(">", false)
 	nextButton.Name = "NextPuzzle"
 	nextButton.AnchorPoint = Vector2.new(1, 0)
 	nextButton.Position = UDim2.fromScale(1, 0)
-	nextButton.Size = UDim2.fromOffset(38, 30)
+	nextButton.Size = UDim2.fromOffset(44, 36)
 	nextButton.Parent = switcher
 	self.indexLabel = label({
-		Position = UDim2.fromOffset(38, 0),
-		Size = UDim2.new(1, -76, 1, 0),
+		Position = UDim2.fromOffset(44, 0),
+		Size = UDim2.new(1, -88, 1, 0),
 		TextColor3 = Theme.TextMuted,
 		TextSize = 14,
 		Parent = switcher,
@@ -248,8 +259,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	-- Stats: moves, captured progress, time.
 	local stats = make("Frame", {
 		Name = "Stats",
-		LayoutOrder = 2,
-		Size = UDim2.new(1, 0, 0, 62),
+		Size = UDim2.new(1, 0, 0, STATS_HEIGHT),
 		BackgroundTransparency = 1,
 		Parent = container,
 	}, {
@@ -318,8 +328,6 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	-- Board area takes whatever height is left.
 	local boardArea = make("Frame", {
 		Name = "BoardArea",
-		LayoutOrder = 3,
-		Size = UDim2.new(1, 0, 1, -(58 + 62 + 40 + 54 + 40)),
 		BackgroundTransparency = 1,
 		Parent = container,
 	})
@@ -354,8 +362,6 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 
 	self.messageLabel = label({
 		Name = "Message",
-		LayoutOrder = 4,
-		Size = UDim2.new(1, 0, 0, 40),
 		TextSize = 16,
 		TextColor3 = Theme.TextMuted,
 		Parent = container,
@@ -363,8 +369,6 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 
 	local controls = make("Frame", {
 		Name = "Controls",
-		LayoutOrder = 5,
-		Size = UDim2.new(1, 0, 0, 54),
 		BackgroundTransparency = 1,
 		Parent = container,
 	}, {
@@ -375,7 +379,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			Padding = UDim.new(0, 12),
 		}),
 	})
-	self.undoButton = button("Undo", false)
+	self.undoButton = controlButton("Undo", false)
 	self.undoButton.Name = "UndoButton"
 	self.undoButton.LayoutOrder = 1
 	self.undoButton.Parent = controls
@@ -385,13 +389,19 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			self.handlers.undo()
 		end
 	end)
-	local restartButton = button("Restart", true)
+	local restartButton = controlButton("Restart", true)
 	restartButton.Name = "RestartButton"
 	restartButton.LayoutOrder = 2
 	restartButton.Parent = controls
 	restartButton.Activated:Connect(function()
 		self.handlers.restart()
 	end)
+
+	self.parts = { header = header, stats = stats, boardArea = boardArea, message = self.messageLabel, controls = controls }
+	container:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		self:_layout()
+	end)
+	self:_layout()
 
 	-- The result card gets its own full-bleed ScreenGui so the dim covers the top bar too.
 	self:_buildResultCard(make("ScreenGui", {
@@ -512,6 +522,53 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 		primary = primary,
 		secondary = secondary,
 	}
+end
+
+-- Layout -----------------------------------------------------------------------
+
+local function place(frame: GuiObject, x: number, y: number, w: number, h: number)
+	frame.Position = UDim2.fromOffset(math.floor(x), math.floor(y))
+	frame.Size = UDim2.fromOffset(math.floor(w), math.floor(h))
+end
+
+-- Short, wide screens (phones in landscape) put the board on the left and the
+-- panels in a column on the right; everything else stacks vertically.
+function PuzzleHUD._layout(self: any)
+	local size = self.container.AbsoluteSize
+	if size.X <= 0 or size.Y <= 0 then
+		return
+	end
+	local p = self.parts
+	local w = size.X - MARGIN * 2
+	local h = size.Y - MARGIN * 2
+	local wide = size.X >= size.Y * 1.3 and size.Y < 640
+	self.layoutMode = if wide then "wide" else "tall"
+	if wide then
+		local sideW = math.clamp(w * 0.4, 260, 380)
+		local boardW = math.min(h, w - sideW - GAP * 2)
+		local x = MARGIN + (w - (boardW + GAP * 2 + sideW)) / 2
+		local sx = x + boardW + GAP * 2
+		place(p.boardArea, x, MARGIN, boardW, h)
+		place(p.header, sx, MARGIN, sideW, HEADER_HEIGHT)
+		place(p.stats, sx, MARGIN + HEADER_HEIGHT + GAP, sideW, STATS_HEIGHT)
+		local messageY = MARGIN + HEADER_HEIGHT + STATS_HEIGHT + GAP * 2
+		place(p.message, sx, messageY, sideW, h + MARGIN - CONTROLS_HEIGHT - GAP - messageY)
+		place(p.controls, sx, MARGIN + h - CONTROLS_HEIGHT, sideW, CONTROLS_HEIGHT)
+	else
+		local cw = math.min(w, MAX_COLUMN_WIDTH)
+		local x = MARGIN + (w - cw) / 2
+		local boardY = MARGIN + HEADER_HEIGHT + STATS_HEIGHT + GAP * 2
+		local bottom = MARGIN + h
+		place(p.header, x, MARGIN, cw, HEADER_HEIGHT)
+		place(p.stats, x, MARGIN + HEADER_HEIGHT + GAP, cw, STATS_HEIGHT)
+		place(p.controls, x, bottom - CONTROLS_HEIGHT, cw, CONTROLS_HEIGHT)
+		place(p.message, x, bottom - CONTROLS_HEIGHT - GAP - MESSAGE_HEIGHT, cw, MESSAGE_HEIGHT)
+		place(p.boardArea, x, boardY, cw, bottom - CONTROLS_HEIGHT - MESSAGE_HEIGHT - GAP * 3 - boardY)
+	end
+	if self.snapshot then
+		-- Ring thickness depends on the square size.
+		self:_renderHighlights()
+	end
 end
 
 -- Board construction ---------------------------------------------------------

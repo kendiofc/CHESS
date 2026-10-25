@@ -183,6 +183,11 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 	elseif action == ACTIONS.Restart then
 		startPuzzle(player, state.session.puzzle)
 	elseif action == ACTIONS.Sync then
+		-- The first puzzle starts when the player joins, before their client has
+		-- loaded; don't count loading time against an untouched attempt.
+		if state.session.moveCount == 0 and #state.session.history == 0 then
+			state.startedAt = os.clock()
+		end
 		send(player, state, "sync")
 	end
 end

@@ -239,6 +239,10 @@ for _, puzzle in ipairs(PuzzleDefinitions.list) do
 		end
 		eq(whites, 1, "exactly one player piece")
 		assert(BoardState.countColor(board, "black") >= 1, "has targets")
+		assert(
+			BoardState.countColor(board, "black") <= PuzzleValidator.MAX_SOLVER_TARGETS,
+			"too many targets for the live solver"
+		)
 	end)
 
 	test("puzzle " .. puzzle.id .. ": stored solution is valid", function()
