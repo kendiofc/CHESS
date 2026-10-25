@@ -8,6 +8,8 @@ local PuzzleSession = require(Shared.PuzzleSession)
 local PuzzleDefinitions = require(Shared.PuzzleDefinitions)
 local ReferenceSolver = require(Shared.ReferenceSolver)
 local BoardGen = require(Shared.BoardGen)
+local PuzzleCheck = require(Shared.PuzzleCheck)
+local GameConfig = require(Shared.GameConfig)
 
 local passed, failed = 0, 0
 
@@ -356,7 +358,7 @@ test("countOrders matches plain enumeration of capture orders", function()
 end)
 
 test("a state budget gives 'unknown', never a wrong answer", function()
-	local board = BoardState.fromLayout(PuzzleDefinitions.get("proto-03").layout)
+	local board = BoardState.fromLayout(PuzzleDefinitions.get("medium-02").layout)
 	eq(PuzzleValidator.solve(board, { maxStates = 2 }).status, "unknown")
 	eq(PuzzleValidator.solve(board, { maxStates = 1000 }).status, "solved")
 	for seed = 1, 300 do
@@ -478,7 +480,73 @@ for _, puzzle in ipairs(PuzzleDefinitions.list) do
 		eq(session.moveCount, #puzzle.solution)
 		eq(session:targetsLeft(), 0)
 	end)
+
+	test("puzzle " .. puzzle.id .. ": PuzzleCheck finds no problems", function()
+		local problems = PuzzleCheck.check(puzzle)
+		assert(#problems == 0, table.concat(problems, "; "))
+	end)
+
+	test("puzzle " .. puzzle.id .. ": the Phase 2 solver independently agrees", function()
+		local board = BoardState.fromLayout(puzzle.layout)
+		eq(ReferenceSolver.isSolvable(board), true)
+		if BoardState.countColor(board, "black") <= 6 then
+			eq((ReferenceSolver.shortestSolution(board)), puzzle.par, "par by full-position BFS")
+		end
+	end)
 end
+
+test("catalogue: 6 puzzles per difficulty, in difficulty order, no repeats", function()
+	local problems = PuzzleCheck.checkCatalog(PuzzleDefinitions.list)
+	assert(#problems == 0, table.concat(problems, "; "))
+	eq(#PuzzleDefinitions.list, 30)
+	for index, difficulty in ipairs(GameConfig.DIFFICULTIES) do
+		local group = PuzzleDefinitions.byDifficulty[difficulty]
+		eq(#group, 6, difficulty)
+		for number, puzzle in ipairs(group) do
+			eq(puzzle.difficultyIndex, index)
+			eq(puzzle.number, number)
+		end
+	end
+	local lastIndex = 0
+	for _, puzzle in ipairs(PuzzleDefinitions.list) do
+		assert(puzzle.difficultyIndex >= lastIndex, "list is not in difficulty order")
+		lastIndex = puzzle.difficultyIndex
+	end
+end)
+
+test("PuzzleCheck catches broken puzzles", function()
+	local good = assert(PuzzleDefinitions.get("easy-02"))
+	local function broken(change: (any) -> ()): { string }
+		local copy = table.clone(good)
+		change(copy)
+		return PuzzleCheck.check(copy)
+	end
+	assert(#broken(function(p)
+		p.solution = table.move(good.solution, 1, #good.solution - 1, 1, {})
+		p.par = #p.solution
+	end) > 0, "short solution")
+	assert(#broken(function(p)
+		p.solution = table.clone(good.solution)
+		p.solution[1] = { p.solution[1][1], "a5" }
+	end) > 0, "illegal first move")
+	assert(#broken(function(p)
+		p.par = good.par + 1
+	end) > 0, "wrong par")
+	assert(#broken(function(p)
+		p.difficulty = "Expert"
+	end) > 0, "wrong difficulty band")
+	assert(#broken(function(p)
+		p.hints = { "Go c1 c2 c3 then win.", "x" }
+	end) > 0, "hint giving away squares")
+	assert(#broken(function(p)
+		p.layout = { "Q...", "....", "....", "...Q" }
+	end) > 0, "two player pieces")
+	assert(#broken(function(p)
+		p.layout = { "P", "r" }
+		p.solution = { { "a2", "a1" } }
+		p.par = 1
+	end) > 0, "unsolvable layout")
+end)
 
 test("every puzzle id is unique and lookups work", function()
 	local seen = {}
@@ -492,7 +560,7 @@ test("every puzzle id is unique and lookups work", function()
 	eq(PuzzleDefinitions.nextAfter(PuzzleDefinitions.list[#PuzzleDefinitions.list].id), PuzzleDefinitions.list[1])
 end)
 
-test("prototype set uses all six piece types", function()
+test("catalogue uses all six piece types", function()
 	local kinds = {}
 	for _, puzzle in ipairs(PuzzleDefinitions.list) do
 		for _, line in ipairs(puzzle.layout) do
@@ -508,7 +576,7 @@ end)
 
 -- Session rules ----------------------------------------------------------------------
 
-local first = assert(PuzzleDefinitions.get("proto-01"))
+local first = assert(PuzzleDefinitions.get("beginner-04")) -- "First Echo", the Phase 2 opener
 
 test("session rejects bad input without changing state", function()
 	local session = PuzzleSession.new(first)
