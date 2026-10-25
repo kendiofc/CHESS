@@ -116,6 +116,7 @@ function PuzzleMenu.new(playerGui: Instance, start: (string, string) -> ())
 		TextSize = 13,
 		TextColor3 = Theme.TextMuted,
 		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 		Position = UDim2.fromOffset(18, 40),
 		Size = UDim2.new(1, -80, 0, 18),
 		Parent = panel,
@@ -228,9 +229,14 @@ local function difficultyRow(self: any, order: number, difficulty: string, index
 	local journey = self.tab == PLAY_MODES.Journey
 	local locked = journey and index > progress.unlockedIndex
 	local puzzles = PuzzleDefinitions.byDifficulty[difficulty]
+	-- In Journey only clears that count towards unlocks are shown.
+	local function isCleared(puzzle: any): boolean
+		local record = progress.completed[puzzle.id]
+		return record ~= nil and (not journey or record.credited)
+	end
 	local done = 0
 	for _, puzzle in ipairs(puzzles) do
-		if progress.completed[puzzle.id] then
+		if isCleared(puzzle) then
 			done += 1
 		end
 	end
@@ -278,7 +284,7 @@ local function difficultyRow(self: any, order: number, difficulty: string, index
 		}),
 	})
 	for number, puzzle in ipairs(puzzles) do
-		local cleared = progress.completed[puzzle.id] ~= nil
+		local cleared = isCleared(puzzle)
 		local current = puzzle.id == self.currentId
 		local cell = make("TextButton", {
 			Name = puzzle.id,
@@ -389,7 +395,7 @@ function PuzzleMenu._render(self: any)
 	local progress = self.progress
 	local wallet = if progress then string.format("%d XP  ·  %d coins", progress.xp, progress.coins) else "Loading progress..."
 	if self.saveStatus == "offline" then
-		wallet ..= "  ·  progress can't be saved right now"
+		wallet ..= "  ·  not saving"
 	end
 	self.wallet.Text = wallet
 	self.note.Text = string.format(NOTES[self.tab], if progress then progress.unlockRequirement else 4)

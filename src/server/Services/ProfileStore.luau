@@ -48,6 +48,21 @@ type Record = {
 	released: boolean,
 }
 
+-- Errors that retrying cannot fix: the place has no DataStore access (Studio
+-- with API access off, or an unpublished place). After one of these the store
+-- stops calling the DataStore for the rest of the server's life.
+local PERMANENT_ERRORS = { "StudioAccessToApisNotAllowed", "Studio access to APIs is not allowed", "must publish" }
+
+local function isPermanent(err: any): boolean
+	local message = tostring(err)
+	for _, fragment in ipairs(PERMANENT_ERRORS) do
+		if string.find(message, fragment, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
 export type Deps = {
 	store: any, -- GetAsync(key) and UpdateAsync(key, transform), like a DataStore
 	progression: any, -- the Progression module
@@ -63,6 +78,7 @@ function ProfileStore.new(deps: Deps)
 		deps = deps,
 		records = {} :: { [number]: Record },
 		failedSaves = 0,
+		disabled = false, -- set after a permanent DataStore error
 	}, ProfileStore)
 	return self
 end
@@ -102,6 +118,9 @@ function ProfileStore._retry(self: any, requestType: string, attempts: number, f
 	local delay = ProfileStore.BACKOFF
 	local lastError = nil
 	for attempt = 1, attempts do
+		if self.disabled then
+			return false, "DataStore access is disabled for this server"
+		end
 		self:_waitForBudget(requestType)
 		local ok, result = pcall(fn)
 		if ok then
@@ -109,6 +128,11 @@ function ProfileStore._retry(self: any, requestType: string, attempts: number, f
 		end
 		lastError = result
 		self:_log(string.format("%s failed (attempt %d/%d): %s", requestType, attempt, attempts, tostring(result)))
+		if isPermanent(result) then
+			self.disabled = true
+			self:_log("DataStores are not available here; progress will not be saved on this server")
+			return false, result
+		end
 		if attempt < attempts then
 			self.deps.wait(delay)
 			delay *= 2

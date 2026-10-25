@@ -932,6 +932,21 @@ test("profile store: leaving saves with extra retries", function()
 	eq(profiles:get(9), nil, "forgotten after leaving")
 end)
 
+test("profile store: a permanent DataStore error stops further calls", function()
+	local store = FakeStore.new()
+	store.GetAsync = function()
+		error("502: API Services rejected request with error. Error code: 7 Reason: Studio access to APIs is not allowed.")
+	end
+	local profiles = makeStore(store)
+	profiles:load(10)
+	eq(profiles:status(10), "offline")
+	assert(profiles.disabled, "store disabled after the first permanent error")
+	profiles:record(10, win("beginner-01", MODES.Journey))
+	eq(profiles:save(10), false)
+	eq(store.writes, 0, "no write attempted")
+	eq(profiles:get(10).stats.solves, 1, "play continues in memory")
+end)
+
 -- Hints ---------------------------------------------------------------------------------
 
 test("hints: written hints first, then a live hint naming a target", function()
