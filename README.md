@@ -58,6 +58,8 @@ layout = {
 | `ReplicatedStorage.Shared.PuzzleHints` | `src/shared/PuzzleHints.luau` | Picks written or live hints |
 | `ReplicatedStorage.Shared.Progression` | `src/shared/Progression.luau` | Profile schema, unlocks, resume, stars, Daily Puzzle and streak, hint allowances, rewards, settings |
 | `ReplicatedStorage.Shared.Achievements` | `src/shared/Achievements.luau` | One-time coin goals and their checks |
+| `ReplicatedStorage.Shared.TutorialFlow` | `src/shared/TutorialFlow.luau` | The tutorial's steps and how player events move between them |
+| `ReplicatedStorage.Shared.InputRules` | `src/shared/InputRules.luau` | Drag threshold, tap suppression, drop square, when to confirm leaving |
 | `ReplicatedStorage.Shared.GameConfig` | `src/shared/GameConfig.luau` | Difficulties, play modes, hint rules, rewards, star slack, streak shield, cosmetic slots, default settings, remotes, rate limits |
 | `ReplicatedStorage.Remotes` | `default.project.json` | `PuzzleAction` (client → server) and `PuzzleState` (server → client) |
 | `ServerScriptService.ServerMain` | `src/server/ServerMain.server.luau` | Boots services and keeps avatars still while the GUI is in use |
@@ -68,6 +70,8 @@ layout = {
 | `StarterPlayerScripts.SoundController` | `src/client/SoundController.luau` | Sound effects, master volume, haptics where supported |
 | `StarterPlayerScripts.UI.PuzzleHUD` | `src/client/UI/PuzzleHUD.luau` | Board, stats, controls (Undo, Hint, Restart) and result card |
 | `StarterPlayerScripts.UI.PuzzleMenu` | `src/client/UI/PuzzleMenu.luau` | Home screen, Journey, Practice, Daily, Statistics and Settings |
+| `StarterPlayerScripts.UI.TutorialCoach` | `src/client/UI/TutorialCoach.luau` | The tutorial card and its pointer ring |
+| `StarterPlayerScripts.UI.ConfirmDialog` | `src/client/UI/ConfirmDialog.luau` | "Restart puzzle?" / "Leave this puzzle?" dialog |
 | `StarterPlayerScripts.UI.SoundConfig` | `src/client/UI/SoundConfig.luau` | The audio asset for each sound event |
 | `StarterPlayerScripts.UI.PieceArt` | `src/client/UI/PieceArt.luau` | Pieces cut from the sprite sheet (drawn GUI shapes as a fallback) |
 | `StarterPlayerScripts.UI.Theme` | `src/client/UI/Theme.luau` | Colours and fonts |
@@ -89,7 +93,31 @@ PuzzleHUD lays itself out from the screen size and redoes it on every resize:
   left and the header, stats and buttons in a column on the right.
 
 The layout was checked in Studio at 320x568, 390x844, 568x320, 844x390,
-1024x768 and full desktop windows.
+768x1024, 1024x768, 1366x768 and 1920x1080, with the tutorial card showing.
+That means in Studio only: real phones and tablets haven't been tried yet.
+
+### Input
+
+- **Tap** your piece, then tap a dot (move) or ring (capture).
+- **Drag** your piece onto a square (Settings > Drag to move, on by default).
+  A press becomes a drag only after it moves 10 px, and taps arriving right
+  after a drag are ignored, so one press is never read as both. An illegal
+  drop puts the piece back and says why. Dragging never sends anything until
+  release; the server checks the move like any other.
+- **Leaving an attempt** that has moves in it (Restart, the puzzle arrows,
+  starting another puzzle or the tutorial) asks first. The dialog blocks the
+  board, ignores presses for its first 0.25 s, and takes Backspace or gamepad
+  B to cancel and Enter to confirm. (Escape belongs to the Roblox menu.)
+
+### Tutorial
+
+A five-step guided run of the first Journey puzzle: select, capture, the
+echo, hints, and clearing the board. It starts by itself only for a player
+who has never finished or skipped it and hasn't cleared any puzzle, so
+players from before the tutorial are never interrupted. Skip ends it at any
+step. Leaving the puzzle interrupts it without saving, so it is offered again
+next session. Replay it from Home ("How to play") or Settings. The server
+saves `completed` or `skipped` (a completion is never replaced by a skip).
 
 ## Modes, hints and progression
 
@@ -122,7 +150,7 @@ The layout was checked in Studio at 320x568, 390x844, 568x320, 844x390,
   - The missed day pays nothing and isn't marked cleared.
   - Two missed days, or a second miss inside the 7 days, reset the streak to 1.
   - Late or repeated ops never move the streak.
-- **Settings.** Sound on/off, master volume and vibration are saved as a `settings` op. The server keeps only valid values.
+- **Settings.** Sound on/off, master volume, vibration and drag-to-move are saved as a `settings` op. The server keeps only valid values.
 
 ### Sound and haptics
 
@@ -131,6 +159,9 @@ The layout was checked in Studio at 320x568, 390x844, 568x320, 844x390,
 - Every id is an Audio asset published by Roblox or ProSoundEffects. Each was checked with `MarketplaceService:GetProductInfo`, and each loaded in Studio.
 - Set an id to `nil` to silence an event.
 - The same event can't start twice within 80 ms.
+- Board sounds are short: move 0.5 s, capture 0.63 s (a ProSoundEffects wood
+  thud; the 2.7 s UI pop it replaced overlapped on fast play). The 3.4 s hint
+  chime fades out at 1.2 s (`maxSeconds`).
 - Vibration is used only when `HapticService` reports support for the current input (touch or gamepad). Otherwise the setting shows "Not supported on this device". Every vibration goes with a sound and a visual change, so nothing depends on it.
 
 ### Saving (ProfileStore)
@@ -218,6 +249,8 @@ The suite checks:
 
 **Progression and saving**
 - unlocks, Practice, Daily rewards and hints, and op de-duplication
+- the tutorial: step order, skipping ahead, skip/leave/win ending it once, who gets it automatically, its saved outcome, and old profiles
+- input rules: the drop square at board edges, the drag threshold, when leaving needs confirming
 - stars and their thresholds, achievements paid once (also across two servers), the streak and its 7-day shield, resume, unlock progress, settings validation, and loading Phase 3 profiles
 - `ProfileStore`, against `tests/lib/FakeStore`: failed loads, failed saves, a write that reports an error, two servers racing, a concurrent write, write spacing, budget waits, the final save on leave, and permanent errors
 
