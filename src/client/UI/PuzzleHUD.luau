@@ -319,7 +319,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	local boardArea = make("Frame", {
 		Name = "BoardArea",
 		LayoutOrder = 3,
-		Size = UDim2.new(1, 0, 1, -(58 + 62 + 26 + 54 + 40)),
+		Size = UDim2.new(1, 0, 1, -(58 + 62 + 40 + 54 + 40)),
 		BackgroundTransparency = 1,
 		Parent = container,
 	})
@@ -355,7 +355,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	self.messageLabel = label({
 		Name = "Message",
 		LayoutOrder = 4,
-		Size = UDim2.new(1, 0, 0, 26),
+		Size = UDim2.new(1, 0, 0, 40),
 		TextSize = 16,
 		TextColor3 = Theme.TextMuted,
 		Parent = container,
