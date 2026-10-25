@@ -613,7 +613,11 @@ function PuzzleHUD._buildSquares(self: any)
 		local col, row = BoardState.toCoord(board, index)
 		local isDark = (col + row) % 2 == 0
 		local base = if isDark then Theme.SquareDark else Theme.SquareLight
-		local coordColor = if isDark then Theme.SquareLight else Theme.SquareDark
+		-- Walls keep their coordinates too, in light text over the hatching.
+		local coordColor = if board.blocked[index]
+			then Theme.Text
+			elseif isDark then Theme.SquareLight
+			else Theme.SquareDark
 		local position, size = self:_squareRect(index)
 		local square = make("TextButton", {
 			Name = BoardState.squareName(board, index),
@@ -667,7 +671,7 @@ function PuzzleHUD._buildSquares(self: any)
 				Position = UDim2.fromOffset(4, 2),
 				Size = UDim2.fromOffset(14, 14),
 				TextXAlignment = Enum.TextXAlignment.Left,
-				Visible = not board.blocked[index],
+				ZIndex = 2,
 				Parent = square,
 			})
 		end
@@ -681,7 +685,7 @@ function PuzzleHUD._buildSquares(self: any)
 				Position = UDim2.new(1, -4, 1, -2),
 				Size = UDim2.fromOffset(14, 14),
 				TextXAlignment = Enum.TextXAlignment.Right,
-				Visible = not board.blocked[index],
+				ZIndex = 2,
 				Parent = square,
 			})
 		end

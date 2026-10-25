@@ -50,17 +50,32 @@ layout = {
 | `ReplicatedStorage.Shared.PuzzleDefinitions` | `src/shared/PuzzleDefinitions.luau` | Handcrafted puzzles |
 | `ReplicatedStorage.Shared.GameConfig` | `src/shared/GameConfig.luau` | Remote names, actions, rate limits |
 | `ReplicatedStorage.Remotes` | `default.project.json` | `PuzzleAction` (client → server) and `PuzzleState` (server → client) |
-| `ServerScriptService.ServerMain` | `src/server/ServerMain.server.luau` | Boots services |
+| `ServerScriptService.ServerMain` | `src/server/ServerMain.server.luau` | Boots services and keeps avatars still while the GUI is in use |
 | `ServerScriptService.Services.PuzzleService` | `src/server/Services/PuzzleService.luau` | Per-player authoritative sessions |
-| `StarterPlayerScripts.ClientController` | `src/client/ClientController.client.luau` | Wires the HUD to the remotes |
+| `StarterPlayerScripts.ClientController` | `src/client/ClientController.client.luau` | Wires the HUD to the remotes and hides the mobile thumbstick |
 | `StarterPlayerScripts.AnimationController` | `src/client/AnimationController.luau` | Tween helpers |
 | `StarterPlayerScripts.UI.PuzzleHUD` | `src/client/UI/PuzzleHUD.luau` | Board, stats, controls and result card |
-| `StarterPlayerScripts.UI.PieceArt` | `src/client/UI/PieceArt.luau` | Piece silhouettes drawn from GUI shapes |
+| `StarterPlayerScripts.UI.PieceArt` | `src/client/UI/PieceArt.luau` | Pieces cut from the sprite sheet (drawn GUI shapes as a fallback) |
 | `StarterPlayerScripts.UI.Theme` | `src/client/UI/Theme.luau` | Colours and fonts |
 
 The UI is built in code, so `StarterGui` stays empty for now.
-Roblox fonts don't include the Unicode chess glyphs, so the pieces are drawn
-from GUI shapes. That means no uploaded images are needed.
+Roblox fonts don't include the Unicode chess glyphs, so the pieces come from a
+sprite sheet: `assets/pieces.png` (6 x 2 cells of 170 px, columns K Q B N R P,
+white row first), uploaded as the image in `Theme.PieceSheet`. Rebuild it from
+`assets/source/pieces-reference.jpg` with `tools/build_piece_sheet.py`. If
+`Theme.PieceSheet` is empty, PieceArt draws the pieces from GUI shapes instead.
+
+### Layout
+
+PuzzleHUD lays itself out from the screen size and redoes it on every resize:
+
+- Tall screens (phones in portrait, tablets, most desktops) stack the header,
+  stats, board, message and buttons in one column up to 720 px wide.
+- Short, wide screens (phones in landscape, small windows) put the board on the
+  left and the header, stats and buttons in a column on the right.
+
+The layout was checked in Studio at 320x568, 390x844, 568x320, 844x390,
+1024x768 and full desktop windows.
 
 ## Security model
 
@@ -92,6 +107,18 @@ The suite checks:
 - par equals the true minimum number of moves (found by BFS)
 - tampered solutions are rejected
 - the session rejects bad input, and handles win, fail, undo and restart
+- every puzzle stays within the solver's target limit
+
+`tests/analyze.luau` prints a report for puzzle authoring: target count, par,
+and how many capture orders clear the board versus dead-end:
+
+```sh
+python3 tools/run_tests.py path/to/luau tests/analyze.luau
+```
+
+The solver is exhaustive. It is instant on the current puzzles, but an
+unsolvable board with 11 targets takes about 0.6 s, so bigger puzzles will need
+the solver work planned for Phase 3 (see `docs/phase3-plan.md`).
 
 ## Syncing into Studio
 
