@@ -656,6 +656,319 @@ test("a won session cannot be undone or moved", function()
 	eq(err, "not_playing")
 end)
 
+-- Progression -----------------------------------------------------------------------
+
+local Progression = require(Shared.Progression)
+local PuzzleHints = require(Shared.PuzzleHints)
+local ProfileStore = require(Shared.ProfileStore)
+local FakeStore = require(Shared.FakeStore)
+local MODES = GameConfig.PLAY_MODES
+
+local nextOpId = 0
+local function opId(): string
+	nextOpId += 1
+	return "op-" .. nextOpId
+end
+
+local function win(puzzleId: string, mode: string, day: number?): any
+	return { id = opId(), kind = "win", puzzleId = puzzleId, mode = mode, moves = 10, seconds = 30, day = day }
+end
+
+test("journey unlocks the next difficulty after enough credited clears", function()
+	local profile = Progression.newProfile()
+	eq(Progression.unlockedIndex(profile), 1)
+	local easy = PuzzleDefinitions.byDifficulty.Easy[1]
+	eq(select(2, Progression.canStart(profile, easy, MODES.Journey, 1)), "locked")
+	eq((Progression.canStart(profile, easy, MODES.Practice, 1)), true, "practice ignores locks")
+	-- Practice clears never count towards unlocks.
+	for i = 1, 6 do
+		Progression.apply(profile, win(PuzzleDefinitions.byDifficulty.Beginner[i].id, MODES.Practice))
+	end
+	eq(Progression.unlockedIndex(profile), 1)
+	for i = 1, GameConfig.UNLOCK_REQUIREMENT - 1 do
+		Progression.apply(profile, win(PuzzleDefinitions.byDifficulty.Beginner[i].id, MODES.Journey))
+	end
+	eq(Progression.unlockedIndex(profile), 1, "one short")
+	Progression.apply(profile, win(PuzzleDefinitions.byDifficulty.Beginner[6].id, MODES.Journey))
+	eq(Progression.unlockedIndex(profile), 2)
+	eq((Progression.canStart(profile, easy, MODES.Journey, 1)), true)
+	local medium = PuzzleDefinitions.byDifficulty.Medium[1]
+	eq(select(2, Progression.canStart(profile, medium, MODES.Journey, 1)), "locked", "still sequential")
+	eq(select(2, Progression.canStart(profile, easy, "Ranked", 1)), "bad_mode")
+end)
+
+test("journey reward is paid once per puzzle, practice pays nothing", function()
+	local profile = Progression.newProfile()
+	local puzzle = PuzzleDefinitions.list[1]
+	local _, reward = Progression.apply(profile, win(puzzle.id, MODES.Practice))
+	eq(reward, nil)
+	local _, first = Progression.apply(profile, win(puzzle.id, MODES.Journey))
+	eq(first.xp, puzzle.reward.xp)
+	local _, again = Progression.apply(profile, win(puzzle.id, MODES.Journey))
+	eq(again, nil, "second clear")
+	eq(profile.xp, puzzle.reward.xp)
+	eq(profile.coins, puzzle.reward.coins)
+	eq(profile.completed[puzzle.id].solves, 3)
+	eq(profile.stats.solves, 3)
+end)
+
+test("the same op applied twice only counts once", function()
+	local profile = Progression.newProfile()
+	local op = win(PuzzleDefinitions.list[1].id, MODES.Journey)
+	eq((Progression.apply(profile, op)), true)
+	eq((Progression.apply(profile, op)), false)
+	eq(profile.stats.solves, 1)
+end)
+
+test("daily puzzle: one reward and one hint per day, reset the next day", function()
+	local day = 20386
+	local daily = Progression.dailyPuzzle(day)
+	assert(table.find(GameConfig.DAILY_DIFFICULTIES, daily.difficulty), "daily comes from the daily pool")
+	assert(Progression.dailyPuzzle(day + 1) ~= daily, "a new puzzle each day")
+	local profile = Progression.newProfile()
+	eq(select(2, Progression.canStart(profile, PuzzleDefinitions.list[1], MODES.Daily, day)), "not_daily")
+	eq((Progression.canStart(profile, daily, MODES.Daily, day)), true)
+	eq(Progression.hintsLeft(profile, MODES.Daily, 0, day), 1)
+	Progression.apply(profile, { id = opId(), kind = "hint", mode = MODES.Daily, day = day })
+	eq(Progression.hintsLeft(profile, MODES.Daily, 0, day), 0, "used today, even in a new attempt")
+	local _, reward = Progression.apply(profile, win(daily.id, MODES.Daily, day))
+	eq(reward.xp, GameConfig.DAILY_REWARD.xp)
+	local _, again = Progression.apply(profile, win(daily.id, MODES.Daily, day))
+	eq(again, nil, "second daily clear the same day")
+	eq(profile.xp, GameConfig.DAILY_REWARD.xp)
+	-- A late op from yesterday must not touch today's state.
+	local tomorrow = day + 1
+	eq(Progression.hintsLeft(profile, MODES.Daily, 0, tomorrow), 1, "new day, new hint")
+	local _, next = Progression.apply(profile, win(Progression.dailyPuzzle(tomorrow).id, MODES.Daily, tomorrow))
+	eq(next.xp, GameConfig.DAILY_REWARD.xp, "tomorrow pays again")
+	local _, late = Progression.apply(profile, win(daily.id, MODES.Daily, day))
+	eq(late, nil, "a late op for yesterday pays nothing")
+	eq(profile.daily.day, tomorrow)
+	-- Daily clears count towards unlocks.
+	assert(profile.completed[daily.id].credited)
+end)
+
+test("hint allowances: unlimited in journey and practice", function()
+	local profile = Progression.newProfile()
+	eq(Progression.hintsLeft(profile, MODES.Practice, 10, 1), math.huge)
+	eq(Progression.hintsLeft(profile, MODES.Journey, 10, 1), math.huge)
+	eq(Progression.hintsLeft(profile, "Ranked", 0, 1), 0, "unknown or competitive modes get none")
+end)
+
+test("damaged stored data is normalised, not trusted", function()
+	local profile = Progression.normalize({
+		xp = "lots",
+		coins = 0 / 0,
+		completed = { ["beginner-01"] = { bestMoves = 3, credited = true }, [5] = {}, bad = "x" },
+		rewards = { ["journey:x"] = true, y = 1 },
+		applied = { "a", 5 },
+		stats = { solves = 2, fails = "x" },
+	})
+	eq(profile.xp, 0)
+	eq(profile.coins, 0)
+	eq(profile.completed["beginner-01"].bestMoves, 3)
+	eq(profile.completed.bad, nil)
+	eq(profile.rewards.y, nil)
+	eq(#profile.applied, 1)
+	eq(profile.stats.solves, 2)
+	eq(profile.stats.fails, 0)
+	eq(Progression.normalize(nil).version, Progression.VERSION)
+end)
+
+-- ProfileStore -------------------------------------------------------------------------
+
+local function makeStore(store: any, logLines: { string }?)
+	local clock = { t = 0 }
+	local deps = {
+		store = store,
+		progression = Progression,
+		now = function()
+			return clock.t
+		end,
+		wait = function(seconds: number)
+			clock.t += seconds
+		end,
+		newId = opId,
+		log = function(line: string)
+			if logLines then
+				table.insert(logLines, line)
+			end
+		end,
+	}
+	return ProfileStore.new(deps), clock, deps
+end
+
+test("profile store: load, record, save round trip", function()
+	local store = FakeStore.new()
+	local profiles = makeStore(store)
+	profiles:load(1)
+	eq(profiles:status(1), "ok")
+	local puzzle = PuzzleDefinitions.list[1]
+	local reward = profiles:record(1, win(puzzle.id, MODES.Journey))
+	eq(reward.xp, puzzle.reward.xp)
+	eq(profiles:pendingCount(1), 1)
+	assert(profiles:save(1))
+	eq(profiles:pendingCount(1), 0)
+	eq(store.data.player_1.xp, puzzle.reward.xp)
+	-- A fresh server sees the same profile.
+	local other = makeStore(store)
+	eq(other:load(1).xp, puzzle.reward.xp)
+end)
+
+test("profile store: failed load plays offline, then the first save heals it", function()
+	local store = FakeStore.new()
+	store.data.player_2 = { xp = 500, coins = 40, rewards = { ["journey:beginner-01"] = true } }
+	store.failGets = 99
+	local logLines = {}
+	local profiles = makeStore(store, logLines)
+	local profile = profiles:load(2)
+	eq(profiles:status(2), "offline")
+	eq(profile.xp, 0, "blank view while offline")
+	assert(#logLines >= ProfileStore.LOAD_ATTEMPTS, "each failed attempt is logged")
+	-- The offline view thinks beginner-01 has no reward yet...
+	local shown = profiles:record(2, win("beginner-01", MODES.Journey))
+	assert(shown ~= nil)
+	assert(profiles:save(2))
+	eq(profiles:status(2), "ok")
+	-- ...but the stored ledger wins: no double reward, nothing lost.
+	eq(store.data.player_2.xp, 500)
+	eq(store.data.player_2.coins, 40)
+	eq(profiles:get(2).xp, 500, "view replaced by the merged profile")
+	eq(store.data.player_2.completed["beginner-01"].solves, 1)
+end)
+
+test("profile store: a save that wrote but reported an error is not applied twice", function()
+	local store = FakeStore.new()
+	local profiles = makeStore(store)
+	profiles:load(3)
+	profiles:record(3, win("beginner-02", MODES.Journey))
+	store.commitThenFail = 1
+	assert(profiles:save(3), "the retry succeeds")
+	eq(store.writes, 2, "written twice")
+	eq(store.data.player_3.stats.solves, 1, "but counted once")
+	eq(store.data.player_3.xp, PuzzleDefinitions.get("beginner-02").reward.xp)
+end)
+
+test("profile store: two servers saving the same player never double-pay", function()
+	local store = FakeStore.new()
+	local a = makeStore(store)
+	local b = makeStore(store)
+	a:load(4)
+	b:load(4)
+	local id = "beginner-03"
+	assert(a:record(4, win(id, MODES.Journey)) ~= nil)
+	assert(b:record(4, win(id, MODES.Journey)) ~= nil, "each server's view pays")
+	assert(a:save(4))
+	assert(b:save(4))
+	local reward = PuzzleDefinitions.get(id).reward
+	eq(store.data.player_4.xp, reward.xp, "the store pays once")
+	eq(store.data.player_4.stats.solves, 2, "both clears are counted")
+	eq(b:get(4).xp, reward.xp, "b's view corrected after its save")
+end)
+
+test("profile store: concurrent write between read and save is merged", function()
+	local store = FakeStore.new()
+	local profiles = makeStore(store)
+	profiles:load(5)
+	profiles:record(5, win("beginner-01", MODES.Journey))
+	store.beforeUpdate = function(key)
+		-- Another server writes a different clear first.
+		store.data[key] = { completed = { ["beginner-05"] = { bestMoves = 6, solves = 1, credited = true } } }
+	end
+	assert(profiles:save(5))
+	assert(store.data.player_5.completed["beginner-01"])
+	assert(store.data.player_5.completed["beginner-05"], "the other server's write survives")
+end)
+
+test("profile store: failed saves keep ops queued and leave stored data alone", function()
+	local store = FakeStore.new()
+	local profiles = makeStore(store)
+	profiles:load(6)
+	assert(profiles:save(6))
+	profiles:record(6, win("beginner-01", MODES.Journey))
+	store.failUpdates = ProfileStore.SAVE_ATTEMPTS
+	eq(profiles:save(6), false)
+	eq(profiles:pendingCount(6), 1)
+	eq(store.data.player_6, nil, "nothing written")
+	eq(profiles.failedSaves, 1)
+	assert(profiles:save(6), "next save gets through")
+	eq(profiles:pendingCount(6), 0)
+	eq(store.data.player_6.stats.solves, 1)
+end)
+
+test("profile store: writes to one key are spaced out", function()
+	local store = FakeStore.new()
+	local profiles, clock = makeStore(store)
+	profiles:load(7)
+	profiles:record(7, win("beginner-01", MODES.Journey))
+	assert(profiles:save(7))
+	local firstWrite = clock.t
+	profiles:record(7, win("beginner-02", MODES.Journey))
+	assert(profiles:save(7))
+	assert(clock.t - firstWrite >= ProfileStore.MIN_SAVE_INTERVAL, "second write waited")
+end)
+
+test("profile store: waits for request budget before calling", function()
+	local store = FakeStore.new()
+	local profiles, clock, deps = makeStore(store)
+	local budget = 0
+	deps.budget = function()
+		budget += 0.25
+		return budget
+	end
+	profiles:load(8)
+	assert(clock.t >= 3, "waited for budget")
+	eq(store.gets, 1)
+end)
+
+test("profile store: leaving saves with extra retries", function()
+	local store = FakeStore.new()
+	local profiles = makeStore(store)
+	profiles:load(9)
+	profiles:record(9, win("beginner-01", MODES.Journey))
+	store.failUpdates = ProfileStore.FINAL_SAVE_ATTEMPTS - 1
+	assert(profiles:release(9))
+	eq(store.data.player_9.stats.solves, 1)
+	eq(profiles:get(9), nil, "forgotten after leaving")
+end)
+
+-- Hints ---------------------------------------------------------------------------------
+
+test("hints: written hints first, then a live hint naming a target", function()
+	for _, puzzle in ipairs(PuzzleDefinitions.list) do
+		local board = BoardState.fromLayout(puzzle.layout)
+		eq(PuzzleHints.forLevel(puzzle, board, "playing", 1), puzzle.hints[1])
+		eq(PuzzleHints.forLevel(puzzle, board, "playing", 2), puzzle.hints[2])
+		local live = PuzzleHints.forLevel(puzzle, board, "playing", 3)
+		local name = assert(string.match(live, "on (%l%d) next%.$"), puzzle.id .. ": " .. live)
+		local target = assert(BoardState.parseSquare(board, name))
+		assert(board.pieces[target] and board.pieces[target].color == "black", puzzle.id .. " names a target")
+	end
+	local stuck = BoardState.fromLayout({ "P", "r" })
+	assert(string.find(PuzzleHints.forLevel({ hints = { "a", "b" } }, stuck, "failed", 1), "Undo"))
+end)
+
+test("hints: a live hint is a capture some solution makes next", function()
+	-- After a couple of solution moves, the live hint must still lead to a win.
+	for _, puzzle in ipairs(PuzzleDefinitions.list) do
+		local session = PuzzleSession.new(puzzle)
+		for i = 1, math.min(2, #puzzle.solution - 1) do
+			assert(session:tryMove(sq(session.board, puzzle.solution[i][1]), sq(session.board, puzzle.solution[i][2])))
+		end
+		local live = PuzzleHints.forLevel(puzzle, session.board, session.status, 3)
+		local name = string.match(live, "on (%l%d) next%.$")
+		if name then
+			local target = sq(session.board, name)
+			-- Remove the target as if captured and become it; still solvable.
+			local board = BoardState.clone(session.board)
+			local player = assert(BoardState.findPlayer(board))
+			board.pieces[target] = { kind = board.pieces[target].kind, color = "white" }
+			board.pieces[player] = nil
+			eq(PuzzleValidator.isSolvable(board), true, puzzle.id)
+		end
+	end
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then
 	error("test failures")
