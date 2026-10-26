@@ -100,7 +100,8 @@ local function fitText(label: TextLabel, max: number, min: number)
 end
 
 local function coinsText(amount: number): string
-	return "🪙 " .. tostring(amount)
+	-- Plain text: the UI font has no coin emoji.
+	return tostring(amount) .. " coins"
 end
 
 -- A card button. `style` is "gold" (buy), "accent" (equip), "done" (equipped
@@ -433,7 +434,8 @@ local function tabs(menu: any, list: Instance, width: number)
 		Parent = list,
 	}, {
 		make("UIGridLayout", {
-			CellSize = UDim2.new(1 / columns, -6 * (columns - 1) / columns, 0, 36),
+			-- One spare pixel per cell, or rounding wraps the last cell to a new row.
+			CellSize = UDim2.new(1 / columns, -math.ceil(6 * (columns - 1) / columns) - 1, 0, 36),
 			CellPadding = UDim2.fromOffset(6, 6),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
@@ -533,7 +535,7 @@ local function itemButton(menu: any, card: Frame, item: ShopCatalog.Item, ctx: a
 		local key = ShopCatalog.ownKey(item)
 		if ctx.coins >= item.coins then
 			local confirming = menu.shopConfirm and menu.shopConfirm.key == key
-			button = actionButton(card, "Action", if confirming then "Tap to confirm" else "Buy " .. coinsText(item.coins), "gold", function()
+			button = actionButton(card, "Action", if confirming then "Tap to confirm" else "Buy  ·  " .. coinsText(item.coins), "gold", function()
 				if menu.shopConfirm and menu.shopConfirm.key == key then
 					request(menu, "buy", item)
 				else
@@ -551,7 +553,7 @@ local function itemButton(menu: any, card: Frame, item: ShopCatalog.Item, ctx: a
 				end
 			end)
 		else
-			button = actionButton(card, "Action", string.format("Need %s more", coinsText(item.coins - ctx.coins)), "off", nil)
+			button = actionButton(card, "Action", string.format("Need %d more coins", item.coins - ctx.coins), "off", nil)
 		end
 	elseif item.pass then
 		-- Not a purchase: it shows the pass that includes the item.
@@ -638,7 +640,7 @@ local function itemCard(menu: any, grid: Instance, order: number, item: ShopCata
 	if item.free then
 		source, sourceColor = "Free", Theme.TextMuted
 	elseif item.coins then
-		source, sourceColor = coinsText(item.coins) .. " coins", Theme.Gold
+		source, sourceColor = coinsText(item.coins), Theme.Gold
 	else
 		local pass = GamePassConfig.PASSES[item.pass :: string]
 		source, sourceColor = "R$  ·  " .. (if pass then pass.name else "Gamepass"), ROBUX
@@ -669,7 +671,7 @@ local function itemGrid(menu: any, list: Instance, order: number, items: { ShopC
 		Parent = list,
 	}, {
 		make("UIGridLayout", {
-			CellSize = UDim2.new(1 / columns, -10 * (columns - 1) / columns, 0, cellHeight),
+			CellSize = UDim2.new(1 / columns, -math.ceil(10 * (columns - 1) / columns) - 1, 0, cellHeight),
 			CellPadding = UDim2.fromOffset(10, 10),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
@@ -795,7 +797,7 @@ local function passCard(menu: any, list: Instance, order: number, key: string, c
 	for index, perk in ipairs(pass.perks) do
 		local line = text({
 			Name = "Perk" .. index,
-			Text = "✦  " .. perk,
+			Text = "•  " .. perk,
 			TextColor3 = Theme.Text,
 			Position = UDim2.fromOffset(18, 86 + (index - 1) * 20),
 			Size = UDim2.new(1, -36, 0, 18),
@@ -810,7 +812,7 @@ local function legend(list: Instance, order: number)
 	text({
 		Name = "Legend",
 		LayoutOrder = order,
-		Text = "🪙 items are bought once with coins you earn by playing. R$ items come with a gamepass. Everything here is cosmetic.",
+		Text = "Coin items are bought once with coins you earn by playing. R$ items come with a gamepass. Everything here is cosmetic.",
 		TextSize = 12,
 		TextColor3 = Theme.TextMuted,
 		TextWrapped = true,
