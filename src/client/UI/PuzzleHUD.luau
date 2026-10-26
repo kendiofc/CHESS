@@ -208,9 +208,21 @@ function PuzzleHUD.new(playerGui: Instance, handlers: Handlers)
 	self:_build(playerGui)
 	self.menu = PuzzleMenu.new(playerGui, {
 		start = function(puzzleId: string, mode: string)
+			if self.tutorialDue and mode == PLAY_MODES.Journey then
+				-- A new player's first Journey puzzle is the tutorial.
+				self:startTutorial()
+				return
+			end
 			self:_confirmLeave(function()
 				self.handlers.start(puzzleId, mode)
 			end)
+		end,
+		play = function()
+			if self.tutorialDue then
+				self:startTutorial()
+			else
+				self.menu:close()
+			end
 		end,
 		settings = function(values: { [string]: any })
 			-- Once the player changes a setting, this session keeps their choice.
@@ -1809,6 +1821,7 @@ end
 -- Starts (or replays) the tutorial on its puzzle in Journey.
 function PuzzleHUD.startTutorial(self: any)
 	self.tutorialOffered = true
+	self.tutorialDue = false
 	self.tutorial = { state = TutorialFlow.new(), awaitingStart = true }
 	self.menu:close()
 	self.handlers.start(TutorialFlow.PUZZLE_ID, PLAY_MODES.Journey)
@@ -1850,14 +1863,12 @@ function PuzzleHUD._trackTutorial(self: any, snap: any)
 			self:_tutorialEvent("hint")
 		end
 	end
-	-- Only players who have never finished or skipped it and haven't cleared
-	-- a puzzle get it automatically, once per session, after their profile loads.
+	-- Everyone lands on the main menu. Players who have never finished or
+	-- skipped the tutorial and haven't cleared a puzzle get it once per
+	-- session when they first leave the menu to play Journey.
 	if not self.tutorialOffered and snap.progress and snap.saveStatus ~= "loading" then
 		self.tutorialOffered = true
-		if snap.progress.needsTutorial then
-			self:startTutorial()
-			return
-		end
+		self.tutorialDue = snap.progress.needsTutorial == true
 	end
 	self:_renderTutorial()
 end

@@ -261,7 +261,7 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		Parent = panel,
 	}, { corner(10) })
 	self.closeButton.Activated:Connect(function()
-		self:close()
+		self:_play()
 	end)
 
 	self.note = text({
@@ -422,15 +422,26 @@ function PuzzleMenu._navigate(self: any, id: string)
 		self:_layout()
 	end
 	if id == "Play" then
-		if self:_canClose() then
-			self:close()
-		end
+		self:_play()
 	elseif id == "Tutorial" then
 		if self.progress and not self:isQueued() then
 			self.handlers.tutorial()
 		end
 	elseif table.find(VIEWS, id) then
 		self:show(id)
+	end
+end
+
+-- Leaves the menu for the board. The HUD may start the tutorial instead,
+-- for a new player who has not played yet.
+function PuzzleMenu._play(self: any)
+	if not self:_canClose() then
+		return
+	end
+	if self.handlers.play then
+		self.handlers.play()
+	else
+		self:close()
 	end
 end
 
@@ -896,7 +907,7 @@ function PuzzleMenu._continueData(self: any): HomeDashboard.Continue
 			),
 			button = "Resume",
 			action = function()
-				self:close()
+				self:_play()
 			end,
 		}
 	end
