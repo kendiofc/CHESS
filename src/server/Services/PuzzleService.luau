@@ -10,11 +10,17 @@
 --
 -- Progress is kept by ProfileStore (DataStore). A win is re-checked by
 -- replaying the server's own move log before it is recorded.
+--
+-- Puzzle Duels (DuelManager) use the same remotes and rate limit. While a
+-- player is in a duel, their move / undo / restart go to the duel board, and
+-- single-player actions that would change what they see are refused.
 
 local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BoardState = require(Shared:WaitForChild("BoardState"))
@@ -24,6 +30,9 @@ local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
 local PuzzleHints = require(Shared:WaitForChild("PuzzleHints"))
 local PuzzleSession = require(Shared:WaitForChild("PuzzleSession"))
 local PuzzleValidator = require(Shared:WaitForChild("PuzzleValidator"))
+local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
+local WeeklyChallenge = require(Shared:WaitForChild("WeeklyChallenge"))
+local DuelManager = require(script.Parent:WaitForChild("DuelManager"))
 local ProfileStore = require(script.Parent:WaitForChild("ProfileStore"))
 
 local ACTIONS = GameConfig.ACTIONS
@@ -42,8 +51,7 @@ type PlayerState = {
 	reward: any,
 	result: any, -- the win summary for the result card (stars, best, unlock, streak)
 	userStarted: boolean, -- the player picked a puzzle themselves
-	tokens: number,
-	refilledAt: number,
+	limiter: RateLimiter.RateLimiter,
 	throttled: boolean,
 }
 
@@ -51,6 +59,7 @@ local PuzzleService = {}
 
 local states: { [Player]: PlayerState } = {}
 local profiles: any
+local duels: any
 local stateRemote: RemoteEvent
 local actionRemote: RemoteEvent
 
@@ -74,19 +83,6 @@ local function ensureRemotes()
 	end
 	actionRemote = ensureRemote(folder :: Instance, GameConfig.REMOTES.Action)
 	stateRemote = ensureRemote(folder :: Instance, GameConfig.REMOTES.State)
-end
-
--- Token bucket: returns false when the player is sending actions too fast.
-local function consumeToken(state: PlayerState): boolean
-	local now = os.clock()
-	local limit = GameConfig.RATE_LIMIT
-	state.tokens = math.min(limit.BURST, state.tokens + (now - state.refilledAt) * limit.PER_SECOND)
-	state.refilledAt = now
-	if state.tokens < 1 then
-		return false
-	end
-	state.tokens -= 1
-	return true
 end
 
 local function elapsed(state: PlayerState): number
@@ -194,6 +190,7 @@ local function snapshot(player: Player, state: PlayerState, event: string, err: 
 		hintSquare = if event == "hint" then state.hintSquare else nil,
 		result = if event == "move" then state.result else nil,
 		nextDailyIn = (today() + 1) * 86400 - os.time(),
+		nextWeeklyIn = WeeklyChallenge.secondsLeft(os.time()),
 		hintsUsed = state.hintsUsed,
 		hintsLeft = (function()
 			local left = Progression.hintsLeft(profileOf(player), state.mode, state.hintsUsed, state.day)
@@ -207,6 +204,25 @@ end
 
 local function send(player: Player, state: PlayerState, event: string, err: string?)
 	stateRemote:FireClient(player, snapshot(player, state, event, err))
+end
+
+-- Duel snapshots carry the same progress and save status as puzzle ones.
+local function sendDuel(player: Player, snap: { [string]: any })
+	snap.progress = Progression.summary(profileOf(player), today())
+	snap.saveStatus = profiles:status(player.UserId) or "loading"
+	snap.nextDailyIn = (today() + 1) * 86400 - os.time()
+	snap.nextWeeklyIn = WeeklyChallenge.secondsLeft(os.time())
+	stateRemote:FireClient(player, snap)
+end
+
+-- Answers on the screen the player is looking at: the duel screen while they
+-- are queued, in a match or on a duel result, otherwise their puzzle.
+local function reply(player: Player, state: PlayerState, event: string, err: string?)
+	if duels:hasScreen(player.UserId) then
+		sendDuel(player, duels:snapshot(player.UserId, event, err))
+	else
+		send(player, state, event, err)
+	end
 end
 
 local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle, mode: string, day: number, byPlayer: boolean?)
@@ -224,8 +240,9 @@ local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle, mod
 		reward = nil,
 		result = nil,
 		userStarted = byPlayer == true or (previous ~= nil and previous.userStarted),
-		tokens = if previous then previous.tokens else GameConfig.RATE_LIMIT.BURST,
-		refilledAt = if previous then previous.refilledAt else now,
+		limiter = if previous
+			then previous.limiter
+			else RateLimiter.new(GameConfig.RATE_LIMIT.BURST, GameConfig.RATE_LIMIT.PER_SECOND, now),
 		throttled = false,
 	}
 	states[player] = state
@@ -237,11 +254,11 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 	if not state then
 		return
 	end
-	if not consumeToken(state) then
+	if not state.limiter:take(os.clock()) then
 		-- Tell the client once per throttled burst; don't answer every spammed call.
 		if not state.throttled then
 			state.throttled = true
-			send(player, state, "rejected", "rate_limited")
+			reply(player, state, "rejected", "rate_limited")
 		end
 		return
 	end
@@ -250,6 +267,57 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 		return
 	end
 	local data = if type(payload) == "table" then payload :: { [any]: any } else {}
+	local userId = player.UserId
+
+	-- Puzzle Duel ----------------------------------------------------------
+	if action == ACTIONS.DuelJoin then
+		local ok, err = duels:join(userId, player.DisplayName)
+		if not ok then
+			reply(player, state, "rejected", err)
+		end
+		return
+	elseif action == ACTIONS.DuelCancel then
+		local ok, err = duels:cancel(userId)
+		if not ok then
+			reply(player, state, "rejected", err)
+		end
+		return
+	elseif action == ACTIONS.DuelLeave then
+		local ok, err = duels:leave(userId)
+		if not ok then
+			reply(player, state, "rejected", err)
+		end
+		return
+	elseif action == ACTIONS.DuelExit then
+		if duels:exit(userId) then
+			send(player, state, "sync")
+		else
+			reply(player, state, "rejected", "in_duel")
+		end
+		return
+	end
+	local duelState = duels:stateOf(userId)
+	if duelState == "countdown" or duelState == "playing" then
+		if action == ACTIONS.Move or action == ACTIONS.Undo or action == ACTIONS.Restart then
+			duels:act(userId, action, data)
+			return
+		end
+	end
+	if action == ACTIONS.Start then
+		-- Starting a puzzle closes a duel result screen, but never leaves the
+		-- queue or a match by accident.
+		if not duels:exit(userId) then
+			reply(player, state, "rejected", "in_duel")
+			return
+		end
+	elseif duels:hasScreen(userId) then
+		if action == ACTIONS.Settings or action == ACTIONS.Tutorial or action == ACTIONS.Sync then
+			-- Handled below; the answer goes to the duel screen.
+		else
+			reply(player, state, "rejected", "in_duel")
+			return
+		end
+	end
 
 	if action == ACTIONS.Start then
 		local mode = data.mode
@@ -380,7 +448,7 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			values[key] = data[key]
 		end
 		record(player, { kind = "settings", settings = values })
-		send(player, state, "settings")
+		reply(player, state, "settings")
 	elseif action == ACTIONS.Tutorial then
 		local outcome = data.outcome
 		if outcome ~= "completed" and outcome ~= "skipped" then
@@ -388,20 +456,116 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			return
 		end
 		record(player, { kind = "tutorial", outcome = outcome })
-		send(player, state, "tutorial")
+		reply(player, state, "tutorial")
 	elseif action == ACTIONS.Sync then
 		-- The first puzzle starts when the player joins, before their client has
 		-- loaded; don't count loading time against an untouched attempt.
 		if state.session.moveCount == 0 and #state.session.history == 0 then
 			state.startedAt = os.clock()
 		end
-		send(player, state, "sync")
+		reply(player, state, "sync")
 	end
+end
+
+local function pickDuelPuzzle(): PuzzleDefinitions.Puzzle
+	local pool = {}
+	for _, difficulty in ipairs(GameConfig.DUEL.DIFFICULTIES) do
+		for _, puzzle in ipairs(PuzzleDefinitions.byDifficulty[difficulty]) do
+			table.insert(pool, puzzle)
+		end
+	end
+	return pool[math.random(1, #pool)]
+end
+
+local function createDuels()
+	duels = DuelManager.new({
+		now = os.clock,
+		newId = function()
+			return HttpService:GenerateGUID(false)
+		end,
+		pickPuzzle = function()
+			return pickDuelPuzzle()
+		end,
+		send = function(userId: number, snap: { [string]: any })
+			local player = Players:GetPlayerByUserId(userId)
+			if player and states[player] then
+				sendDuel(player, snap)
+			end
+		end,
+		record = function(userId: number, result: { [string]: any }): (any, string?)
+			-- Only players with a profile on this server (not the Studio test bot).
+			local profile = profiles:get(userId)
+			if not profile then
+				return nil, nil
+			end
+			local day = today()
+			local block = if result.outcome ~= "loss" then Progression.duelRewardBlock(profile, day, result.opponent) else nil
+			local reward = profiles:record(userId, {
+				-- One id per player per match: a repeated record is ignored.
+				id = "duel:" .. result.matchId .. ":" .. userId,
+				kind = "duel",
+				matchId = result.matchId,
+				outcome = result.outcome,
+				reason = result.reason,
+				opponent = result.opponent,
+				day = day,
+			})
+			print(string.format("[PuzzleService] duel %s: %d %s (%s)", result.matchId, userId, result.outcome, result.reason))
+			task.spawn(function()
+				profiles:save(userId)
+			end)
+			return reward, block
+		end,
+		modules = { PuzzleSession = PuzzleSession, PuzzleValidator = PuzzleValidator, BoardState = BoardState },
+		config = GameConfig.DUEL,
+	})
+end
+
+-- Studio only: a server-side BindableFunction that adds a test opponent (user
+-- id -1) driven from Studio's command bar, so one person can play a whole duel
+-- in Studio. It doesn't exist in a live game, and clients can't call it.
+local function createStudioDuelHook()
+	if not RunService:IsStudio() then
+		return
+	end
+	local BOT = -1
+	local hook = Instance.new("BindableFunction")
+	hook.Name = "EchoChessDuelTestHook"
+	hook.OnInvoke = function(command: string, a: any, b: any): any
+		if command == "join" then
+			return duels:join(BOT, "Studio Bot")
+		elseif command == "move" then
+			local snap = duels:snapshot(BOT, "sync")
+			if not snap.layout then
+				return false, "not_in_duel"
+			end
+			local board = BoardState.fromLayout(snap.layout)
+			return duels:act(BOT, "move", { from = BoardState.parseSquare(board, a), to = BoardState.parseSquare(board, b) })
+		elseif command == "leave" then
+			return duels:leave(BOT)
+		elseif command == "disconnect" then
+			duels:disconnect(BOT)
+			return true
+		elseif command == "state" then
+			return duels:snapshot(if type(a) == "number" then a else BOT, "sync")
+		elseif command == "timeout" then
+			-- Ends every running match as if its time ran out.
+			for _, match in pairs(duels.matches) do
+				match.endsAt = os.clock()
+			end
+			duels:update()
+			return true
+		end
+		return nil
+	end
+	hook.Parent = ServerStorage
 end
 
 function PuzzleService.Start()
 	ensureRemotes()
 	createProfiles()
+	createDuels()
+	createStudioDuelHook()
 	actionRemote.OnServerEvent:Connect(onAction)
 
 	local function onPlayerAdded(player: Player)
@@ -425,8 +589,19 @@ function PuzzleService.Start()
 		task.spawn(onPlayerAdded, player)
 	end
 	Players.PlayerRemoving:Connect(function(player)
+		-- Settle any duel first, so the leaver's loss is saved with their profile
+		-- and the opponent gets their result straight away.
+		duels:disconnect(player.UserId)
 		states[player] = nil
 		profiles:release(player.UserId)
+	end)
+
+	-- Duel clock: starts matches after the countdown and ends them on time.
+	task.spawn(function()
+		while true do
+			task.wait(0.2)
+			duels:update()
+		end
 	end)
 
 	-- Autosave: ops are also saved soon after every win.

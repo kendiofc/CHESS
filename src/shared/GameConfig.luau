@@ -24,11 +24,19 @@ GameConfig.DIFFICULTY_SETTINGS = {
 --             the next difficulty and pay the puzzle's reward once
 --   Practice  any difficulty, free hints, no rewards and no unlock progress
 --   Daily     one puzzle per UTC day, one free hint, reward once per day
+--   Weekly    the week's fixed set of puzzles (WeeklyChallenge), milestone
+--             rewards once per week
+-- Puzzle Duels are not a play mode: a client can't start one with "start".
+-- The server creates them from its queue (see GameConfig.DUEL).
 GameConfig.PLAY_MODES = {
 	Journey = "Journey",
 	Practice = "Practice",
 	Daily = "Daily",
+	Weekly = "Weekly",
 }
+
+-- The mode name duel snapshots carry.
+GameConfig.DUEL_MODE = "Duel"
 
 -- Hints allowed per attempt (math.huge = unlimited). Daily hints are counted
 -- per day, not per attempt, so restarting does not refill them. A competitive
@@ -37,6 +45,8 @@ GameConfig.HINTS = {
 	Journey = math.huge,
 	Practice = math.huge,
 	Daily = 1,
+	Weekly = 1,
+	Duel = 0,
 }
 
 -- Completed puzzles of a difficulty (in Journey or Daily) needed to unlock the next.
@@ -90,6 +100,18 @@ GameConfig.RATE_LIMIT = {
 	PER_SECOND = 6,
 }
 
+-- Puzzle Duel: two players in the same server race to clear the same puzzle.
+GameConfig.DUEL = {
+	DIFFICULTIES = { "Easy", "Medium" }, -- the server picks the puzzle from these
+	COUNTDOWN = 3, -- seconds between "opponent found" and the start
+	TIME_LIMIT = 180, -- seconds; nobody clearing the board in time is a draw
+	REWARD_WIN = { xp = 25, coins = 6 },
+	REWARD_DRAW = { xp = 10, coins = 2 }, -- also a win because the opponent left
+	DAILY_REWARDED = 5, -- rewarded duels per player per UTC day
+	-- A player is paid for at most one duel per opponent per UTC day, so
+	-- matching the same second account again and again earns nothing.
+}
+
 GameConfig.REMOTES = {
 	Folder = "Remotes",
 	Action = "PuzzleAction", -- client -> server: (action: string, payload: table?)
@@ -105,6 +127,10 @@ GameConfig.ACTIONS = {
 	Settings = "settings", -- { sound: boolean?, volume: number?, haptics: boolean?, drag: boolean? }
 	Tutorial = "tutorial", -- { outcome = "completed" | "skipped" }
 	Sync = "sync", -- client asks for the current snapshot (e.g. after it loads)
+	DuelJoin = "duel_join", -- enter the duel queue
+	DuelCancel = "duel_cancel", -- leave the queue before a match starts
+	DuelLeave = "duel_leave", -- forfeit the current match
+	DuelExit = "duel_exit", -- close the result screen and go back to puzzles
 }
 
 return GameConfig

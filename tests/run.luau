@@ -1464,6 +1464,695 @@ test("tutorial and drag settings survive normalize", function()
 	eq(profile.settings.drag, false)
 end)
 
+-- Weekly Challenge -----------------------------------------------------------------
+
+local WeeklyChallenge = require(Shared.WeeklyChallenge)
+
+-- 2026-10-26 00:00:00 UTC is a Monday.
+local MONDAY = 1792972800
+local MONDAY_DAY = MONDAY // 86400
+
+test("weekly: weeks start on Monday 00:00 UTC", function()
+	eq(os.date("!%A", MONDAY), "Monday", "fixture is a Monday")
+	local week = WeeklyChallenge.weekOf(MONDAY)
+	eq(WeeklyChallenge.weekOf(MONDAY - 1), week - 1, "Sunday 23:59:59 is the previous week")
+	eq(WeeklyChallenge.weekOf(MONDAY + 7 * 86400 - 1), week, "next Sunday 23:59:59 is still this week")
+	eq(WeeklyChallenge.weekOf(MONDAY + 7 * 86400), week + 1)
+	eq(WeeklyChallenge.firstDay(week), MONDAY_DAY)
+	eq(WeeklyChallenge.secondsLeft(MONDAY), 7 * 86400)
+	eq(WeeklyChallenge.secondsLeft(MONDAY + 7 * 86400 - 1), 1)
+	eq(WeeklyChallenge.weekOf(0), 0, "1970-01-01 (Thursday) is week 0")
+	eq(WeeklyChallenge.weekOfDay(3), 0, "Sunday 1970-01-04")
+	eq(WeeklyChallenge.weekOfDay(4), 1, "Monday 1970-01-05")
+	for day = MONDAY_DAY - 20, MONDAY_DAY + 20 do
+		eq(WeeklyChallenge.weekOfDay(day), WeeklyChallenge.weekOf(day * 86400 + 43200))
+	end
+end)
+
+test("weekly: the same week always gives the same ordered set", function()
+	local week = WeeklyChallenge.weekOf(MONDAY)
+	local a, b = WeeklyChallenge.puzzles(week), WeeklyChallenge.puzzles(week)
+	eq(#a, WeeklyChallenge.SIZE)
+	for i = 1, #a do
+		eq(a[i].id, b[i].id)
+	end
+	local differs = false
+	for i, puzzle in ipairs(WeeklyChallenge.puzzles(week + 1)) do
+		differs = differs or puzzle.id ~= a[i].id
+	end
+	assert(differs, "next week is a different set")
+end)
+
+test("weekly: every set for two years is 4 distinct, solvable catalogue puzzles, easiest first", function()
+	local order = { Easy = 2, Medium = 3, Hard = 4 }
+	for week = 2900, 3004 do
+		local seen = {}
+		local last = 0
+		for _, puzzle in ipairs(WeeklyChallenge.puzzles(week)) do
+			assert(PuzzleDefinitions.get(puzzle.id) == puzzle, "catalogue puzzle")
+			assert(not seen[puzzle.id], "distinct in week " .. week)
+			seen[puzzle.id] = true
+			local rank = assert(order[puzzle.difficulty], "difficulty " .. puzzle.difficulty)
+			assert(rank >= last, "ordered by difficulty")
+			last = rank
+			assert(WeeklyChallenge.contains(week, puzzle.id))
+		end
+	end
+	-- The solver proves every puzzle that can appear is solvable, and its stored solution replays.
+	local used = {}
+	for week = 0, 5 do
+		for _, puzzle in ipairs(WeeklyChallenge.puzzles(week)) do
+			used[puzzle.id] = puzzle
+		end
+	end
+	local count = 0
+	for _, puzzle in pairs(used) do
+		count += 1
+		eq(PuzzleValidator.isSolvable(BoardState.fromLayout(puzzle.layout)), true, puzzle.id)
+		eq((PuzzleValidator.validateSolution(puzzle.layout, puzzle.solution)), true, puzzle.id)
+	end
+	eq(count, 18, "the rotation uses all Easy, Medium and Hard puzzles over 6 weeks")
+end)
+
+test("weekly: only this week's puzzles can be started in Weekly mode", function()
+	local profile = Progression.newProfile()
+	local week = WeeklyChallenge.weekOfDay(MONDAY_DAY)
+	local set = WeeklyChallenge.puzzles(week)
+	for _, puzzle in ipairs(set) do
+		eq((Progression.canStart(profile, puzzle, MODES.Weekly, MONDAY_DAY)), true, "no unlock needed")
+	end
+	local outside = nil
+	for _, puzzle in ipairs(PuzzleDefinitions.list) do
+		if not WeeklyChallenge.contains(week, puzzle.id) then
+			outside = puzzle
+			break
+		end
+	end
+	eq(select(2, Progression.canStart(profile, outside, MODES.Weekly, MONDAY_DAY)), "not_weekly")
+	-- Sunday night still belongs to last week.
+	eq(select(2, Progression.canStart(profile, set[1], MODES.Weekly, MONDAY_DAY - 1)) == nil, WeeklyChallenge.contains(week - 1, set[1].id))
+	eq(Progression.hintsLeft(profile, MODES.Weekly, 0, MONDAY_DAY), 1)
+	eq(Progression.hintsLeft(profile, MODES.Weekly, 1, MONDAY_DAY), 0)
+end)
+
+test("weekly: milestones pay once; replays and repeated ops pay nothing", function()
+	local profile = Progression.newProfile()
+	local week = WeeklyChallenge.weekOfDay(MONDAY_DAY)
+	local set = WeeklyChallenge.puzzles(week)
+	local half, full = WeeklyChallenge.MILESTONES[1], WeeklyChallenge.MILESTONES[2]
+	local _, reward = Progression.apply(profile, winIn(set[1].id, MODES.Weekly, set[1].par, MONDAY_DAY))
+	eq(reward, nil, "one clear: no milestone yet")
+	eq(Progression.weeklyView(profile, MONDAY_DAY).clearedCount, 1)
+	-- Replaying the same puzzle doesn't count twice.
+	_, reward = Progression.apply(profile, winIn(set[1].id, MODES.Weekly, set[1].par, MONDAY_DAY))
+	eq(reward, nil)
+	eq(Progression.weeklyView(profile, MONDAY_DAY).clearedCount, 1)
+	_, reward = Progression.apply(profile, winIn(set[2].id, MODES.Weekly, set[2].par, MONDAY_DAY + 2))
+	eq(reward.coins, half.coins)
+	eq(reward.xp, half.xp)
+	local coins = profile.coins
+	-- The same op delivered again (a retried save) is ignored.
+	local op = winIn(set[3].id, MODES.Weekly, set[3].par, MONDAY_DAY + 3)
+	Progression.apply(profile, op)
+	eq(select(1, Progression.apply(profile, op)), false)
+	eq(profile.coins, coins)
+	_, reward = Progression.apply(profile, winIn(set[4].id, MODES.Weekly, set[4].par, MONDAY_DAY + 6))
+	eq(reward.coins, full.coins)
+	eq(profile.stats.weeklies, 1)
+	local view = Progression.weeklyView(profile, MONDAY_DAY + 6)
+	eq(view.completed, true)
+	eq(view.milestones[1].claimed and view.milestones[2].claimed, true)
+	-- Replaying every puzzle after completion pays nothing more.
+	coins = profile.coins
+	for _, puzzle in ipairs(set) do
+		local _, again = Progression.apply(profile, winIn(puzzle.id, MODES.Weekly, puzzle.par, MONDAY_DAY + 6))
+		eq(again, nil)
+	end
+	eq(profile.coins, coins)
+	eq(profile.stats.weeklies, 1)
+	-- Weekly clears are credited like Daily clears (stars saved).
+	eq(profile.completed[set[1].id].credited, true)
+	eq(profile.completed[set[1].id].stars, 3)
+end)
+
+test("weekly: a new week starts fresh; a late op for last week counts nothing", function()
+	local profile = Progression.newProfile()
+	local week = WeeklyChallenge.weekOfDay(MONDAY_DAY)
+	local set = WeeklyChallenge.puzzles(week)
+	Progression.apply(profile, winIn(set[1].id, MODES.Weekly, 99, MONDAY_DAY))
+	Progression.apply(profile, winIn(set[2].id, MODES.Weekly, 99, MONDAY_DAY))
+	eq(Progression.weeklyView(profile, MONDAY_DAY).clearedCount, 2)
+	local nextMonday = MONDAY_DAY + 7
+	local view = Progression.weeklyView(profile, nextMonday)
+	eq(view.week, week + 1)
+	eq(view.clearedCount, 0, "next week's view starts at 0")
+	eq(view.milestones[1].claimed, false)
+	local nextSet = WeeklyChallenge.puzzles(week + 1)
+	Progression.apply(profile, winIn(nextSet[1].id, MODES.Weekly, 99, nextMonday))
+	eq(profile.weekly.week, week + 1)
+	-- An op from an attempt started last week arrives late.
+	local _, reward = Progression.apply(profile, winIn(set[3].id, MODES.Weekly, 99, MONDAY_DAY + 6))
+	eq(reward, nil)
+	eq(profile.weekly.week, week + 1, "the week never moves backwards")
+	eq(profile.weekly.cleared[set[3].id], nil)
+end)
+
+test("weekly: a Weekly clear doesn't touch the Daily streak or Daily state", function()
+	local profile = Progression.newProfile()
+	local daily = Progression.dailyPuzzle(MONDAY_DAY - 1)
+	Progression.apply(profile, win(daily.id, MODES.Daily, MONDAY_DAY - 1))
+	eq(profile.streak.current, 1)
+	local set = WeeklyChallenge.puzzles(WeeklyChallenge.weekOfDay(MONDAY_DAY))
+	for _, puzzle in ipairs(set) do
+		Progression.apply(profile, win(puzzle.id, MODES.Weekly, MONDAY_DAY))
+	end
+	eq(profile.streak.current, 1)
+	eq(profile.streak.lastDay, MONDAY_DAY - 1)
+	eq(profile.daily.day, MONDAY_DAY - 1)
+	eq(profile.stats.dailies, 1)
+	eq(Progression.streakView(profile, MONDAY_DAY).current, 1, "today's Daily can still extend it")
+end)
+
+test("weekly: Practice and Journey clears of a weekly puzzle don't count for the week", function()
+	local profile = Progression.newProfile()
+	local set = WeeklyChallenge.puzzles(WeeklyChallenge.weekOfDay(MONDAY_DAY))
+	for _, puzzle in ipairs(set) do
+		Progression.apply(profile, win(puzzle.id, MODES.Practice, MONDAY_DAY))
+		Progression.apply(profile, win(puzzle.id, MODES.Journey, MONDAY_DAY))
+	end
+	eq(Progression.weeklyView(profile, MONDAY_DAY).clearedCount, 0)
+	-- A Weekly op without a day (a forged or broken op) changes nothing for the week.
+	Progression.apply(profile, { id = opId(), kind = "win", puzzleId = set[1].id, mode = MODES.Weekly, moves = 5, seconds = 5 })
+	eq(Progression.weeklyView(profile, MONDAY_DAY).clearedCount, 0)
+end)
+
+test("weekly: weekly and duel data survive normalize, and old profiles get defaults", function()
+	local old = Progression.normalize({ version = 1, xp = 10, stats = { solves = 2 } })
+	eq(old.weekly.week, 0)
+	eq(next(old.weekly.cleared), nil)
+	eq(old.stats.weeklies, 0)
+	eq(old.duel.played, 0)
+	local week = WeeklyChallenge.weekOfDay(MONDAY_DAY)
+	local set = WeeklyChallenge.puzzles(week)
+	local saved = Progression.normalize({
+		weekly = { week = week, cleared = { [set[1].id] = true, ["beginner-01"] = true, [set[2].id] = "yes" } },
+		duel = { played = 3, wins = 2, losses = 1, draws = "x", day = 5, rewardedToday = 2, opponentsToday = { 7, "8" }, recent = { "m1", 5 } },
+	})
+	eq(saved.weekly.cleared[set[1].id], true)
+	eq(saved.weekly.cleared["beginner-01"], nil, "not in that week's set")
+	eq(saved.weekly.cleared[set[2].id], nil, "must be true")
+	eq(saved.duel.wins, 2)
+	eq(saved.duel.draws, 0)
+	eq(#saved.duel.opponentsToday, 1)
+	eq(#saved.duel.recent, 1)
+	local damaged = Progression.normalize({ weekly = "x", duel = 4 })
+	eq(damaged.weekly.week, 0)
+	eq(damaged.duel.played, 0)
+end)
+
+test("weekly: rewards stay single when the same week is saved from two servers", function()
+	local store = FakeStore.new()
+	local a = makeStore(store)
+	local b = makeStore(store)
+	a:load(40)
+	b:load(40)
+	local set = WeeklyChallenge.puzzles(WeeklyChallenge.weekOfDay(MONDAY_DAY))
+	for _, puzzle in ipairs(set) do
+		a:record(40, win(puzzle.id, MODES.Weekly, MONDAY_DAY))
+		b:record(40, win(puzzle.id, MODES.Weekly, MONDAY_DAY))
+	end
+	assert(a:save(40))
+	assert(b:save(40))
+	local total = 0
+	for _, milestone in ipairs(WeeklyChallenge.MILESTONES) do
+		total += milestone.coins
+	end
+	-- Each puzzle's first-clear coins don't apply in Weekly; only milestones (and achievements) pay.
+	local stored = store.data.player_40
+	eq(stored.stats.weeklies, 1)
+	local ach = 0
+	for key in pairs(stored.rewards) do
+		if string.sub(key, 1, 4) == "ach:" then
+			ach += 1
+		end
+	end
+	eq(ach, 0, "no achievement is reachable from one week")
+	eq(stored.coins, total)
+end)
+
+-- Puzzle Duel -----------------------------------------------------------------------
+
+local DuelManager = require(Shared.DuelManager)
+local RateLimiter = require(Shared.RateLimiter)
+
+local DUEL_DAY = MONDAY_DAY
+local DUEL_PUZZLE = assert(PuzzleDefinitions.get("beginner-01")) -- solution c2-b2 b2-c3 c3-c4
+
+-- A manager with a fake clock. Every finished match is recorded as a real
+-- Progression "duel" op on an in-memory profile per player.
+local function makeDuels(puzzle: any?)
+	local env = { t = 100, sent = {}, records = {}, profiles = {}, ids = 0, day = DUEL_DAY }
+	local function profileFor(id: number): any
+		env.profiles[id] = env.profiles[id] or Progression.newProfile()
+		return env.profiles[id]
+	end
+	env.profileFor = profileFor
+	env.duels = DuelManager.new({
+		now = function()
+			return env.t
+		end,
+		newId = function()
+			env.ids += 1
+			return "match-" .. env.ids
+		end,
+		pickPuzzle = function()
+			return puzzle or DUEL_PUZZLE
+		end,
+		send = function(id: number, snap: any)
+			env.sent[id] = env.sent[id] or {}
+			table.insert(env.sent[id], snap)
+		end,
+		record = function(id: number, result: any)
+			table.insert(env.records, { id = id, result = result })
+			local profile = profileFor(id)
+			local block = if result.outcome ~= "loss" then Progression.duelRewardBlock(profile, env.day, result.opponent) else nil
+			local _, reward = Progression.apply(profile, {
+				id = "duel:" .. result.matchId .. ":" .. id,
+				kind = "duel",
+				matchId = result.matchId,
+				outcome = result.outcome,
+				reason = result.reason,
+				opponent = result.opponent,
+				day = env.day,
+			})
+			return reward, block
+		end,
+		modules = { PuzzleSession = PuzzleSession, PuzzleValidator = PuzzleValidator, BoardState = BoardState },
+		config = GameConfig.DUEL,
+	})
+	function env.last(id: number): any
+		local list = env.sent[id]
+		return list and list[#list]
+	end
+	function env.move(id: number, from: string, to: string): (boolean, string?)
+		local board = BoardState.fromLayout(DUEL_PUZZLE.layout)
+		return env.duels:act(id, "move", { from = sq(board, from), to = sq(board, to) })
+	end
+	function env.start()
+		env.t += GameConfig.DUEL.COUNTDOWN
+		env.duels:update()
+	end
+	return env
+end
+
+local function matched(env: any, a: number, b: number)
+	assert(env.duels:join(a, "P" .. a))
+	assert(env.duels:join(b, "P" .. b))
+end
+
+test("duel: join, waiting state and cancel", function()
+	local env = makeDuels()
+	local duels = env.duels
+	eq((duels:join(1, "Ann")), true)
+	eq(duels:stateOf(1), "queued")
+	eq(env.last(1).duel.phase, "queued")
+	eq(env.last(1).layout, nil, "no board while waiting")
+	eq((duels:cancel(1)), true)
+	eq(duels:stateOf(1), nil)
+	eq(env.last(1).duel.phase, "idle")
+	eq(select(2, duels:cancel(1)), "not_queued")
+	-- Joining again after cancelling works.
+	eq((duels:join(1, "Ann")), true)
+	eq(duels:queueSize(), 1)
+end)
+
+test("duel: a player can't queue twice or be matched with themselves", function()
+	local env = makeDuels()
+	local duels = env.duels
+	assert(duels:join(1, "Ann"))
+	eq(select(2, duels:join(1, "Ann")), "already_queued")
+	eq(duels:queueSize(), 1)
+	eq(duels:stateOf(1), "queued", "still waiting, never matched with self")
+	eq(#env.records, 0)
+end)
+
+test("duel: two players are matched on the same puzzle with a countdown", function()
+	local env = makeDuels()
+	local duels = env.duels
+	matched(env, 1, 2)
+	eq(duels:queueSize(), 0)
+	eq(duels:stateOf(1), "countdown")
+	eq(duels:stateOf(2), "countdown")
+	local a, b = env.last(1), env.last(2)
+	eq(a.event, "duel_found")
+	eq(a.duel.matchId, b.duel.matchId, "same match")
+	eq(a.puzzleId, b.puzzleId, "same puzzle")
+	eq(table.concat(a.layout, "/"), table.concat(b.layout, "/"), "same board")
+	eq(a.duel.opponent.name, "P2")
+	eq(b.duel.opponent.name, "P1")
+	eq(a.duel.startsIn, GameConfig.DUEL.COUNTDOWN)
+	eq(a.hintsLeft, 0, "no hints in a duel")
+	-- Neither can join another match while in this one.
+	eq(select(2, duels:join(1, "Ann")), "in_duel")
+	-- Moves before the start are refused.
+	eq(select(2, env.move(1, "c2", "b2")), "not_started")
+	eq(env.last(1).error, "not_started")
+	env.start()
+	eq(duels:stateOf(1), "playing")
+	eq(env.last(1).event, "duel_start")
+	eq(env.last(2).event, "duel_start")
+end)
+
+test("duel: three players joining at once make one match and one waiter", function()
+	local env = makeDuels()
+	local duels = env.duels
+	for id = 1, 3 do
+		assert(duels:join(id, "P" .. id))
+	end
+	eq(duels:stateOf(1), "countdown")
+	eq(duels:stateOf(2), "countdown")
+	eq(duels:stateOf(3), "queued")
+	assert(duels:join(4, "P4"))
+	eq(duels:stateOf(4), "countdown")
+	assert(env.last(3).duel.matchId ~= env.last(1).duel.matchId, "unique match ids")
+end)
+
+test("duel: each move is checked against the mover's own board", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	env.start()
+	eq(select(2, env.move(1, "c2", "a1")), "illegal_move")
+	eq(env.last(1).error, "illegal_move")
+	eq(select(2, env.move(1, "c4", "c3")), "not_your_piece")
+	eq(select(2, env.duels:act(1, "move", { from = "c2", to = "b2" })), "bad_square")
+	eq(select(2, env.duels:act(1, "move", { from = 1.5, to = {} })), "bad_square")
+	assert(env.move(1, "c2", "b2"))
+	eq(env.last(1).moveCount, 1)
+	eq(env.last(1).targetsLeft, 2)
+	-- The opponent sees progress, never the board or moves.
+	local seen = env.last(2)
+	eq(seen.event, "duel_opponent")
+	eq(seen.duel.opponent.captured, 1)
+	eq(seen.duel.opponent.moves, 1)
+	eq(table.concat(seen.layout, "/"), table.concat(DUEL_PUZZLE.layout, "/"), "player 2's own board is untouched")
+	eq(seen.lastMove, nil)
+	-- Undo and restart only touch your own board.
+	assert(env.duels:act(1, "undo", {}))
+	eq(env.last(1).moveCount, 0)
+	eq(select(2, env.duels:act(1, "undo", {})), "cannot_undo")
+	assert(env.move(1, "c2", "b2"))
+	assert(env.duels:act(1, "restart", {}))
+	eq(env.last(1).moveCount, 0)
+	eq(select(2, env.duels:act(1, "hint", {})), "bad_action")
+end)
+
+test("duel: the first valid clear wins and both get results", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	env.start()
+	assert(env.move(2, "c2", "b2"))
+	assert(env.move(1, "c2", "b2"))
+	assert(env.move(1, "b2", "c3"))
+	assert(env.move(1, "c3", "c4"))
+	local a, b = env.last(1), env.last(2)
+	eq(a.event, "duel_end")
+	eq(a.duel.phase, "finished")
+	eq(a.duel.outcome, "win")
+	eq(a.duel.reason, "solved")
+	eq(b.duel.outcome, "loss")
+	eq(b.duel.reason, "opponent_solved")
+	eq(b.duel.opponent.solved, true)
+	eq(#env.records, 2)
+	eq(a.duel.reward.coins, GameConfig.DUEL.REWARD_WIN.coins)
+	eq(b.duel.reward, nil)
+	eq(env.profiles[1].duel.wins, 1)
+	eq(env.profiles[2].duel.losses, 1)
+	-- The loser can't keep playing or overturn it.
+	eq(select(2, env.move(2, "b2", "c3")), "not_in_duel")
+	eq(env.duels:stateOf(1), nil)
+	eq(#env.records, 2, "recorded once")
+end)
+
+test("duel: simultaneous finishing moves are settled by arrival order", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	env.start()
+	for _, id in ipairs({ 1, 2 }) do
+		assert(env.move(id, "c2", "b2"))
+		assert(env.move(id, "b2", "c3"))
+	end
+	-- Both send the final move in the same instant; player 2's arrives first.
+	assert(env.move(2, "c3", "c4"))
+	eq(select(2, env.move(1, "c3", "c4")), "not_in_duel")
+	eq(env.last(2).duel.outcome, "win")
+	eq(env.last(1).duel.outcome, "loss")
+	eq(env.profiles[1].duel.wins, 0)
+	eq(#env.records, 2)
+end)
+
+test("duel: a client can't declare a win or pick the winner", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	env.start()
+	for _, action in ipairs({ "win", "finish", "result", "solve" }) do
+		eq(select(2, env.duels:act(1, action, { winner = 1, matchId = "match-1", won = true })), "bad_action")
+	end
+	-- Extra fields on a move are ignored.
+	assert(env.duels:act(1, "move", { from = sq(BoardState.fromLayout(DUEL_PUZZLE.layout), "c2"), to = sq(BoardState.fromLayout(DUEL_PUZZLE.layout), "b2"), status = "won", targetsLeft = 0 }))
+	eq(env.duels:stateOf(1), "playing")
+	eq(#env.records, 0)
+end)
+
+test("duel: players outside a match can't act on it", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	env.start()
+	eq(select(2, env.move(3, "c2", "b2")), "not_in_duel")
+	eq(env.last(3).error, "not_in_duel")
+	eq(select(2, env.duels:leave(3)), "not_in_duel")
+	eq(env.last(1).moveCount, 0, "nothing reached player 1's board")
+	eq(env.duels:stateOf(1), "playing")
+end)
+
+test("duel: nobody clearing in time is a draw", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	env.start()
+	assert(env.move(1, "c2", "b2"))
+	env.t += GameConfig.DUEL.TIME_LIMIT - 1
+	env.duels:update()
+	eq(env.duels:stateOf(1), "playing")
+	env.t += 1
+	env.duels:update()
+	eq(env.last(1).duel.outcome, "draw")
+	eq(env.last(2).duel.outcome, "draw")
+	eq(env.last(1).duel.reason, "timeout")
+	eq(env.last(1).duel.timeLeft, 0)
+	eq(env.profiles[1].duel.draws, 1)
+	eq(env.last(1).duel.reward.coins, GameConfig.DUEL.REWARD_DRAW.coins)
+end)
+
+test("duel: a move after the time limit can't win, even before the timer ticks", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	env.start()
+	assert(env.move(1, "c2", "b2"))
+	assert(env.move(1, "b2", "c3"))
+	env.t += GameConfig.DUEL.TIME_LIMIT
+	eq(select(2, env.move(1, "c3", "c4")), "match_over")
+	eq(env.last(2).duel.outcome, "draw")
+	eq(env.profiles[1].duel.wins, 0)
+end)
+
+test("duel: disconnects never leave the other player stuck", function()
+	-- In the queue.
+	local env = makeDuels()
+	assert(env.duels:join(1, "Ann"))
+	env.duels:disconnect(1)
+	eq(env.duels:queueSize(), 0)
+	-- During the countdown.
+	matched(env, 2, 3)
+	env.duels:disconnect(2)
+	eq(env.last(3).duel.outcome, "win")
+	eq(env.last(3).duel.reason, "opponent_left")
+	eq(env.last(3).duel.opponent.connected, false)
+	eq(env.profiles[2].duel.losses, 1, "leaving counts as a loss")
+	eq(env.duels:stateOf(3), nil, "free to queue again")
+	-- During play.
+	matched(env, 4, 5)
+	env.start()
+	assert(env.move(4, "c2", "b2"))
+	env.duels:disconnect(5)
+	eq(env.last(4).duel.outcome, "win")
+	-- A forfeit win pays like a draw.
+	eq(env.last(4).duel.reward.coins, GameConfig.DUEL.REWARD_DRAW.coins)
+	-- Nothing more is sent to the player who left, and disconnecting twice is harmless.
+	local count = #env.sent[5]
+	env.duels:disconnect(5)
+	env.duels:update()
+	eq(#env.sent[5], count)
+	eq(env.duels:snapshot(5, "sync").duel.phase, "idle")
+end)
+
+test("duel: forfeiting with Leave", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	env.start()
+	assert(env.duels:leave(1))
+	eq(env.last(1).duel.outcome, "loss")
+	eq(env.last(1).duel.reason, "left")
+	eq(env.last(2).duel.outcome, "win")
+	eq(select(2, env.duels:leave(1)), "not_in_duel")
+	-- Leave while queued just cancels.
+	assert(env.duels:join(1, "Ann"))
+	assert(env.duels:leave(1))
+	eq(env.duels:stateOf(1), nil)
+end)
+
+test("duel: result screen stays until exit; exit is refused mid-match", function()
+	local env = makeDuels()
+	matched(env, 1, 2)
+	eq(env.duels:exit(1), false)
+	env.start()
+	assert(env.duels:leave(2))
+	eq(env.duels:snapshot(1, "sync").duel.phase, "finished")
+	eq(env.duels:exit(1), true)
+	eq(env.duels:snapshot(1, "sync").duel.phase, "idle")
+	eq(env.duels:hasScreen(1), false)
+	eq(env.duels:hasScreen(2), true, "player 2 hasn't closed theirs")
+	-- Re-sending exit or results never records again.
+	env.duels:exit(1)
+	eq(#env.records, 2)
+end)
+
+test("duel: rewards are paid once per match and capped per day and per opponent", function()
+	local profile = Progression.newProfile()
+	local function duelOp(matchId: string, outcome: string, opponent: number, day: number, reason: string?): any
+		return { id = opId(), kind = "duel", matchId = matchId, outcome = outcome, reason = reason or "solved", opponent = opponent, day = day }
+	end
+	local _, reward = Progression.apply(profile, duelOp("m1", "win", 50, DUEL_DAY))
+	eq(reward.coins, GameConfig.DUEL.REWARD_WIN.coins)
+	eq(reward.xp, GameConfig.DUEL.REWARD_WIN.xp)
+	-- The same match delivered again under another op id (a second server) is ignored.
+	local coins = profile.coins
+	_, reward = Progression.apply(profile, duelOp("m1", "win", 50, DUEL_DAY))
+	eq(reward, nil)
+	eq(profile.coins, coins)
+	eq(profile.duel.played, 1)
+	-- The same opponent again today: counted, not paid.
+	_, reward = Progression.apply(profile, duelOp("m2", "win", 50, DUEL_DAY))
+	eq(reward, nil)
+	eq(Progression.duelRewardBlock(profile, DUEL_DAY, 50), "same_opponent")
+	eq(profile.duel.wins, 2)
+	-- Losses never pay; draws pay a little.
+	_, reward = Progression.apply(profile, duelOp("m3", "loss", 51, DUEL_DAY))
+	eq(reward, nil)
+	_, reward = Progression.apply(profile, duelOp("m4", "draw", 52, DUEL_DAY, "timeout"))
+	eq(reward.coins, GameConfig.DUEL.REWARD_DRAW.coins)
+	-- Daily cap.
+	for i = 1, 10 do
+		Progression.apply(profile, duelOp("cap" .. i, "win", 100 + i, DUEL_DAY))
+	end
+	eq(profile.duel.rewardedToday, GameConfig.DUEL.DAILY_REWARDED)
+	eq(Progression.duelRewardBlock(profile, DUEL_DAY, 999), "daily_cap")
+	eq(Progression.summary(profile, DUEL_DAY).duel.rewardsLeftToday, 0)
+	-- A new UTC day pays again, including the same opponent.
+	_, reward = Progression.apply(profile, duelOp("next", "win", 50, DUEL_DAY + 1))
+	eq(reward.coins, GameConfig.DUEL.REWARD_WIN.coins)
+	-- A late op for a day that has passed doesn't pay.
+	_, reward = Progression.apply(profile, duelOp("late", "win", 77, DUEL_DAY))
+	eq(reward, nil)
+	-- Garbage ops change nothing.
+	local played = profile.duel.played
+	Progression.apply(profile, { id = opId(), kind = "duel", matchId = "", outcome = "win" })
+	Progression.apply(profile, { id = opId(), kind = "duel", matchId = "x", outcome = "victory" })
+	eq(profile.duel.played, played)
+	local summary = Progression.summary(profile, DUEL_DAY + 1)
+	eq(summary.duel.played, played)
+	eq(summary.duel.wins + summary.duel.losses + summary.duel.draws, played)
+end)
+
+test("duel: matching the same account all day earns one reward", function()
+	local env = makeDuels()
+	for _ = 1, 6 do
+		matched(env, 1, 2)
+		env.start()
+		for _, m in ipairs({ { "c2", "b2" }, { "b2", "c3" }, { "c3", "c4" } }) do
+			assert(env.move(1, m[1], m[2]))
+		end
+		env.duels:exit(1)
+		env.duels:exit(2)
+	end
+	eq(env.profiles[1].duel.wins, 6)
+	eq(env.profiles[1].coins, GameConfig.DUEL.REWARD_WIN.coins, "paid for the first match only")
+	eq(env.profiles[2].coins, 0)
+	local notes = {}
+	for _, list in pairs({ env.sent[1] }) do
+		for _, snap in ipairs(list) do
+			if snap.event == "duel_end" then
+				table.insert(notes, snap.duel.rewardNote or "paid")
+			end
+		end
+	end
+	eq(notes[1], "paid")
+	eq(notes[2], "same_opponent")
+end)
+
+test("duel: duel records survive the profile store round trip once", function()
+	local store = FakeStore.new()
+	local a = makeStore(store)
+	a:load(60)
+	local op = { kind = "duel", matchId = "match-x", outcome = "win", reason = "solved", opponent = 61, day = DUEL_DAY }
+	op.id = "duel:match-x:60"
+	a:record(60, op)
+	a:record(60, op) -- recorded twice by mistake
+	assert(a:save(60))
+	local b = makeStore(store)
+	b:load(60)
+	b:record(60, { id = "duel:match-x:60:retry", kind = "duel", matchId = "match-x", outcome = "win", reason = "solved", opponent = 61, day = DUEL_DAY })
+	assert(b:save(60))
+	eq(store.data.player_60.duel.wins, 1)
+	eq(store.data.player_60.coins, GameConfig.DUEL.REWARD_WIN.coins)
+end)
+
+test("duel: Duel is not a play mode a client can start", function()
+	eq(GameConfig.PLAY_MODES.Duel, nil)
+	eq(GameConfig.PLAY_MODES[GameConfig.DUEL_MODE], nil)
+	eq(select(2, Progression.canStart(Progression.newProfile(), DUEL_PUZZLE, "Duel", DUEL_DAY)), "bad_mode")
+	eq(GameConfig.HINTS.Duel, 0)
+end)
+
+test("duel: the server's duel pool is validated puzzles only", function()
+	for _, difficulty in ipairs(GameConfig.DUEL.DIFFICULTIES) do
+		for _, puzzle in ipairs(PuzzleDefinitions.byDifficulty[difficulty]) do
+			eq(#PuzzleCheck.check(puzzle), 0, puzzle.id)
+		end
+	end
+end)
+
+test("rate limiter: bursts are allowed, floods are refused, then it refills", function()
+	local limit = RateLimiter.new(GameConfig.RATE_LIMIT.BURST, GameConfig.RATE_LIMIT.PER_SECOND, 0)
+	local allowed = 0
+	for _ = 1, 50 do
+		if limit:take(0) then
+			allowed += 1
+		end
+	end
+	eq(allowed, GameConfig.RATE_LIMIT.BURST, "50 requests in one instant: only the burst passes")
+	eq(limit:take(0.05), false)
+	eq(limit:take(1), true, "a second later there are tokens again")
+	-- A steady stream at the refill rate is never refused.
+	local steady = RateLimiter.new(8, 6, 10)
+	for i = 1, 100 do
+		eq(steady:take(10 + i / 6), true)
+	end
+	-- A clock going backwards never adds tokens.
+	local odd = RateLimiter.new(2, 6, 100)
+	odd:take(100)
+	odd:take(100)
+	eq(odd:take(50), false)
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then
 	error("test failures")

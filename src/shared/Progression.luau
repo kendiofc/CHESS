@@ -15,11 +15,15 @@
 --     once per day, whichever server applies it. Achievements pay under
 --     "ach:<id>" the same way;
 --   * the Daily streak only moves forward: an op for a day at or before the
---     last counted day changes nothing.
+--     last counted day changes nothing;
+--   * Weekly Challenge milestones pay under "weekly:<week>:<n>", once ever;
+--   * a duel is counted once per match id (profile.duel.recent remembers the
+--     last ones, on top of the op id), whichever server applies it.
 
 local Achievements = require(script.Parent.Achievements)
 local GameConfig = require(script.Parent.GameConfig)
 local PuzzleDefinitions = require(script.Parent.PuzzleDefinitions)
+local WeeklyChallenge = require(script.Parent.WeeklyChallenge)
 
 local Progression = {}
 
@@ -43,17 +47,30 @@ export type Streak = {
 	protectedDay: number, -- the missed day that shield covered (0 = none)
 }
 
+export type Duel = {
+	played: number,
+	wins: number,
+	losses: number,
+	draws: number,
+	day: number, -- UTC day the two counters below belong to
+	rewardedToday: number, -- duels that paid a reward on `day`
+	opponentsToday: { number }, -- user ids of opponents that paid a reward on `day`
+	recent: { string }, -- last match ids counted
+}
+
 export type Settings = { sound: boolean, volume: number, haptics: boolean, drag: boolean }
 
 export type Profile = {
 	version: number,
 	completed: { [string]: Completion },
-	stats: { solves: number, fails: number, restarts: number, hints: number, moves: number, dailies: number },
+	stats: { solves: number, fails: number, restarts: number, hints: number, moves: number, dailies: number, weeklies: number },
 	xp: number,
 	coins: number,
 	rewards: { [string]: boolean },
 	daily: { day: number, completed: boolean, hintUsed: boolean, rewarded: boolean },
 	streak: Streak,
+	weekly: { week: number, cleared: { [string]: boolean } }, -- the current week's cleared challenge puzzles
+	duel: Duel,
 	lastJourney: string?, -- last puzzle cleared in Journey (where Continue resumes)
 	settings: Settings,
 	tutorial: { done: boolean, outcome: string? }, -- "completed" or "skipped"
@@ -63,14 +80,17 @@ export type Profile = {
 
 export type Op = {
 	id: string,
-	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings" | "tutorial"
+	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings" | "tutorial" | "duel"
 	puzzleId: string?,
 	mode: string?,
 	moves: number?,
 	seconds: number?,
 	day: number?,
 	settings: { [string]: any }?,
-	outcome: string?, -- tutorial ops
+	outcome: string?, -- tutorial ops; duel ops: "win" | "loss" | "draw"
+	matchId: string?, -- duel ops
+	reason: string?, -- duel ops: "solved" | "timeout" | "opponent_left" | "left"
+	opponent: number?, -- duel ops: the opponent's user id
 }
 
 -- What one op paid. `items` lists each part (first clear, daily, achievements).
@@ -87,16 +107,24 @@ local function newStreak(): Streak
 	return { current = 0, longest = 0, lastDay = 0, shieldUsedOn = NO_SHIELD, protectedDay = 0 }
 end
 
+local function newDuel(): Duel
+	return { played = 0, wins = 0, losses = 0, draws = 0, day = 0, rewardedToday = 0, opponentsToday = {}, recent = {} }
+end
+
+Progression.DUEL_RECENT = 30 -- match ids remembered for de-duplication
+
 function Progression.newProfile(): Profile
 	return {
 		version = Progression.VERSION,
 		completed = {},
-		stats = { solves = 0, fails = 0, restarts = 0, hints = 0, moves = 0, dailies = 0 },
+		stats = { solves = 0, fails = 0, restarts = 0, hints = 0, moves = 0, dailies = 0, weeklies = 0 },
 		xp = 0,
 		coins = 0,
 		rewards = {},
 		daily = { day = 0, completed = false, hintUsed = false, rewarded = false },
 		streak = newStreak(),
+		weekly = { week = 0, cleared = {} },
+		duel = newDuel(),
 		lastJourney = nil,
 		settings = table.clone(GameConfig.DEFAULT_SETTINGS),
 		tutorial = { done = false, outcome = nil },
@@ -182,6 +210,36 @@ function Progression.normalize(data: any): Profile
 			protectedDay = wholeNumber(streak.protectedDay, 0, 0, NONE),
 		}
 		profile.streak.longest = math.max(profile.streak.longest, profile.streak.current)
+	end
+	if type(data.weekly) == "table" then
+		profile.weekly.week = wholeNumber(data.weekly.week, 0, 0, NONE)
+		if type(data.weekly.cleared) == "table" then
+			for id, value in pairs(data.weekly.cleared) do
+				if type(id) == "string" and value == true and WeeklyChallenge.contains(profile.weekly.week, id) then
+					profile.weekly.cleared[id] = true
+				end
+			end
+		end
+	end
+	if type(data.duel) == "table" then
+		local duel = data.duel
+		for _, key in ipairs({ "played", "wins", "losses", "draws", "day", "rewardedToday" }) do
+			(profile.duel :: any)[key] = wholeNumber(duel[key], 0, 0, NONE)
+		end
+		if type(duel.opponentsToday) == "table" then
+			for _, id in ipairs(duel.opponentsToday) do
+				if type(id) == "number" then
+					table.insert(profile.duel.opponentsToday, id)
+				end
+			end
+		end
+		if type(duel.recent) == "table" then
+			for _, id in ipairs(duel.recent) do
+				if type(id) == "string" then
+					table.insert(profile.duel.recent, id)
+				end
+			end
+		end
 	end
 	if type(data.lastJourney) == "string" and PuzzleDefinitions.get(data.lastJourney) then
 		profile.lastJourney = data.lastJourney
@@ -405,6 +463,11 @@ function Progression.canStart(profile: Profile, puzzle: PuzzleDefinitions.Puzzle
 			return false, "not_daily"
 		end
 		return true, nil
+	elseif mode == GameConfig.PLAY_MODES.Weekly then
+		if not WeeklyChallenge.contains(WeeklyChallenge.weekOfDay(day), puzzle.id) then
+			return false, "not_weekly"
+		end
+		return true, nil
 	end
 	return false, "bad_mode"
 end
@@ -436,7 +499,9 @@ local function applyWin(profile: Profile, op: Op): Reward?
 		return nil
 	end
 	local moves, seconds = number(op.moves, NONE), number(op.seconds, NONE)
-	local credited = op.mode == GameConfig.PLAY_MODES.Journey or op.mode == GameConfig.PLAY_MODES.Daily
+	local credited = op.mode == GameConfig.PLAY_MODES.Journey
+		or op.mode == GameConfig.PLAY_MODES.Daily
+		or op.mode == GameConfig.PLAY_MODES.Weekly
 	-- Stars come from the server's own move count, and only credited clears keep them.
 	local stars = if credited then Progression.starsFor(puzzle, moves) else 0
 	local record = profile.completed[puzzle.id]
@@ -472,6 +537,30 @@ local function applyWin(profile: Profile, op: Op): Reward?
 				table.insert(items, { xp = GameConfig.DAILY_REWARD.xp, coins = GameConfig.DAILY_REWARD.coins, reason = "daily puzzle" })
 			end
 		end
+	elseif op.mode == GameConfig.PLAY_MODES.Weekly and op.day then
+		-- The week the attempt started in; a late op for an earlier week counts
+		-- for nothing once the profile has moved on.
+		local week = WeeklyChallenge.weekOfDay(op.day)
+		if week > profile.weekly.week then
+			profile.weekly = { week = week, cleared = {} }
+		end
+		if profile.weekly.week == week and WeeklyChallenge.contains(week, puzzle.id) then
+			profile.weekly.cleared[puzzle.id] = true
+			local cleared = 0
+			for _ in pairs(profile.weekly.cleared) do
+				cleared += 1
+			end
+			for _, milestone in ipairs(WeeklyChallenge.MILESTONES) do
+				local key = WeeklyChallenge.rewardKey(week, milestone.cleared)
+				if cleared >= milestone.cleared and not profile.rewards[key] then
+					profile.rewards[key] = true
+					if milestone.cleared >= WeeklyChallenge.SIZE then
+						profile.stats.weeklies += 1
+					end
+					table.insert(items, { xp = milestone.xp, coins = milestone.coins, reason = milestone.reason })
+				end
+			end
+		end
 	end
 	if credited then
 		for _, achievement in ipairs(Achievements.list) do
@@ -495,6 +584,76 @@ local function applyWin(profile: Profile, op: Op): Reward?
 	return reward
 end
 
+-- Duels ---------------------------------------------------------------------------
+
+local function rollDuelDay(duel: Duel, day: number)
+	if day > duel.day then
+		duel.day = day
+		duel.rewardedToday = 0
+		duel.opponentsToday = {}
+	end
+end
+
+-- Why a duel finished on `day` against `opponent` would pay nothing, or nil
+-- when it can pay: "daily_cap" or "same_opponent".
+function Progression.duelRewardBlock(profile: Profile, day: number, opponent: number): string?
+	local duel = profile.duel
+	if duel.day == day then
+		if table.find(duel.opponentsToday, opponent) then
+			return "same_opponent"
+		elseif duel.rewardedToday >= GameConfig.DUEL.DAILY_REWARDED then
+			return "daily_cap"
+		end
+	elseif day < duel.day then
+		return "daily_cap" -- a late op for a day that has passed
+	end
+	return nil
+end
+
+local function applyDuel(profile: Profile, op: Op): Reward?
+	local matchId, outcome = op.matchId, op.outcome
+	if type(matchId) ~= "string" or matchId == "" then
+		return nil
+	end
+	if outcome ~= "win" and outcome ~= "loss" and outcome ~= "draw" then
+		return nil
+	end
+	local duel = profile.duel
+	if table.find(duel.recent, matchId) then
+		return nil -- this match was already counted
+	end
+	table.insert(duel.recent, matchId)
+	while #duel.recent > Progression.DUEL_RECENT do
+		table.remove(duel.recent, 1)
+	end
+	duel.played += 1
+	if outcome == "win" then
+		duel.wins += 1
+	elseif outcome == "loss" then
+		duel.losses += 1
+	else
+		duel.draws += 1
+	end
+	local day, opponent = op.day, op.opponent
+	if outcome == "loss" or type(day) ~= "number" or type(opponent) ~= "number" then
+		return nil
+	end
+	if Progression.duelRewardBlock(profile, day, opponent) then
+		return nil
+	end
+	rollDuelDay(duel, day)
+	duel.rewardedToday += 1
+	table.insert(duel.opponentsToday, opponent)
+	-- A win because the opponent left pays like a draw, so leaving on purpose
+	-- doesn't hand a second account a full win.
+	local full = outcome == "win" and op.reason == "solved"
+	local amount = if full then GameConfig.DUEL.REWARD_WIN else GameConfig.DUEL.REWARD_DRAW
+	local reason = if full then "duel win" elseif outcome == "win" then "duel win (opponent left)" else "duel draw"
+	profile.xp += amount.xp
+	profile.coins += amount.coins
+	return { xp = amount.xp, coins = amount.coins, reason = reason, items = { { xp = amount.xp, coins = amount.coins, reason = reason } } }
+end
+
 -- Applies one op. Returns whether it was new, and the reward it paid (if any).
 function Progression.apply(profile: Profile, op: Op): (boolean, Reward?)
 	if table.find(profile.applied, op.id) then
@@ -503,6 +662,8 @@ function Progression.apply(profile: Profile, op: Op): (boolean, Reward?)
 	remember(profile, op.id)
 	if op.kind == "win" then
 		return true, applyWin(profile, op)
+	elseif op.kind == "duel" then
+		return true, applyDuel(profile, op)
 	elseif op.kind == "fail" then
 		profile.stats.fails += 1
 	elseif op.kind == "restart" then
@@ -583,6 +744,49 @@ function Progression.summary(profile: Profile, day: number): { [string]: any }
 			completed = today and profile.daily.completed,
 			hintUsed = today and profile.daily.hintUsed,
 		},
+		weekly = Progression.weeklyView(profile, day),
+		duel = {
+			played = profile.duel.played,
+			wins = profile.duel.wins,
+			losses = profile.duel.losses,
+			draws = profile.duel.draws,
+			rewardsLeftToday = if profile.duel.day == day
+				then math.max(0, GameConfig.DUEL.DAILY_REWARDED - profile.duel.rewardedToday)
+				else GameConfig.DUEL.DAILY_REWARDED,
+		},
+	}
+end
+
+-- This week's challenge as the player stands in it on `day`.
+function Progression.weeklyView(profile: Profile, day: number): { [string]: any }
+	local week = WeeklyChallenge.weekOfDay(day)
+	local current = profile.weekly.week == week
+	local ids, clearedIds, cleared = {}, {}, 0
+	for _, puzzle in ipairs(WeeklyChallenge.puzzles(week)) do
+		table.insert(ids, puzzle.id)
+		if current and profile.weekly.cleared[puzzle.id] then
+			clearedIds[puzzle.id] = true
+			cleared += 1
+		end
+	end
+	local milestones = {}
+	for _, milestone in ipairs(WeeklyChallenge.MILESTONES) do
+		table.insert(milestones, {
+			cleared = milestone.cleared,
+			xp = milestone.xp,
+			coins = milestone.coins,
+			claimed = profile.rewards[WeeklyChallenge.rewardKey(week, milestone.cleared)] == true,
+		})
+	end
+	return {
+		week = week,
+		firstDay = WeeklyChallenge.firstDay(week),
+		puzzleIds = ids,
+		cleared = clearedIds,
+		clearedCount = cleared,
+		size = #ids,
+		completed = cleared >= #ids,
+		milestones = milestones,
 	}
 end
 

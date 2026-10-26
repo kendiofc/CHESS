@@ -2,10 +2,11 @@
 """Run the pure-Luau test suite outside Roblox.
 
 Shared modules use Roblox-style `require(script.Parent.X)`. This script bundles
-every module in src/shared and tests/lib, plus the server's ProfileStore, into one chunk with a tiny
-`script`/`require` shim, appends tests/run.luau (or the given test file), and
-executes it with the standalone `luau` CLI. Test-only helpers in tests/lib sit
-beside the shared modules, so `script.Parent.X` reaches both.
+every module in src/shared and tests/lib, plus the pure server modules
+(ProfileStore, DuelManager), into one chunk with a tiny `script`/`require`
+shim, appends tests/run.luau (or the given test file), and executes it with
+the standalone `luau` CLI. Test-only helpers in tests/lib sit beside the shared
+modules, so `script.Parent.X` reaches both.
 
 Usage: python3 tools/run_tests.py [path/to/luau] [test file]
 """
@@ -18,8 +19,11 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SHARED = ROOT / "src" / "shared"
 TEST_LIB = ROOT / "tests" / "lib"
-# Server modules that take their Roblox services as arguments (ProfileStore).
-SERVER_PURE = [ROOT / "src" / "server" / "Services" / "ProfileStore.luau"]
+# Server modules that take their Roblox services as arguments (ProfileStore, DuelManager).
+SERVER_PURE = [
+    ROOT / "src" / "server" / "Services" / "ProfileStore.luau",
+    ROOT / "src" / "server" / "Services" / "DuelManager.luau",
+]
 TESTS = ROOT / "tests" / "run.luau"
 
 PRELUDE = """
