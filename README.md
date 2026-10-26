@@ -15,6 +15,9 @@ capturing every black piece, and each capture turns you into the piece you took.
 and Puzzle Duel, the first multiplayer mode: two players race to clear the same
 puzzle. Opponents are found on the same server first, then on any other server.
 
+Endless mode adds generated boards that never run out: clear as many as you can
+before your three lives are gone.
+
 Ratings, monetization and other rule sets are not built yet.
 
 ## Rules: Echo Clear mode
@@ -65,6 +68,8 @@ layout = {
 | `ReplicatedStorage.Shared.TutorialFlow` | `src/shared/TutorialFlow.luau` | The tutorial's steps and how player events move between them |
 | `ReplicatedStorage.Shared.InputRules` | `src/shared/InputRules.luau` | Drag threshold, tap suppression, drop square, when to confirm leaving |
 | `ReplicatedStorage.Shared.WeeklyChallenge` | `src/shared/WeeklyChallenge.luau` | UTC week numbers and each week's four puzzles |
+| `ReplicatedStorage.Shared.EndlessGen` | `src/shared/EndlessGen.luau` | Endless boards: the size/target ramp and solver-checked random layouts |
+| `ReplicatedStorage.Shared.EndlessRun` | `src/shared/EndlessRun.luau` | One Endless run: board, lives, score (pure; only the server uses it) |
 | `ReplicatedStorage.Shared.RateLimiter` | `src/shared/RateLimiter.luau` | Token bucket used for each player's actions |
 | `ReplicatedStorage.Shared.GameConfig` | `src/shared/GameConfig.luau` | Difficulties, play modes, hint rules, rewards, star slack, streak shield, cosmetic slots, default settings, remotes, rate limits |
 | `ReplicatedStorage.Remotes` | `default.project.json` | `PuzzleAction` (client → server) and `PuzzleState` (server → client) |
@@ -136,6 +141,7 @@ saves `completed` or `skipped` (a completion is never replaced by a skip).
 | Daily | one puzzle per UTC day (Easy to Hard pool) | 1 per day | daily reward, once per day | yes |
 | Weekly | the week's 4 puzzles | 1 per attempt | milestones at 2 and 4 cleared, once per week | yes |
 | Duel | one Easy or Medium puzzle chosen by the server | none | win or draw, capped (see below) | no |
+| Endless | generated boards, one after another | none | XP a board, capped per day (see Endless) | no |
 
 - **Unlocks.** Beginner is always open. Each later difficulty opens after 4 Journey or Daily clears of the one before it (`GameConfig.UNLOCK_REQUIREMENT`).
 - **Hints.** The first two hints are the puzzle's written hints: a strategy, then a first step. Each later hint is live: the server's solver names the next piece to capture from the current position. On a dead-end board the hint says to undo, and that costs nothing.
@@ -191,6 +197,31 @@ saves `completed` or `skipped` (a completion is never replaced by a skip).
   save or playing on two servers never pays twice. A finished week adds one to
   `stats.weeklies`.
 - **Separate from the Daily.** The Daily streak and its shield are not touched.
+
+## Endless
+
+A run of generated boards, one after another.
+
+- **Boards.** The server picks a random seed for each run; board n is built from
+  the seed and n (`EndlessGen`). Boards start at 4x4 with 2 targets and grow to
+  8x8 with 10 targets by board 27, then 11 to 12 targets from board 30. Every
+  board is a random layout that the solver has proven clearable (within a
+  20,000-state budget, so generating never stalls the server; about 3 ms a
+  board). Endless boards have no par.
+- **Lives.** A run starts with 3 lives. A dead end costs a life, and the board
+  can then be replayed for free. Restarting a board with moves on it costs a
+  life (with a confirm). There's no undo and no hints. The run ends when the
+  last life is gone.
+- **Score.** The boards cleared in the run. The server checks each clear by
+  replaying its own move log, and only a cleared board lets the run move on.
+  The client never says which board it is on or how many lives are left.
+- **Saved.** Best run, runs and boards cleared, under the op id
+  `endless:<run id>:<board>` so a retried save counts once. The best only goes up.
+- **Rewards.** +5 XP a board for the first 30 boards each UTC day. No coins for
+  boards; the achievements Still Echoing (10 boards in one run, 30 coins) and
+  Endless Echo (25 boards, 60 coins) pay once.
+- **Leaving.** A run lives on the server only: starting another puzzle, or
+  leaving the game, ends it. Its cleared boards are already saved.
 
 ## Puzzle Duel
 
@@ -364,6 +395,13 @@ The suite checks:
 - only this week's puzzles start, with 1 hint each
 - milestones pay once, a late op for last week doesn't pay this week, and two servers don't double-pay
 - the Daily streak is untouched, and Practice and Journey clears don't count
+
+**Endless**
+- the size and target ramp never goes down and tops out at 8x8
+- boards 1 to 45 for three seeds are solvable (checked again with no budget), the right size, and the same for the same seed
+- a generated board plays to a win that passes the server's replay check
+- scoring once per board, no skipping, lives for dead ends and restarts, free replays after a dead end, and the end of a run
+- best run, run count, the daily XP cap, late ops, the two achievements, bad board numbers, and a save round trip
 
 **Duel and rate limits**
 - join, cancel, duplicate joins, self-match, and three or four players joining

@@ -26,6 +26,8 @@ GameConfig.DIFFICULTY_SETTINGS = {
 --   Daily     one puzzle per UTC day, one free hint, reward once per day
 --   Weekly    the week's fixed set of puzzles (WeeklyChallenge), milestone
 --             rewards once per week
+--   Endless   generated boards one after another (EndlessGen) until the run's
+--             lives are gone; see GameConfig.ENDLESS
 -- Puzzle Duels are not a play mode: a client can't start one with "start".
 -- The server creates them from its queue (see GameConfig.DUEL).
 GameConfig.PLAY_MODES = {
@@ -33,6 +35,7 @@ GameConfig.PLAY_MODES = {
 	Practice = "Practice",
 	Daily = "Daily",
 	Weekly = "Weekly",
+	Endless = "Endless",
 }
 
 -- The mode name duel snapshots carry.
@@ -47,6 +50,7 @@ GameConfig.HINTS = {
 	Daily = 1,
 	Weekly = 1,
 	Duel = 0,
+	Endless = 0, -- a score run: no hints, and no undo either
 }
 
 -- Completed puzzles of a difficulty (in Journey or Daily) needed to unlock the next.
@@ -108,6 +112,8 @@ GameConfig.DUEL = {
 	REWARD_WIN = { xp = 25, coins = 6 },
 	REWARD_DRAW = { xp = 10, coins = 2 }, -- also a win because the opponent left
 	DAILY_REWARDED = 5, -- rewarded duels per player per UTC day
+	-- A player is paid for at most one duel per opponent per UTC day, so
+	-- matching the same second account again and again earns nothing.
 	-- Searching other servers (MemoryStore tickets, then a teleport to a reserved
 	-- server). Off in Studio, where MemoryStore and teleports aren't available
 	-- without API access; players there are matched on their own server.
@@ -120,8 +126,16 @@ GameConfig.DUEL = {
 		RANGE = 50, -- tickets read per search
 		ARRIVAL_WAIT = 45, -- seconds the match server waits for both players
 	},
-	-- A player is paid for at most one duel per opponent per UTC day, so
-	-- matching the same second account again and again earns nothing.
+}
+
+-- Endless: a run of generated boards. A dead end or a restart costs a life
+-- and replays the board; the run ends with the last life. The score is the
+-- boards cleared. Each cleared board pays XP, for a capped number of boards a
+-- UTC day; coins come only from the Endless achievements.
+GameConfig.ENDLESS = {
+	LIVES = 3,
+	XP_PER_BOARD = 5,
+	DAILY_REWARDED = 30, -- boards per player per UTC day that pay XP
 }
 
 GameConfig.REMOTES = {
@@ -131,7 +145,7 @@ GameConfig.REMOTES = {
 }
 
 GameConfig.ACTIONS = {
-	Start = "start", -- { puzzleId, mode } or { mode = "Daily" }
+	Start = "start", -- { puzzleId, mode } or { mode = "Daily" }; Endless: puzzleId "next" continues the run
 	Move = "move",
 	Undo = "undo",
 	Restart = "restart",

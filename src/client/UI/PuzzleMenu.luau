@@ -32,7 +32,7 @@ local MenuSidebar = require(script.Parent:WaitForChild("MenuSidebar"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local PLAY_MODES = GameConfig.PLAY_MODES
-local VIEWS = { "Home", "Journey", "Practice", "Daily", "Weekly", "Duel", "Stats", "Settings" }
+local VIEWS = { "Home", "Journey", "Practice", "Daily", "Weekly", "Endless", "Duel", "Stats", "Settings" }
 
 -- Below this screen width the sidebar is a rail of icons, and opening it
 -- floats it over the page instead of pushing the page over.
@@ -44,6 +44,7 @@ local NAV_ITEMS: { MenuSidebar.Item } = {
 	{ id = "Journey", icon = "🏔", label = "Journey" },
 	{ id = "Daily", icon = "📅", label = "Daily Puzzle" },
 	{ id = "Weekly", icon = "🏆", label = "Weekly Challenge" },
+	{ id = "Endless", icon = "🌀", label = "Endless" },
 	{ id = "Practice", icon = "🧩", label = "Practice" },
 	{ id = "Duel", icon = "⚔️", label = "Puzzle Duel" },
 	{ id = "Stats", icon = "📊", label = "Statistics" },
@@ -981,6 +982,10 @@ function PuzzleMenu._renderHome(self: any)
 		queued = self:isQueued(),
 		serverPlayers = #Players:GetPlayers(),
 		allServers = self.duelsAllServers == true,
+		endlessBoard = (function()
+			local run = self:_liveRun()
+			return run and run.board
+		end)(),
 		weeklyLeftText = if left then duration(left) else nil,
 		continue = self:_continueData(),
 	}, {
@@ -1248,6 +1253,152 @@ end
 
 -- Stats ----------------------------------------------------------------------------------
 
+-- "♥♥♡" for 2 of 3 lives.
+function PuzzleMenu.livesText(lives: number, maxLives: number): string
+	return string.rep("♥", lives) .. string.rep("♡", math.max(0, maxLives - lives))
+end
+
+-- The run in progress, if the player's current puzzle is a live Endless board.
+function PuzzleMenu._liveRun(self: any): any
+	local snap = self.snapshot
+	local run = snap and snap.mode == PLAY_MODES.Endless and snap.endless
+	if run and not run.over then
+		return run
+	end
+	return nil
+end
+
+function PuzzleMenu._renderEndless(self: any)
+	local progress = self.progress
+	local stats = progress and progress.endless
+	local run = self:_liveRun()
+	-- On a phone-width panel the rules wrap to more lines.
+	local bodyHeight = if self.list.AbsoluteSize.X < 340 then 76 else 54
+	local top = card(self, 1, 132 + bodyHeight, "EndlessCard")
+	text({
+		Text = if run then "RUN IN PROGRESS" else "HOW FAR CAN YOU GO?",
+		FontFace = Theme.FontBold,
+		TextSize = 13,
+		TextColor3 = Theme.Gold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 12),
+		Size = UDim2.new(1, -28, 0, 18),
+		Parent = top,
+	})
+	text({
+		Name = "Headline",
+		Text = if run
+			then string.format("Board %d  ·  %s", run.board, PuzzleMenu.livesText(run.lives, run.maxLives))
+			else string.format("Best run: %d %s", stats and stats.best or 0, if stats and stats.best == 1 then "board" else "boards"),
+		FontFace = Theme.FontBold,
+		TextSize = 24,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Position = UDim2.fromOffset(14, 32),
+		Size = UDim2.new(1, -28, 0, 30),
+		Parent = top,
+	})
+	text({
+		Name = "Body",
+		Text = string.format(
+			"You start with %d lives. Every board is new and solvable, and they get bigger as you go. Your score is the boards you clear.",
+			GameConfig.ENDLESS.LIVES
+		),
+		TextSize = 14,
+		TextColor3 = Theme.TextMuted,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextWrapped = true,
+		Position = UDim2.fromOffset(14, 66),
+		Size = UDim2.new(1, -28, 0, bodyHeight),
+		Parent = top,
+	})
+	local buttons = make("Frame", {
+		Name = "Buttons",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 14, 1, -12),
+		Size = UDim2.new(1, -28, 0, 48),
+		BackgroundTransparency = 1,
+		Parent = top,
+	}, {
+		make("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, 10),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+	})
+	local function button(name: string, label: string, primary: boolean, order: number, width: UDim, onClick: () -> ())
+		local b = make("TextButton", {
+			Name = name,
+			LayoutOrder = order,
+			Size = UDim2.new(width.Scale, width.Offset, 1, 0),
+			BackgroundColor3 = if primary then Theme.Accent else Theme.PanelRaised,
+			FontFace = Theme.FontBold,
+			Text = label,
+			TextColor3 = Theme.Text,
+			TextSize = 18,
+			Parent = buttons,
+		}, { corner(12) })
+		b.Activated:Connect(onClick)
+	end
+	if run then
+		button("ContinueRun", "Continue", true, 1, UDim.new(0.5, -5), function()
+			self:close()
+		end)
+		button("NewRun", "New run", false, 2, UDim.new(0.5, -5), function()
+			self:_start("new", PLAY_MODES.Endless)
+		end)
+	else
+		button("StartRun", "Start run", true, 1, UDim.new(1, 0), function()
+			self:_start("new", PLAY_MODES.Endless)
+		end)
+	end
+
+	local info = card(self, 2, 108, "EndlessStats")
+	text({
+		Text = "YOUR ENDLESS RUNS",
+		FontFace = Theme.FontBold,
+		TextSize = 13,
+		TextColor3 = Theme.Gold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 12),
+		Size = UDim2.new(1, -28, 0, 18),
+		Parent = info,
+	})
+	text({
+		Name = "Numbers",
+		Text = if stats
+			then string.format("Best %d  ·  Runs %d  ·  Boards cleared %d", stats.best, stats.runs, stats.boards)
+			else "Loading...",
+		FontFace = Theme.FontBold,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextScaled = true,
+		Position = UDim2.fromOffset(14, 36),
+		Size = UDim2.new(1, -28, 0, 22),
+		Parent = info,
+	})
+	text({
+		Name = "Rewards",
+		Text = if stats
+			then string.format(
+				"+%d XP a board, for %d boards a day (%d left today). Clear 10 and 25 boards in one run for achievement coins.",
+				GameConfig.ENDLESS.XP_PER_BOARD,
+				GameConfig.ENDLESS.DAILY_REWARDED,
+				stats.rewardsLeftToday
+			)
+			else "",
+		TextSize = 13,
+		TextColor3 = Theme.TextMuted,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextWrapped = true,
+		Position = UDim2.fromOffset(14, 62),
+		Size = UDim2.new(1, -28, 0, 40),
+		Parent = info,
+	})
+end
+
 function PuzzleMenu._renderStats(self: any)
 	local progress = self.progress
 	if not progress then
@@ -1262,6 +1413,7 @@ function PuzzleMenu._renderStats(self: any)
 		{ "Daily streak", string.format("%d  (best %d)", streak.current, streak.longest) },
 		{ "Dailies cleared", tostring(stats.dailies or 0) },
 		{ "Weekly challenges", tostring(stats.weeklies or 0) },
+		{ "Best Endless run", if progress.endless then string.format("%d boards", progress.endless.best) else "0 boards" },
 		{
 			"Duels W / L / D",
 			if progress.duel
@@ -1522,7 +1674,8 @@ local NOTES = {
 	Practice = "Play any puzzle at any difficulty. Hints are free. Practice earns no rewards or stars and doesn't unlock difficulties.",
 	Daily = "A new puzzle every day at 00:00 UTC. One free hint and one reward per day.",
 	Weekly = "Four puzzles, the same for everyone, new every Monday 00:00 UTC. One hint per attempt. Each reward is paid once.",
-	Duel = "Opponents come from this server. Leaving a duel counts as a loss.",
+	Endless = "Generated boards, one after another, getting harder as you go. No undo or hints. A dead end or a restart costs a life.",
+	Duel = "Opponents come from this server first, then from any server. Leaving a duel counts as a loss.",
 	Stats = "Your numbers, as the server has them.",
 	Settings = "",
 }
@@ -1533,6 +1686,7 @@ local TITLES = {
 	Practice = "PRACTICE",
 	Daily = "DAILY PUZZLE",
 	Weekly = "WEEKLY CHALLENGE",
+	Endless = "ENDLESS",
 	Duel = "PUZZLE DUEL",
 	Stats = "STATISTICS",
 	Settings = "SETTINGS",
@@ -1622,6 +1776,8 @@ function PuzzleMenu._render(self: any)
 		self:_renderDaily()
 	elseif self.view == "Weekly" then
 		self:_renderWeekly()
+	elseif self.view == "Endless" then
+		self:_renderEndless()
 	elseif self.view == "Duel" then
 		self:_renderDuel()
 	elseif self.view == "Stats" then

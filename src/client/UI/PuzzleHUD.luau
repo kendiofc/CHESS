@@ -77,6 +77,9 @@ local ERROR_MESSAGES = {
 	matching = "Matching you with an opponent, one moment.",
 	teleport_failed = "Couldn't move you to the match server. Try again.",
 	opponent_missing = "Your opponent didn't make it to the match. Try again.",
+	no_undo = "No undo in Endless. A dead end costs a life instead.",
+	run_over = "This run is over. Start a new one from the Endless page.",
+	not_cleared = "Clear this board first.",
 }
 
 -- Duel result lines, by the server's reason.
@@ -722,6 +725,14 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 		end
 		if snap.duel and snap.duel.phase == "finished" then
 			self.handlers.duelJoin()
+		elseif snap.endless then
+			if snap.endless.over then
+				self.handlers.start("new", PLAY_MODES.Endless)
+			elseif snap.status == "won" then
+				self.handlers.start("next", PLAY_MODES.Endless)
+			elseif snap.status == "failed" then
+				self.handlers.restart() -- free: the dead end already cost the life
+			end
 		elseif snap.status == "won" then
 			local _, action = self:_nextAfterWin()
 			action()
@@ -734,6 +745,10 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 		local snap = self.snapshot
 		if snap and snap.duel and snap.duel.phase == "finished" then
 			self.handlers.duelExit()
+			return
+		end
+		if snap and snap.endless then
+			self.menu:open("Endless")
 			return
 		end
 		self.handlers.restart()
@@ -1164,12 +1179,18 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	self.titleLabel.Text = snap.name
 	self.difficultyPill.BackgroundColor3 = Theme.DifficultyColors[snap.difficulty] or Theme.PanelRaised
 	local group = PuzzleDefinitions.byDifficulty[snap.difficulty]
-	self.difficultyPill.Text = string.format("%s  %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
+	local run = snap.endless
+	self.difficultyPill.Text = if run
+		then string.format("%s  ·  BOARD %d", string.upper(snap.difficulty), run.board)
+		else string.format("%s  %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
 	-- Narrow headers (phones) only have room for the mode name.
 	local mode = if snap.mode == DUEL_MODE then "PUZZLE DUEL" else string.upper(snap.mode or PLAY_MODES.Journey)
 	self.brandLabel.Text = if self.parts.header.AbsoluteSize.X < 340 then mode else "ECHO CHESS  ·  " .. mode
 	-- Daily, Weekly and Duel puzzles have no neighbours to step to.
-	local fixed = snap.mode == PLAY_MODES.Daily or snap.mode == PLAY_MODES.Weekly or snap.mode == DUEL_MODE
+	local fixed = snap.mode == PLAY_MODES.Daily
+		or snap.mode == PLAY_MODES.Weekly
+		or snap.mode == PLAY_MODES.Endless
+		or snap.mode == DUEL_MODE
 	self.prevButton.Visible = not fixed
 	self.nextButton.Visible = not fixed
 	local dueling = snap.duel ~= nil and snap.duel.phase ~= "finished"
@@ -1181,7 +1202,7 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	self.hintButton.BackgroundTransparency = if hintsOn then 0 else 0.6
 	self.hintButton.TextTransparency = if hintsOn then 0 else 0.5
 	self.movesValue.Text = tostring(snap.moveCount)
-	self.parLabel.Text = "Par " .. tostring(snap.par)
+	self.parLabel.Text = if run then PuzzleMenu.livesText(run.lives, run.maxLives) else "Par " .. tostring(snap.par)
 	local captured = snap.targetsTotal - snap.targetsLeft
 	self.capturedValue.Text = string.format("%d / %d", captured, snap.targetsTotal)
 	Anim.tween(self.progressFill, 0.3, { Size = UDim2.fromScale(captured / math.max(1, snap.targetsTotal), 1) })
@@ -1569,6 +1590,102 @@ function PuzzleHUD._renderDuelResult(self: any, snap: any, previous: any)
 	end
 end
 
+-- Opens the result card with its entrance animation.
+function PuzzleHUD._popResult(self: any)
+	local r = self.result
+	r.dim.BackgroundTransparency = 1
+	Anim.tween(r.dim, 0.25, { BackgroundTransparency = 0.4 })
+	r.scale.Scale = 0.85
+	task.defer(function()
+		self:_fitResultCard()
+		r.scale.Scale = r.fit * 0.85
+		Anim.tween(r.scale, 0.35, { Scale = r.fit }, Enum.EasingStyle.Back)
+	end)
+end
+
+-- Endless: a cleared board, a dead end (a life lost), or the end of the run.
+function PuzzleHUD._renderEndlessResult(self: any, snap: any, previous: any)
+	local r = self.result
+	local run = snap.endless
+	local state = if run.over then "over" elseif snap.status == "won" then "won" elseif snap.status == "failed" then "failed" else nil
+	if not state then
+		r.dim.Visible = false
+		return
+	end
+	local before = previous and previous.endless
+	local wasShowing = r.dim.Visible
+		and before ~= nil
+		and before.board == run.board
+		and before.over == run.over
+		and previous.status == snap.status
+	r.dim.Visible = true
+	r.stars.Visible = false
+	r.banner.Visible = false
+	local lives = PuzzleMenu.livesText(run.lives, run.maxLives)
+	local result = snap.result
+	r.gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Theme.GoldDeep),
+		ColorSequenceKeypoint.new(0.5, Theme.Gold),
+		ColorSequenceKeypoint.new(1, Theme.GoldDeep),
+	})
+	if state == "won" then
+		r.title.Text = "BOARD CLEARED"
+		r.title.TextColor3 = Color3.new(1, 1, 1)
+		r.gradient.Enabled = true
+		r.stroke.Color = Theme.Gold
+		r.subtitle.Text = string.format("Score: %d", run.cleared) .. (if result and result.newBest then "  ·  New best!" else "")
+		r.stats.Text = string.format("Moves %d    Time %s    Lives %s", snap.moveCount, formatTime(snap.elapsed), lives)
+		r.detail.Visible = true
+		r.detail.Text = "The next board is a little bigger."
+		r.reward.Visible = true
+		if snap.reward then
+			r.reward.Text = rewardText(snap) .. saveNote(snap)
+			r.reward.TextColor3 = Theme.Legal
+		else
+			r.reward.Text = "No XP for this board: today's Endless XP is used up. Your score still counts."
+			r.reward.TextColor3 = Theme.TextMuted
+		end
+		r.primary.Text = "Next board"
+		r.secondary.Text = "Menu"
+	elseif state == "failed" then
+		r.title.Text = "DEAD END"
+		r.title.TextColor3 = Theme.Danger
+		r.gradient.Enabled = false
+		r.stroke.Color = Theme.Danger
+		r.subtitle.Text = string.format("That cost a life. Lives left: %s", lives)
+		r.stats.Text = string.format("Moves %d    Captured %d / %d", snap.moveCount, snap.targetsTotal - snap.targetsLeft, snap.targetsTotal)
+		r.detail.Visible = true
+		r.detail.Text = "Try the same board again. Think about which piece you want to become next."
+		r.reward.Visible = false
+		r.primary.Text = "Try again"
+		r.secondary.Text = "Menu"
+	else
+		r.title.Text = "RUN OVER"
+		r.title.TextColor3 = Theme.Danger
+		r.gradient.Enabled = false
+		r.stroke.Color = Theme.Danger
+		r.subtitle.Text = string.format("You cleared %d %s.", run.cleared, if run.cleared == 1 then "board" else "boards")
+		r.stats.Text = string.format("Reached board %d", run.board)
+		r.detail.Visible = true
+		r.detail.Text = if run.cleared > 0 and run.cleared >= run.best then "That's your best run!" else string.format("Best run: %d", run.best)
+		r.reward.Visible = false
+		r.primary.Text = "New run"
+		r.secondary.Text = "Menu"
+	end
+	r.progress.Visible = false
+	if not wasShowing then
+		self:_popResult()
+		if state == "won" then
+			Anim.burst(r.dim, Theme.Gold, 14)
+			Sound.play("win")
+			Sound.haptic("heavy")
+		else
+			Sound.play("fail")
+			Sound.haptic("medium")
+		end
+	end
+end
+
 function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 	local r = self.result
 	if snap.duel then
@@ -1579,6 +1696,10 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 			r.dim.Visible = false
 			return
 		end
+	end
+	if snap.endless then
+		self:_renderEndlessResult(snap, previous)
+		return
 	end
 	if snap.status == "playing" then
 		r.dim.Visible = false
@@ -1902,6 +2023,21 @@ end
 
 function PuzzleHUD._confirmRestart(self: any)
 	local snap = self.snapshot
+	local run = snap and snap.endless
+	if run and not run.over and snap.status == "playing" and snap.moveCount > 0 then
+		self:_cancelDrag()
+		self.dialog:ask({
+			title = "Restart this board?",
+			body = if run.lives > 1
+				then string.format("It costs a life. You have %d left.", run.lives)
+				else "It costs your last life and ends the run.",
+			confirm = "Restart",
+			onConfirm = function()
+				self.handlers.restart()
+			end,
+		})
+		return
+	end
 	if not InputRules.needsConfirm(snap) then
 		self.handlers.restart()
 		return

@@ -28,6 +28,7 @@ local TeleportService = game:GetService("TeleportService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BoardState = require(Shared:WaitForChild("BoardState"))
+local EndlessRun = require(Shared:WaitForChild("EndlessRun"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local Progression = require(Shared:WaitForChild("Progression"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
@@ -58,6 +59,7 @@ type PlayerState = {
 	userStarted: boolean, -- the player picked a puzzle themselves
 	limiter: RateLimiter.RateLimiter,
 	throttled: boolean,
+	endless: any, -- the EndlessRun, in Endless mode
 }
 
 local PuzzleService = {}
@@ -188,7 +190,7 @@ local function snapshot(player: Player, state: PlayerState, event: string, err: 
 		moveCount = session.moveCount,
 		targetsTotal = session.targetsTotal,
 		targetsLeft = session:targetsLeft(),
-		canUndo = session.status ~= "won" and #session.history > 0,
+		canUndo = session.status ~= "won" and #session.history > 0 and not state.endless,
 		elapsed = elapsed(state),
 		lastMove = lastMove,
 		mode = state.mode,
@@ -207,6 +209,7 @@ local function snapshot(player: Player, state: PlayerState, event: string, err: 
 		progress = Progression.summary(profileOf(player), today()),
 		saveStatus = profiles:status(player.UserId) or "loading",
 		duelsAllServers = matchmaker ~= nil,
+		endless = if state.endless then state.endless:view(profileOf(player).endless.best) else nil,
 	}
 end
 
@@ -234,7 +237,14 @@ local function reply(player: Player, state: PlayerState, event: string, err: str
 	end
 end
 
-local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle, mode: string, day: number, byPlayer: boolean?)
+local function startPuzzle(
+	player: Player,
+	puzzle: PuzzleDefinitions.Puzzle,
+	mode: string,
+	day: number,
+	byPlayer: boolean?,
+	endless: any?
+)
 	local now = os.clock()
 	local previous = states[player]
 	local state: PlayerState = {
@@ -253,6 +263,7 @@ local function startPuzzle(player: Player, puzzle: PuzzleDefinitions.Puzzle, mod
 			then previous.limiter
 			else RateLimiter.new(GameConfig.RATE_LIMIT.BURST, GameConfig.RATE_LIMIT.PER_SECOND, now),
 		throttled = false,
+		endless = endless,
 	}
 	states[player] = state
 	send(player, state, "start")
@@ -346,6 +357,20 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			return
 		end
 		local day = today()
+		if mode == PLAY_MODES.Endless then
+			-- "next" moves the current run on (only after its board was cleared);
+			-- anything else starts a new run with a server-chosen seed.
+			local run = state.endless
+			if data.puzzleId == "next" and run and run:advance() then
+				startPuzzle(player, run.puzzle, mode, day, true, run)
+			elseif data.puzzleId == "next" then
+				send(player, state, "rejected", "not_cleared")
+			else
+				run = EndlessRun.new(HttpService:GenerateGUID(false), Random.new():NextInteger(1, 2147483646))
+				startPuzzle(player, run.puzzle, mode, day, true, run)
+			end
+			return
+		end
 		local puzzle = if mode == PLAY_MODES.Daily
 			then Progression.dailyPuzzle(day)
 			else PuzzleDefinitions.get(data.puzzleId)
@@ -361,6 +386,10 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 		startPuzzle(player, puzzle, mode, day, true)
 	elseif action == ACTIONS.Move then
 		local session = state.session
+		if state.endless and state.endless.over then
+			send(player, state, "rejected", "run_over")
+			return
+		end
 		local wasPlaying = session.status == "playing"
 		local ok, err = session:tryMove(data.from, data.to)
 		if not ok then
@@ -377,7 +406,20 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 				table.insert(log, { BoardState.squareName(session.board, move.from), BoardState.squareName(session.board, move.to) })
 			end
 			local valid, why = PuzzleValidator.validateSolution(session.puzzle.layout, log)
-			if valid then
+			if valid and state.endless then
+				local profile = profileOf(player)
+				local bestBefore = profile.endless.best
+				local op = state.endless:clear(state.day)
+				if op then
+					state.reward = record(player, op)
+					requestSave(player)
+				end
+				state.result = {
+					endless = true,
+					newBest = state.endless.cleared > bestBefore,
+					previousBest = bestBefore,
+				}
+			elseif valid then
 				-- Compare the profile before and after so the card shows what changed.
 				local profile = profileOf(player)
 				local puzzleId = session.puzzle.id
@@ -425,21 +467,45 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			)
 		elseif wasPlaying and session.status == "failed" then
 			record(player, { kind = "fail", puzzleId = session.puzzle.id, mode = state.mode })
+			if state.endless then
+				state.endless:deadEnd()
+			end
 		end
 		send(player, state, "move")
 	elseif action == ACTIONS.Undo then
+		if state.endless then
+			-- A score run: a dead end can't be undone, only paid for with a life.
+			send(player, state, "rejected", "no_undo")
+			return
+		end
 		if not state.session:undo() then
 			send(player, state, "rejected", "cannot_undo")
 			return
 		end
 		send(player, state, "undo")
 	elseif action == ACTIONS.Restart then
-		if state.session.moveCount > 0 then
-			record(player, { kind = "restart", puzzleId = state.session.puzzle.id, mode = state.mode })
+		local session = state.session
+		if state.endless then
+			if session.status == "won" then
+				send(player, state, "rejected", "not_playing")
+				return
+			end
+			if not state.endless:retry(session.moveCount > 0, session.status == "failed") then
+				-- That was the last life (or the run was already over).
+				send(player, state, "endless_over")
+				return
+			end
 		end
-		startPuzzle(player, state.session.puzzle, state.mode, state.day)
+		if session.moveCount > 0 then
+			record(player, { kind = "restart", puzzleId = session.puzzle.id, mode = state.mode })
+		end
+		startPuzzle(player, session.puzzle, state.mode, state.day, nil, state.endless)
 	elseif action == ACTIONS.Hint then
 		local session = state.session
+		if state.endless then
+			send(player, state, "rejected", "no_hints")
+			return
+		end
 		if session.status == "won" then
 			send(player, state, "rejected", "not_playing")
 			return

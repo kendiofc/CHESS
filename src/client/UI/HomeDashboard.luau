@@ -43,6 +43,7 @@ export type Data = {
 	queued: boolean,
 	serverPlayers: number,
 	allServers: boolean?, -- duels also search other servers
+	endlessBoard: number?, -- the board of the Endless run in progress
 	weeklyLeftText: string?,
 	continue: Continue,
 }
@@ -558,14 +559,17 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 	y += heroH
 
 	-- Mode cards ---------------------------------------------------------------------------
-	local columns = if wide then 4 elseif W >= 260 then 2 else 1
+	local CARDS = 5
+	local columns = if wide then 5 elseif W >= 260 then 2 else 1
 	local cardW = math.floor((W - gap * (columns - 1)) / columns)
 	local cardH = if wide then 236 elseif compact then 206 else 214
 	local small = cardW < 200
 	local function cardRect(index: number)
 		local column = (index - 1) % columns
 		local row = (index - 1) // columns
-		return { x = column * (cardW + gap), y = y + row * (cardH + gap), w = cardW, h = cardH }
+		-- A last card alone on its row takes the whole row.
+		local alone = index == CARDS and column == 0 and columns > 1
+		return { x = column * (cardW + gap), y = y + row * (cardH + gap), w = if alone then W else cardW, h = cardH }
 	end
 	local unlocked = if loading then "Beginner" else GameConfig.DIFFICULTIES[progress.unlockedIndex] or "Beginner"
 	local journeyCard = modeCard(page, "Journey", cardRect(1), {
@@ -626,8 +630,20 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 	if data.weeklyLeftText then
 		ticking.weeklyBadge = badge(weeklyCard, "⏱ " .. data.weeklyLeftText, Color3.fromRGB(196, 170, 255), false)
 	end
+	local endless = if loading then nil else progress.endless
+	local endlessCard = modeCard(page, "Endless", cardRect(5), {
+		icon = "🌀",
+		title = "Endless",
+		desc = "Boards that never run out. How far can you go?",
+		status = if endless == nil then "" else string.format("Best run: %d", endless.best),
+	}, small, function()
+		actions.open("Endless")
+	end)
+	if data.endlessBoard then
+		badge(endlessCard, string.format("BOARD %d", data.endlessBoard), Theme.Gold, false)
+	end
 	journeyCard.Name = "JourneyCard"
-	y += math.ceil(4 / columns) * (cardH + gap) + (if compact then 4 else 10)
+	y += math.ceil(CARDS / columns) * (cardH + gap) + (if compact then 4 else 10)
 
 	-- Continue and streak --------------------------------------------------------------------
 	local side = wide

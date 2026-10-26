@@ -18,7 +18,9 @@
 --     last counted day changes nothing;
 --   * Weekly Challenge milestones pay under "weekly:<week>:<n>", once ever;
 --   * a duel is counted once per match id (profile.duel.recent remembers the
---     last ones, on top of the op id), whichever server applies it.
+--     last ones, on top of the op id), whichever server applies it;
+--   * an Endless board is one op per run and board ("endless:<run>:<n>"), so a
+--     retried save counts it once; the best run only ever goes up.
 
 local Achievements = require(script.Parent.Achievements)
 local GameConfig = require(script.Parent.GameConfig)
@@ -58,6 +60,14 @@ export type Duel = {
 	recent: { string }, -- last match ids counted
 }
 
+export type Endless = {
+	best: number, -- most boards cleared in one run
+	runs: number, -- runs that cleared at least one board
+	boards: number, -- boards cleared in all runs
+	day: number, -- UTC day rewardedToday belongs to
+	rewardedToday: number, -- boards that paid XP on `day`
+}
+
 export type Settings = { sound: boolean, volume: number, haptics: boolean, drag: boolean }
 
 export type Profile = {
@@ -71,6 +81,7 @@ export type Profile = {
 	streak: Streak,
 	weekly: { week: number, cleared: { [string]: boolean } }, -- the current week's cleared challenge puzzles
 	duel: Duel,
+	endless: Endless,
 	lastJourney: string?, -- last puzzle cleared in Journey (where Continue resumes)
 	settings: Settings,
 	tutorial: { done: boolean, outcome: string? }, -- "completed" or "skipped"
@@ -80,7 +91,8 @@ export type Profile = {
 
 export type Op = {
 	id: string,
-	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings" | "tutorial" | "duel"
+	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings" | "tutorial" | "duel" | "endless"
+	board: number?, -- endless ops: the board number cleared in the run
 	puzzleId: string?,
 	mode: string?,
 	moves: number?,
@@ -125,6 +137,7 @@ function Progression.newProfile(): Profile
 		streak = newStreak(),
 		weekly = { week = 0, cleared = {} },
 		duel = newDuel(),
+		endless = { best = 0, runs = 0, boards = 0, day = 0, rewardedToday = 0 },
 		lastJourney = nil,
 		settings = table.clone(GameConfig.DEFAULT_SETTINGS),
 		tutorial = { done = false, outcome = nil },
@@ -239,6 +252,11 @@ function Progression.normalize(data: any): Profile
 					table.insert(profile.duel.recent, id)
 				end
 			end
+		end
+	end
+	if type(data.endless) == "table" then
+		for _, key in ipairs({ "best", "runs", "boards", "day", "rewardedToday" }) do
+			(profile.endless :: any)[key] = wholeNumber(data.endless[key], 0, 0, NONE)
 		end
 	end
 	if type(data.lastJourney) == "string" and PuzzleDefinitions.get(data.lastJourney) then
@@ -491,6 +509,9 @@ function Progression.canStart(profile: Profile, puzzle: PuzzleDefinitions.Puzzle
 			return false, "not_weekly"
 		end
 		return true, nil
+	elseif mode == GameConfig.PLAY_MODES.Endless then
+		-- Endless boards come from the server's run, never from the catalogue.
+		return false, "bad_mode"
 	end
 	return false, "bad_mode"
 end
@@ -514,6 +535,32 @@ local function remember(profile: Profile, id: string)
 	while #profile.applied > Progression.APPLIED_MEMORY do
 		table.remove(profile.applied, 1)
 	end
+end
+
+-- Adds every achievement newly met to `items`, each paid once ever.
+local function payAchievements(profile: Profile, items: { any })
+	for _, achievement in ipairs(Achievements.list) do
+		local key = Achievements.rewardKey(achievement.id)
+		if not profile.rewards[key] and achievement.check(profile) then
+			profile.rewards[key] = true
+			table.insert(items, { xp = 0, coins = achievement.coins, reason = achievement.name, achievement = achievement.id })
+		end
+	end
+end
+
+-- Pays the items and returns them as one reward, or nil if there are none.
+local function pay(profile: Profile, items: { any }): Reward?
+	if #items == 0 then
+		return nil
+	end
+	local reward: Reward = { xp = 0, coins = 0, reason = items[1].reason, items = items }
+	for _, item in ipairs(items) do
+		reward.xp += item.xp
+		reward.coins += item.coins
+	end
+	profile.xp += reward.xp
+	profile.coins += reward.coins
+	return reward
 end
 
 local function applyWin(profile: Profile, op: Op): Reward?
@@ -586,25 +633,38 @@ local function applyWin(profile: Profile, op: Op): Reward?
 		end
 	end
 	if credited then
-		for _, achievement in ipairs(Achievements.list) do
-			local key = Achievements.rewardKey(achievement.id)
-			if not profile.rewards[key] and achievement.check(profile) then
-				profile.rewards[key] = true
-				table.insert(items, { xp = 0, coins = achievement.coins, reason = achievement.name, achievement = achievement.id })
-			end
-		end
+		payAchievements(profile, items)
 	end
-	if #items == 0 then
+	return pay(profile, items)
+end
+
+-- Endless ----------------------------------------------------------------------------
+
+local function applyEndless(profile: Profile, op: Op): Reward?
+	local board = op.board
+	if type(board) ~= "number" or board ~= math.floor(board) or board < 1 or board > 100000 then
 		return nil
 	end
-	local reward: Reward = { xp = 0, coins = 0, reason = items[1].reason, items = items }
-	for _, item in ipairs(items) do
-		reward.xp += item.xp
-		reward.coins += item.coins
+	local endless = profile.endless
+	endless.boards += 1
+	if board == 1 then
+		endless.runs += 1
 	end
-	profile.xp += reward.xp
-	profile.coins += reward.coins
-	return reward
+	endless.best = math.max(endless.best, board)
+	local items = {}
+	local day = op.day
+	if type(day) == "number" and day >= endless.day then
+		if day > endless.day then
+			endless.day = day
+			endless.rewardedToday = 0
+		end
+		if endless.rewardedToday < GameConfig.ENDLESS.DAILY_REWARDED then
+			endless.rewardedToday += 1
+			table.insert(items, { xp = GameConfig.ENDLESS.XP_PER_BOARD, coins = 0, reason = "endless board" })
+		end
+	end
+	payAchievements(profile, items)
+	return pay(profile, items)
 end
 
 -- Duels ---------------------------------------------------------------------------
@@ -687,6 +747,8 @@ function Progression.apply(profile: Profile, op: Op): (boolean, Reward?)
 		return true, applyWin(profile, op)
 	elseif op.kind == "duel" then
 		return true, applyDuel(profile, op)
+	elseif op.kind == "endless" then
+		return true, applyEndless(profile, op)
 	elseif op.kind == "fail" then
 		profile.stats.fails += 1
 	elseif op.kind == "restart" then
@@ -768,6 +830,14 @@ function Progression.summary(profile: Profile, day: number): { [string]: any }
 			hintUsed = today and profile.daily.hintUsed,
 		},
 		weekly = Progression.weeklyView(profile, day),
+		endless = {
+			best = profile.endless.best,
+			runs = profile.endless.runs,
+			boards = profile.endless.boards,
+			rewardsLeftToday = if profile.endless.day == day
+				then math.max(0, GameConfig.ENDLESS.DAILY_REWARDED - profile.endless.rewardedToday)
+				else GameConfig.ENDLESS.DAILY_REWARDED,
+		},
 		duel = {
 			played = profile.duel.played,
 			wins = profile.duel.wins,

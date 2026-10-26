@@ -37,6 +37,7 @@ local NAV_ITEMS: { MenuSidebar.Item } = {
 	{ id = "Journey", icon = "🏔", label = "Journey" },
 	{ id = "Daily", icon = "📅", label = "Daily Puzzle" },
 	{ id = "Weekly", icon = "🏆", label = "Weekly Challenge" },
+	{ id = "Endless", icon = "🌀", label = "Endless" },
 	{ id = "Duel", icon = "⚔️", label = "Puzzle Duel" },
 	{ id = "Practice", icon = "🧩", label = "Practice" },
 	{ id = "Stats", icon = "📊", label = "Statistics" },
@@ -526,7 +527,10 @@ end
 
 function PlayDesk._renderDots(self: any, snap: any)
 	local group = PuzzleDefinitions.byDifficulty[snap.difficulty]
-	local fixed = snap.mode == PLAY_MODES.Daily or snap.mode == PLAY_MODES.Weekly or snap.mode == DUEL_MODE
+	local fixed = snap.mode == PLAY_MODES.Daily
+		or snap.mode == PLAY_MODES.Weekly
+		or snap.mode == PLAY_MODES.Endless
+		or snap.mode == DUEL_MODE
 	self.dotsRow.Visible = group ~= nil and not fixed
 	if not self.dotsRow.Visible then
 		return
@@ -967,17 +971,26 @@ function PlayDesk.render(self: any, snap: any, saveStatus: string?)
 	self.modeLabel.Text = "ECHO CHESS  ·  " .. modeName
 	self.title.Text = snap.name
 	local group = PuzzleDefinitions.byDifficulty[snap.difficulty]
-	self.pill.Text = string.format("%s %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
+	local run = snap.endless
+	self.pill.Text = if run
+		then string.format("%s · BOARD %d", string.upper(snap.difficulty), run.board)
+		else string.format("%s %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
 	self.pill.BackgroundColor3 = Theme.DifficultyColors[snap.difficulty] or Theme.PanelRaised
 
 	local captured = snap.targetsTotal - snap.targetsLeft
 	self.cells.MOVES.value.Text = tostring(snap.moveCount)
 	self.cells.CAPTURED.value.Text = string.format("%d / %d", captured, snap.targetsTotal)
-	self.cells.PAR.value.Text = tostring(snap.par)
+	-- Endless boards have no par: that cell shows the run's lives instead.
+	self.cells.PAR.head.Text = if run then "LIVES" else "PAR"
+	self.cells.PAR.value.Text = if run
+		then string.rep("♥", run.lives) .. string.rep("♡", math.max(0, run.maxLives - run.lives))
+		else tostring(snap.par)
 	self.cells.TIME.head.Text = if snap.duel then "TIME LEFT" else "TIME"
 
 	self.goalCapture.Text = string.format("Capture <b>%d / %d</b> pieces", captured, snap.targetsTotal)
-	self.goalPar.Text = string.format("Par: <b>%d</b> moves", snap.par)
+	self.goalPar.Text = if run
+		then string.format("Score <b>%d</b>  ·  best <b>%d</b>", run.cleared, run.best)
+		else string.format("Par: <b>%d</b> moves", snap.par)
 
 	self:_renderDots(snap)
 	self:_renderStreak(progress)

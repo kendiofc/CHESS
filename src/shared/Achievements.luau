@@ -3,10 +3,10 @@
 -- profile, shared by the server (which pays them) and the client (which lists
 -- them).
 --
--- Progression checks every achievement after each Journey or Daily win and
--- pays the ones newly met under the reward key "ach:<id>", so each pays at
--- most once, even when the same win reaches the DataStore twice or from two
--- servers. Practice wins never pay; an achievement met through Practice-only
+-- Progression checks every achievement after each Journey, Daily or Weekly
+-- win and each cleared Endless board, and pays the ones newly met under the
+-- reward key "ach:<id>", so each pays at most once, even when the same win
+-- reaches the DataStore twice or from two servers. Practice wins never pay; an achievement met through Practice-only
 -- progress is impossible anyway, because only Journey and Daily clears are
 -- credited and only they save stars.
 
@@ -108,6 +108,20 @@ table.insert(list, {
 		return profile.stats.dailies >= 10
 	end,
 })
+
+local function endlessGoal(id: string, name: string, boards: number, coins: number)
+	table.insert(list, {
+		id = id,
+		name = name,
+		description = string.format("Clear %d boards in one Endless run.", boards),
+		coins = coins,
+		check = function(profile)
+			return profile.endless ~= nil and profile.endless.best >= boards
+		end,
+	})
+end
+endlessGoal("endless_10", "Still Echoing", 10, 30)
+endlessGoal("endless_25", "Endless Echo", 25, 60)
 
 Achievements.list = list
 Achievements.byId = {} :: { [string]: Achievement }

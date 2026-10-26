@@ -1102,6 +1102,9 @@ test("every achievement can be reached and has coins", function()
 	for i = 0, 9 do
 		Progression.apply(profile, winIn(Progression.dailyPuzzle(day + i).id, MODES.Daily, 99, day + i))
 	end
+	for board = 1, 25 do
+		Progression.apply(profile, { id = "endless:run:" .. board, kind = "endless", board = board, day = day })
+	end
 	for _, achievement in ipairs(Achievements.list) do
 		assert(achievement.coins > 0, achievement.id)
 		assert(profile.rewards[Achievements.rewardKey(achievement.id)], "not reached: " .. achievement.id)
@@ -2513,6 +2516,200 @@ test("duel cross-server: a locked player isn't matched locally until released", 
 	eq(duels:stateOf(1), "countdown", "released, so the two are matched here")
 	eq(duels:stateOf(2), "countdown")
 	eq(duels:markFound(5, "X"), false, "not waiting")
+end)
+
+-- Endless ----------------------------------------------------------------------------
+
+local EndlessGen = require(Shared.EndlessGen)
+local EndlessRun = require(Shared.EndlessRun)
+local ENDLESS = GameConfig.ENDLESS
+
+test("endless: boards ramp up and stay at the top tier", function()
+	local previous = EndlessGen.spec(1)
+	eq(previous.size, 4)
+	eq(previous.targets, 2)
+	for n = 2, 200 do
+		local spec = EndlessGen.spec(n)
+		assert(spec.size >= previous.size, "boards never shrink at " .. n)
+		assert(spec.targets >= previous.targets, "targets never drop at " .. n)
+		assert(spec.size <= 8, "at most 8x8")
+		previous = spec
+	end
+	eq(EndlessGen.spec(200).size, 8)
+	eq(EndlessGen.spec(200).targets, EndlessGen.TIERS[#EndlessGen.TIERS].maxTargets)
+end)
+
+test("endless: every generated board is solvable and the same for the same seed", function()
+	for _, seed in ipairs({ 1, 424242, 2147483646 }) do
+		for n = 1, 45 do
+			local puzzle = assert(EndlessGen.board(seed, n), "board " .. n)
+			local spec = EndlessGen.spec(n)
+			local board = BoardState.fromLayout(puzzle.layout)
+			eq(board.width, spec.size)
+			eq(board.height, spec.size)
+			eq(BoardState.countColor(board, "black"), spec.targets, "target count")
+			eq(BoardState.countColor(board, "white"), 1, "one player piece")
+			-- The live solver (no budget) agrees it can be cleared.
+			assert(PuzzleValidator.isSolvable(board), string.format("seed %d board %d solvable", seed, n))
+			eq(puzzle.id, "endless-" .. n)
+			eq(puzzle.difficulty, spec.difficulty)
+			if n <= 12 then
+				eq(table.concat(EndlessGen.board(seed, n).layout, "/"), table.concat(puzzle.layout, "/"), "deterministic")
+			end
+		end
+	end
+	assert(
+		table.concat(EndlessGen.board(1, 20).layout) ~= table.concat(EndlessGen.board(2, 20).layout),
+		"different seeds give different boards"
+	)
+end)
+
+test("endless: a session can play a generated board to the end", function()
+	local puzzle = assert(EndlessGen.board(77, 8))
+	local session = PuzzleSession.new(puzzle)
+	local solution = assert(PuzzleValidator.findSolution(BoardState.fromLayout(puzzle.layout)))
+	local log = {}
+	for _, move in ipairs(solution) do
+		assert(session:tryMove(move[1], move[2]))
+		table.insert(log, { BoardState.squareName(session.board, move[1]), BoardState.squareName(session.board, move[2]) })
+	end
+	eq(session.status, "won")
+	assert(PuzzleValidator.validateSolution(puzzle.layout, log), "the server's replay check accepts it")
+end)
+
+test("endless: clearing scores once and unlocks the next board", function()
+	local run = EndlessRun.new("run-1", 99)
+	eq(run.board, 1)
+	eq(run.lives, ENDLESS.LIVES)
+	eq(run:advance(), false, "can't skip an uncleared board")
+	local op = assert(run:clear(500))
+	eq(op.id, "endless:run-1:1")
+	eq(op.kind, "endless")
+	eq(op.board, 1)
+	eq(run:clear(500), nil, "scored once")
+	eq(run.cleared, 1)
+	eq(run:advance(), true)
+	eq(run.board, 2)
+	eq(run.puzzle.id, "endless-2")
+	eq(run:advance(), false)
+	eq(run:view(0).best, 1, "the run's score counts towards the shown best")
+	eq(run:view(7).best, 7)
+end)
+
+test("endless: dead ends and restarts cost lives and end the run", function()
+	local run = EndlessRun.new("run-2", 5)
+	run:deadEnd()
+	eq(run.lives, ENDLESS.LIVES - 1)
+	run:deadEnd()
+	eq(run.lives, ENDLESS.LIVES - 1, "one dead end costs one life")
+	eq(run:retry(true, true), true, "replaying after a dead end is free")
+	eq(run.lives, ENDLESS.LIVES - 1)
+	eq(run:retry(false, false), true, "restarting an untouched board is free")
+	eq(run.lives, ENDLESS.LIVES - 1)
+	eq(run:retry(true, false), true, "restarting with moves on the board costs a life")
+	eq(run.lives, ENDLESS.LIVES - 2)
+	-- The last life: a restart ends the run.
+	eq(run:retry(true, false), false)
+	eq(run.lives, 0)
+	eq(run.over, true)
+	eq(run:clear(1), nil, "nothing scores after the end")
+	eq(run:advance(), false)
+	eq(run:retry(false, false), false)
+	run:deadEnd()
+	eq(run.lives, 0, "never below zero")
+	-- A dead end on the last life ends it too.
+	local other = EndlessRun.new("run-3", 6)
+	for _ = 1, ENDLESS.LIVES do
+		other:deadEnd()
+		if not other.over then
+			assert(other:retry(true, true))
+		end
+	end
+	eq(other.over, true)
+end)
+
+test("endless: progression keeps the best run, counts runs and caps XP", function()
+	local profile = Progression.newProfile()
+	local day = 40000
+	local function board(run: string, n: number, d: number?): any
+		local _, reward = Progression.apply(profile, { id = "endless:" .. run .. ":" .. n, kind = "endless", board = n, day = d or day })
+		return reward
+	end
+	for n = 1, 4 do
+		local reward = assert(board("a", n))
+		eq(reward.xp, ENDLESS.XP_PER_BOARD)
+		eq(reward.coins, 0, "no coins for boards")
+	end
+	eq(profile.endless.best, 4)
+	eq(profile.endless.runs, 1)
+	eq(profile.endless.boards, 4)
+	eq(board("a", 4), nil, "a repeated op counts once")
+	eq(profile.endless.boards, 4)
+	board("b", 1)
+	board("b", 2)
+	eq(profile.endless.best, 4, "a shorter run doesn't lower the best")
+	eq(profile.endless.runs, 2)
+	-- The daily XP cap.
+	local paid = 0
+	for n = 1, ENDLESS.DAILY_REWARDED + 10 do
+		local reward = board("c", n)
+		if reward and reward.xp > 0 then
+			paid += 1
+		end
+	end
+	eq(paid, ENDLESS.DAILY_REWARDED - 6, "only the day's remaining boards pay")
+	eq(Progression.summary(profile, day).endless.rewardsLeftToday, 0)
+	eq(Progression.summary(profile, day + 1).endless.rewardsLeftToday, ENDLESS.DAILY_REWARDED)
+	local reward = assert(board("d", 1, day + 1))
+	eq(reward.xp, ENDLESS.XP_PER_BOARD, "a new day pays again")
+	eq(board("e", 1, day - 1), nil, "a late op for an earlier day pays nothing")
+	-- Achievements for long runs pay coins once.
+	eq(profile.rewards[Achievements.rewardKey("endless_10")], true, "the 40-board run reached 10")
+	eq(profile.rewards[Achievements.rewardKey("endless_25")], true)
+	-- Bad board numbers are ignored.
+	local before = profile.endless.boards
+	for _, bad in ipairs({ 0, -1, 1.5, 1e9 }) do
+		Progression.apply(profile, { id = "bad:" .. tostring(bad), kind = "endless", board = bad, day = day })
+	end
+	Progression.apply(profile, { id = "bad:string", kind = "endless", board = "7" :: any, day = day })
+	eq(profile.endless.boards, before)
+end)
+
+test("endless: achievements pay coins the first time a run reaches them", function()
+	local profile = Progression.newProfile()
+	local coins = 0
+	for n = 1, 10 do
+		local _, reward = Progression.apply(profile, { id = "endless:x:" .. n, kind = "endless", board = n, day = 1 })
+		if reward then
+			coins += reward.coins
+		end
+	end
+	eq(coins, Achievements.byId.endless_10.coins)
+	for n = 1, 10 do
+		local _, reward = Progression.apply(profile, { id = "endless:y:" .. n, kind = "endless", board = n, day = 1 })
+		eq(reward and reward.coins or 0, 0, "never twice")
+	end
+end)
+
+test("endless: profiles keep their Endless record through a save", function()
+	local profile = Progression.newProfile()
+	Progression.apply(profile, { id = "endless:s:1", kind = "endless", board = 1, day = 3 })
+	Progression.apply(profile, { id = "endless:s:2", kind = "endless", board = 2, day = 3 })
+	local loaded = Progression.normalize(profile)
+	eq(loaded.endless.best, 2)
+	eq(loaded.endless.runs, 1)
+	eq(loaded.endless.boards, 2)
+	eq(loaded.endless.rewardedToday, 2)
+	local damaged = Progression.normalize({ endless = { best = -5, runs = "x", boards = 1.5 } })
+	eq(damaged.endless.best, 0)
+	eq(damaged.endless.runs, 0)
+	eq(Progression.normalize({}).endless.best, 0, "older profiles start at zero")
+end)
+
+test("endless: catalogue starts can't claim to be Endless boards", function()
+	local profile = Progression.newProfile()
+	eq(select(2, Progression.canStart(profile, PuzzleDefinitions.list[1], MODES.Endless, 1)), "bad_mode")
+	eq(GameConfig.HINTS.Endless, 0, "no hints in a score run")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failed))
