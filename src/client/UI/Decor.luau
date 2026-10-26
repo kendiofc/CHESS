@@ -83,14 +83,14 @@ function Decor.backdrop(gui: ScreenGui)
 			Parent = base,
 		})
 		make("UIAspectRatioConstraint", { AspectRatio = 1, Parent = holder })
-		for i = 1, 10 do
-			local scale = 1.1 - i * 0.1
+		for i = 1, 16 do
+			local scale = 1.0625 - i * 0.0625
 			local circle = make("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromScale(scale, scale),
 				BackgroundColor3 = color,
-				BackgroundTransparency = 0.984,
+				BackgroundTransparency = 0.99,
 				BorderSizePixel = 0,
 				Parent = holder,
 			})

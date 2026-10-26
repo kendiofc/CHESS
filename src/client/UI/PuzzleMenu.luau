@@ -381,8 +381,7 @@ local function rowIcon(button: TextButton, kind: string, black: boolean?)
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 12, 0.5, 0),
 		Size = UDim2.fromOffset(40, 40),
-		BackgroundColor3 = Theme.Background,
-		BackgroundTransparency = 0.45,
+		BackgroundColor3 = Theme.SquareLight,
 		Parent = button,
 	}, { corner(20) })
 	make("ImageLabel", {
