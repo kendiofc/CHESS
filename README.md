@@ -11,7 +11,11 @@ capturing every black piece, and each capture turns you into the piece you took.
 - three ways to play: Journey (difficulties unlock in order), Practice (any puzzle) and a Daily Puzzle
 - progress saved in a DataStore
 
-Multiplayer, monetization and other rule sets are not built yet.
+**Phase 6** adds a Weekly Challenge (four puzzles a week, the same for everyone)
+and Puzzle Duel, the first multiplayer mode: two players on the same server race
+to clear the same puzzle.
+
+Cross-server matchmaking, ratings, monetization and other rule sets are not built yet.
 
 ## Rules: Echo Clear mode
 
@@ -60,16 +64,19 @@ layout = {
 | `ReplicatedStorage.Shared.Achievements` | `src/shared/Achievements.luau` | One-time coin goals and their checks |
 | `ReplicatedStorage.Shared.TutorialFlow` | `src/shared/TutorialFlow.luau` | The tutorial's steps and how player events move between them |
 | `ReplicatedStorage.Shared.InputRules` | `src/shared/InputRules.luau` | Drag threshold, tap suppression, drop square, when to confirm leaving |
+| `ReplicatedStorage.Shared.WeeklyChallenge` | `src/shared/WeeklyChallenge.luau` | UTC week numbers and each week's four puzzles |
+| `ReplicatedStorage.Shared.RateLimiter` | `src/shared/RateLimiter.luau` | Token bucket used for each player's actions |
 | `ReplicatedStorage.Shared.GameConfig` | `src/shared/GameConfig.luau` | Difficulties, play modes, hint rules, rewards, star slack, streak shield, cosmetic slots, default settings, remotes, rate limits |
 | `ReplicatedStorage.Remotes` | `default.project.json` | `PuzzleAction` (client → server) and `PuzzleState` (server → client) |
 | `ServerScriptService.ServerMain` | `src/server/ServerMain.server.luau` | Boots services and keeps avatars still while the GUI is in use |
 | `ServerScriptService.Services.PuzzleService` | `src/server/Services/PuzzleService.luau` | Per-player authoritative sessions, modes, hints, rewards |
+| `ServerScriptService.Services.DuelManager` | `src/server/Services/DuelManager.luau` | Duel queue, matches, countdown, timer and results (pure; the clock and sends are passed in) |
 | `ServerScriptService.Services.ProfileStore` | `src/server/Services/ProfileStore.luau` | DataStore loading and saving |
 | `StarterPlayerScripts.ClientController` | `src/client/ClientController.client.luau` | Wires the HUD to the remotes and hides the mobile thumbstick |
 | `StarterPlayerScripts.AnimationController` | `src/client/AnimationController.luau` | Tween helpers |
 | `StarterPlayerScripts.SoundController` | `src/client/SoundController.luau` | Sound effects, master volume, haptics where supported |
 | `StarterPlayerScripts.UI.PuzzleHUD` | `src/client/UI/PuzzleHUD.luau` | Board, stats, controls (Undo, Hint, Restart) and result card |
-| `StarterPlayerScripts.UI.PuzzleMenu` | `src/client/UI/PuzzleMenu.luau` | Home screen, Journey, Practice, Daily, Statistics and Settings |
+| `StarterPlayerScripts.UI.PuzzleMenu` | `src/client/UI/PuzzleMenu.luau` | Home screen, Journey, Practice, Daily, Weekly, Duel, Statistics and Settings |
 | `StarterPlayerScripts.UI.TutorialCoach` | `src/client/UI/TutorialCoach.luau` | The tutorial card and its pointer ring |
 | `StarterPlayerScripts.UI.ConfirmDialog` | `src/client/UI/ConfirmDialog.luau` | "Restart puzzle?" / "Leave this puzzle?" dialog |
 | `StarterPlayerScripts.UI.SoundConfig` | `src/client/UI/SoundConfig.luau` | The audio asset for each sound event |
@@ -126,6 +133,8 @@ saves `completed` or `skipped` (a completion is never replaced by a skip).
 | Journey | unlocked difficulties only | unlimited | puzzle's XP and coins, first clear only | yes |
 | Practice | any puzzle | unlimited | none | no |
 | Daily | one puzzle per UTC day (Easy to Hard pool) | 1 per day | daily reward, once per day | yes |
+| Weekly | the week's 4 puzzles | 1 per attempt | milestones at 2 and 4 cleared, once per week | yes |
+| Duel | one Easy or Medium puzzle chosen by the server | none | win or draw, capped (see below) | no |
 
 - **Unlocks.** Beginner is always open. Each later difficulty opens after 4 Journey or Daily clears of the one before it (`GameConfig.UNLOCK_REQUIREMENT`).
 - **Hints.** The first two hints are the puzzle's written hints: a strategy, then a first step. Each later hint is live: the server's solver names the next piece to capture from the current position. On a dead-end board the hint says to undo, and that costs nothing.
@@ -164,6 +173,58 @@ saves `completed` or `skipped` (a completion is never replaced by a skip).
   chime fades out at 1.2 s (`maxSeconds`).
 - Vibration is used only when `HapticService` reports support for the current input (touch or gamepad). Otherwise the setting shows "Not supported on this device". Every vibration goes with a sound and a visual change, so nothing depends on it.
 
+### Weekly Challenge
+
+- **Weeks.** A week runs from Monday 00:00 UTC to the next Monday. Its number is
+  `(day + 3) // 7`, where `day` is the UTC day number, so every server agrees
+  from its own clock. The client never sends a week.
+- **Puzzles.** Each week is one Easy, two Medium and one Hard puzzle from the
+  catalogue, picked by week number (`WeeklyChallenge.puzzles`). Every player gets
+  the same set. Each catalogue puzzle is already checked by `PuzzleCheck`, and
+  the tests also run the solver over every set used in two years of weeks.
+- **Progress.** Clearing a puzzle in Weekly mode adds it to `profile.weekly.cleared`.
+  It's credited like a Daily clear: stars are saved and it counts toward unlocks.
+  When the week changes the list starts empty.
+- **Rewards.** Clearing 2 pays +30 XP and +10 coins; clearing all 4 pays +100 XP and
+  +30 coins. They are keyed `weekly:<week>:<n>`, so replaying puzzles, retrying a
+  save or playing on two servers never pays twice. A finished week adds one to
+  `stats.weeklies`.
+- **Separate from the Daily.** The Daily streak and its shield are not touched.
+
+## Puzzle Duel
+
+Two players race on the same puzzle, each on their own board.
+
+1. **Queue.** Find opponent joins the queue on this server; Cancel leaves it. A
+   player is in the queue at most once, can't be matched with themselves and
+   can't queue while in a match. The first two players in the queue are matched.
+2. **Countdown.** The server picks an Easy or Medium puzzle and gives the match a
+   unique id. Both players get the same 3-second countdown, and moves before it
+   ends are refused.
+3. **Play.** Each player has their own `PuzzleSession` on the server, so every
+   move is validated there. A player sees the opponent's captures and move count,
+   never their board or moves. Undo and Restart work; hints are off.
+4. **Result.** The first board clear the server processes wins. The server
+   replays the winner's move log before accepting it, and simultaneous finishes
+   are settled by the order the server handles them. If nobody clears the board
+   within 3 minutes it's a draw. Leaving (with a confirm dialog) or
+   disconnecting is a loss, and the opponent wins at once. The client never
+   declares a result.
+
+**Rewards and stats.** Every match adds to wins, losses, draws and matches played.
+
+- A win pays +25 XP and +6 coins. A draw, or a win because the opponent left, pays +10 XP and +2 coins. A loss pays nothing.
+- Rewards are capped at 5 rewarded duels per UTC day, and one per opponent per day, so two accounts can't farm each other.
+- Each match is recorded with the op id `duel:<matchId>:<userId>`, so it's counted once even if a save is retried.
+- There's no rating yet.
+
+**Limitations.**
+
+- **Same server only.** Cross-server matchmaking would need MemoryStore queues and teleports, so it isn't built. On a quiet server, a player can wait with nobody to match.
+- **Two-player testing.** The full flow has only been run in Studio against a server-side test opponent, not with two real players.
+- **Studio test opponent.** The test opponent exists only in Studio (`ServerStorage.EchoChessDuelTestHook`, created only when `RunService:IsStudio()`), and clients can't reach it.
+- **Single-player timer.** The puzzle a player left behind keeps its timer running during a duel.
+
 ### Saving (ProfileStore)
 
 Progress lives in the DataStore `EchoChessProfiles_v1`, under the key `player_<userId>`. It holds:
@@ -172,6 +233,8 @@ Progress lives in the DataStore `EchoChessProfiles_v1`, under the key `player_<u
 - XP and coins
 - stats: solves, fails, restarts, hints, moves, dailies
 - the Daily Puzzle state for the day, and the streak with its shield
+- the Weekly Challenge state for the week
+- duel results and the day's duel reward allowance
 - the last Journey clear (for Continue)
 - settings, and cosmetic slots for later
 - a ledger of rewards already paid
@@ -180,7 +243,7 @@ How saving works:
 
 - **Ops, not overwrites.** Every change is an op. The server applies it to the in-memory profile at once, and applies it again inside `UpdateAsync` against whatever is stored at that moment. Another server's writes are kept.
 - **No double counting.** Each op has an id, and the profile remembers the last 200 ids. A save that is retried, or that wrote but reported an error, counts only once.
-- **No double rewards.** Rewards are keyed: `journey:<puzzle id>` for puzzle rewards, `ach:<id>` for achievements, the day number for the Daily reward. Each reward is paid at most once, even if two servers race.
+- **No double rewards.** Rewards are keyed: `journey:<puzzle id>` for puzzle rewards, `ach:<id>` for achievements, the day number for the Daily reward, `weekly:<week>:<n>` for Weekly milestones. A duel's result is an op with the id `duel:<matchId>:<userId>`. Each reward is paid at most once, even if two servers race.
 - **Failures.** Loads and saves wait for request budget and retry with exponential backoff. Writes to one key are at least 7 s apart.
   - If loading fails, the player plays on a blank profile marked offline. The next save that succeeds merges into the stored data and replaces the blank view.
   - A failed save keeps its ops queued and writes nothing.
@@ -189,11 +252,13 @@ How saving works:
 
 ## Security model
 
-The client sends only intents (`start`, `move`, `undo`, `restart`, `hint`, `settings`, `sync`). The server owns everything else:
+The client sends only intents (`start`, `move`, `undo`, `restart`, `hint`, `settings`, `tutorial`, `sync`, and `duel_join`, `duel_cancel`, `duel_leave`, `duel_exit`). The server owns everything else:
 
 - The server validates every move against the shared rules. It rejects the move if the player has no piece there, the move is illegal or the input is malformed.
 - The server decides win and fail and keeps its own timer. Before recording a win, it replays its own move log through the rules.
 - Unlocks, the Daily Puzzle choice, hint allowances, stars, achievements, the streak and rewards are decided on the server from the stored profile. The client's menu only displays them.
+- Duels: the server owns the queue, the match, both boards, the timer and the result. Moves go to the board of the player who sent them, so no one can move for another player. A player who isn't in the match can't act on it.
+- If saving is unavailable, the win card and menu say so ("not saving", "isn't saved yet") rather than showing a reward as saved.
 - After every action the server sends a full snapshot.
 - Each player is limited to a burst of 8 actions, refilled at 6 per second. A throttled burst gets a single "rate limited" notice.
 
@@ -256,6 +321,20 @@ The suite checks:
 
 **Hints**
 - each live hint names a target that still leaves the board solvable
+
+**Weekly Challenge**
+- week boundaries at Sunday 23:59:59 and Monday 00:00 UTC, the same set on every call, and valid sets for two years of weeks
+- the solver clears every puzzle used
+- only this week's puzzles start, with 1 hint each
+- milestones pay once, a late op for last week doesn't pay this week, and two servers don't double-pay
+- the Daily streak is untouched, and Practice and Journey clears don't count
+
+**Duel and rate limits**
+- join, cancel, duplicate joins, self-match, and three or four players joining
+- countdown, illegal and early moves, moves after the end, and outsiders
+- opponent progress without their board, first clear wins, simultaneous finishes, and no client-declared win
+- timeout draws, disconnects at each stage, Leave, and the result screen
+- reward caps, the same-opponent rule, a save round trip, and that the duel puzzle pool passes `PuzzleCheck`
 
 ### Other scripts
 
