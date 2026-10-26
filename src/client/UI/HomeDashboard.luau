@@ -19,7 +19,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local Progression = require(Shared:WaitForChild("Progression"))
 
-local Decor = require(script.Parent:WaitForChild("Decor"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local HomeDashboard = {}
@@ -496,8 +495,9 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	local heroH = if compact then 132 else 206
 	if wide and Theme.PieceSheet ~= "" then
 		-- A big lit king on the right, as in the reference.
-		local kingSize = math.min(300, math.floor(W * 0.22))
-		local center = Vector2.new(W - kingSize * 0.42, y + heroH * 0.5)
+		-- It stands on the cards' top edge, clear of the coins above it.
+		local kingSize = math.min(230, math.floor(W * 0.17))
+		local center = Vector2.new(W - kingSize * 0.6, y + heroH - kingSize * 0.5)
 		glow(page, center, kingSize * 1.6, Theme.Accent)
 		piece("K", {
 			Name = "HeroKing",
@@ -675,27 +675,32 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 			{ Color3.fromRGB(80, 220, 130), Theme.Legal }
 		)
 	end
+	-- The gradient would tint the button's own text, so the label is a child.
 	local go = make("TextButton", {
 		Name = "ContinueButton",
 		AnchorPoint = if compact then Vector2.new(0, 1) else Vector2.new(1, 0.5),
 		Position = if compact then UDim2.new(0, 14, 1, -14) else UDim2.new(1, -22, 0.5, 0),
 		Size = UDim2.fromOffset(buttonW, if compact then 48 else 56),
 		BackgroundColor3 = Color3.new(1, 1, 1),
-		AutoButtonColor = cont.action ~= nil,
-		FontFace = Theme.FontHeavy,
-		Text = cont.button .. "  ▶",
-		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = if compact then 17 else 19,
+		BackgroundTransparency = if cont.action then 0 else 0.5,
+		AutoButtonColor = false,
+		Text = "",
 		Parent = panel,
 	}, {
 		corner(14),
 		gradient(Color3.fromRGB(150, 118, 255), Theme.AccentPressed),
 	})
-	Decor.sheen(go, 0.2)
-	if not cont.action then
-		go.BackgroundTransparency = 0.5
-		go.TextTransparency = 0.4
-	end
+	hoverLift(go)
+	text({
+		Name = "Label",
+		Size = UDim2.fromScale(1, 1),
+		FontFace = Theme.FontHeavy,
+		Text = cont.button .. "  ▶",
+		TextColor3 = Color3.new(1, 1, 1),
+		TextTransparency = if cont.action then 0 else 0.4,
+		TextSize = if compact then 17 else 19,
+		Parent = go,
+	})
 	local function runContinue()
 		if cont.action then
 			cont.action()
