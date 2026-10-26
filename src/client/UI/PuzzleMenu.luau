@@ -1245,17 +1245,17 @@ function PuzzleMenu._renderStats(self: any)
 			BackgroundColor3 = Theme.PanelRaised,
 			Parent = grid,
 		}, { corner(10) })
-		text({
+		local label = text({
 			Text = string.upper(tile[1]),
 			FontFace = Theme.FontBold,
-			TextSize = 11,
+			TextScaled = true,
 			TextColor3 = Theme.TextMuted,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			TextTruncate = Enum.TextTruncate.AtEnd,
 			Position = UDim2.fromOffset(10, 8),
 			Size = UDim2.new(1, -20, 0, 14),
 			Parent = frame,
 		})
+		make("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 8, Parent = label })
 		text({
 			Name = "Value",
 			Text = tile[2],
@@ -1281,7 +1281,8 @@ function PuzzleMenu._renderStats(self: any)
 	})
 	for order, achievement in ipairs(Achievements.list) do
 		local earned = progress.achievements[achievement.id] == true
-		local row = card(self, 2 + order, 54, achievement.id)
+		-- Tall enough for the description to wrap onto a second line on a phone.
+		local row = card(self, 2 + order, 62, achievement.id)
 		row.BackgroundTransparency = if earned then 0 else 0.45
 		text({
 			Text = (if earned then "✓  " else "") .. achievement.name,
@@ -1295,12 +1296,13 @@ function PuzzleMenu._renderStats(self: any)
 		})
 		text({
 			Text = achievement.description,
-			TextSize = 13,
+			TextSize = 12,
 			TextColor3 = Theme.TextMuted,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextWrapped = true,
 			Position = UDim2.fromOffset(12, 28),
-			Size = UDim2.new(1, -110, 0, 16),
+			Size = UDim2.new(1, -110, 0, 28),
 			Parent = row,
 		})
 		text({
