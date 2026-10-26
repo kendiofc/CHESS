@@ -333,6 +333,10 @@ function MenuSidebar.setDense(self: any, dense: boolean)
 	self.list.Position = UDim2.fromOffset(0, logoH + 4)
 	self.list.Size = UDim2.new(1, 0, 1, -(logoH + 4 + footerHeight))
 	self.footer.Size = UDim2.new(1, 0, 0, footerHeight)
+	-- On a short screen the rail has to scroll, so make the bar easy to see.
+	self.list.ScrollBarThickness = if dense then 5 else 3
+	self.list.ScrollBarImageColor3 = if dense then Theme.Accent else Theme.Stroke
+	self.list.ScrollBarImageTransparency = if dense then 0.15 else 0
 	self.divider.Position = UDim2.new(0.5, 0, 1, -footerHeight + 4)
 	for _, entry in pairs(self.items) do
 		entry.button.Size = UDim2.new(1, 0, 0, itemH)
