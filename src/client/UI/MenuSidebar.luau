@@ -17,6 +17,9 @@ MenuSidebar.COLLAPSED = 72
 export type Item = { id: string, icon: string, label: string, footer: boolean? }
 
 local ITEM_HEIGHT = 48
+local DENSE_ITEM_HEIGHT = 38
+local LOGO_HEIGHT = 76
+local DENSE_LOGO_HEIGHT = 52
 
 local function make(className: string, props: { [string]: any }?, children: { Instance }?): any
 	local instance = Instance.new(className)
@@ -44,6 +47,7 @@ function MenuSidebar.new(parent: Instance, items: { Item }, onSelect: (string) -
 	self.items = {}
 	self.selected = nil
 	self.collapsed = false
+	self.dense = false
 
 	local frame = make("Frame", {
 		Name = "Sidebar",
@@ -130,6 +134,7 @@ function MenuSidebar.new(parent: Instance, items: { Item }, onSelect: (string) -
 			footerCount += 1
 		end
 	end
+	self.footerCount = footerCount
 	local footerHeight = footerCount * (ITEM_HEIGHT + 6) + 22
 	local list = make("ScrollingFrame", {
 		Name = "Items",
@@ -152,6 +157,7 @@ function MenuSidebar.new(parent: Instance, items: { Item }, onSelect: (string) -
 			PaddingBottom = UDim.new(0, 8),
 		}),
 	})
+	self.list = list
 	local footer = make("Frame", {
 		Name = "Footer",
 		AnchorPoint = Vector2.new(0, 1),
@@ -168,7 +174,9 @@ function MenuSidebar.new(parent: Instance, items: { Item }, onSelect: (string) -
 			PaddingTop = UDim.new(0, 12),
 		}),
 	})
-	make("Frame", {
+	self.footer = footer
+	self.logo = logo
+	self.divider = make("Frame", {
 		Name = "Divider",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 1, -footerHeight + 4),
@@ -305,20 +313,52 @@ function MenuSidebar.setLabel(self: any, id: string, label: string)
 	end
 end
 
+-- Dense: shorter rows and a shorter logo, so every item fits on a screen
+-- that is not tall (a phone held sideways).
+function MenuSidebar.setDense(self: any, dense: boolean)
+	if self.dense == dense then
+		return
+	end
+	self.dense = dense
+	local itemH = if dense then DENSE_ITEM_HEIGHT else ITEM_HEIGHT
+	local logoH = if dense then DENSE_LOGO_HEIGHT else LOGO_HEIGHT
+	local footerHeight = self.footerCount * (itemH + 6) + (if dense then 14 else 22)
+	self.logo.Size = UDim2.new(1, 0, 0, logoH)
+	if self.logoIcon then
+		self.logoIcon.Size = UDim2.fromOffset(if dense then 28 else 36, if dense then 28 else 36)
+		self.logoIcon.Position = UDim2.fromOffset(self.logoIcon.Position.X.Offset, logoH / 2)
+	end
+	self.logoText.Position = UDim2.fromOffset(62, logoH / 2 - 16)
+	self.logoText.TextSize = if dense then 18 else 22
+	self.list.Position = UDim2.fromOffset(0, logoH + 4)
+	self.list.Size = UDim2.new(1, 0, 1, -(logoH + 4 + footerHeight))
+	self.footer.Size = UDim2.new(1, 0, 0, footerHeight)
+	self.divider.Position = UDim2.new(0.5, 0, 1, -footerHeight + 4)
+	for _, entry in pairs(self.items) do
+		entry.button.Size = UDim2.new(1, 0, 0, itemH)
+		entry.icon.TextSize = if dense then 19 else 22
+		entry.label.TextSize = if dense then 15 else 16
+	end
+	self:setMode(self.collapsed, self.floating or false)
+end
+
 -- Collapsed: icons only, centred in the rail, with the dot on the icon.
 -- `floating`: drawn over the page with a shadow (narrow screens).
 function MenuSidebar.setMode(self: any, collapsed: boolean, floating: boolean)
 	self.collapsed = collapsed
+	self.floating = floating
+	local itemH = if self.dense then DENSE_ITEM_HEIGHT else ITEM_HEIGHT
 	local width = if collapsed then MenuSidebar.COLLAPSED else MenuSidebar.EXPANDED
 	self.frame.Size = UDim2.new(0, width, 1, 0)
 	self.shadow.Visible = floating and not collapsed
 	self.logoText.Visible = not collapsed
 	if self.logoIcon then
-		self.logoIcon.Position = UDim2.fromOffset(if collapsed then MenuSidebar.COLLAPSED / 2 else 36, 40)
+		self.logoIcon.Position =
+			UDim2.fromOffset(if collapsed then MenuSidebar.COLLAPSED / 2 else 36, self.logo.Size.Y.Offset / 2)
 	end
 	for _, entry in pairs(self.items) do
 		entry.label.Visible = not collapsed
-		entry.icon.Position = UDim2.fromOffset(if collapsed then (MenuSidebar.COLLAPSED - 24) / 2 else 24, ITEM_HEIGHT / 2)
+		entry.icon.Position = UDim2.fromOffset(if collapsed then (MenuSidebar.COLLAPSED - 24) / 2 else 24, itemH / 2)
 		entry.dot.Position = if collapsed then UDim2.new(1, -8, 0, 10) else UDim2.new(1, -18, 0.5, 0)
 	end
 end

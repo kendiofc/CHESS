@@ -310,9 +310,11 @@ end
 
 -- Build --------------------------------------------------------------------------------------
 
--- Draws the page into `holder` (a ScrollingFrame) for a content `width`.
+-- Draws the page into `holder` (a ScrollingFrame) for a content `width` and
+-- `height`. A short viewport (a phone held sideways) gets a smaller hero so
+-- the mode cards are on screen without scrolling.
 -- Returns labels PuzzleMenu keeps ticking.
-function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data, actions: Actions): { [string]: any }
+function HomeDashboard.render(holder: ScrollingFrame, width: number, height: number, data: Data, actions: Actions): { [string]: any }
 	for _, child in ipairs(holder:GetChildren()) do
 		child:Destroy()
 	end
@@ -322,6 +324,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	local W = math.max(180, width - pad * 2)
 	local tiny = W < 320
 	local compact = W < 600
+	local short = height > 0 and height < 480
 	local wide = W >= 880
 	local gap = if compact then 12 else 18
 	local page = make("Frame", {
@@ -501,8 +504,8 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	y = if compact then avatarSize + 78 else 76
 
 	-- Hero ---------------------------------------------------------------------------------
-	local heroH = if compact then 132 else 206
-	if wide and Theme.PieceSheet ~= "" then
+	local heroH = if short then 112 elseif compact then 132 else 206
+	if wide and not short and Theme.PieceSheet ~= "" then
 		-- A big lit king on the right, as in the reference.
 		-- It stands on the cards' top edge, clear of the coins above it.
 		local kingSize = math.min(230, math.floor(W * 0.17))
@@ -520,34 +523,34 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	text({
 		Name = "Crown",
 		Position = UDim2.fromOffset(0, y),
-		Size = UDim2.new(1, 0, 0, if compact then 40 else 62),
+		Size = UDim2.new(1, 0, 0, if short then 32 elseif compact then 40 else 62),
 		FontFace = Theme.FontBold,
 		Text = "👑",
-		TextSize = if compact then 34 else 56,
+		TextSize = if short then 28 elseif compact then 34 else 56,
 		Parent = page,
 	})
 	local title = text({
 		Name = "Title",
-		Position = UDim2.fromOffset(0, y + (if compact then 38 else 60)),
-		Size = UDim2.new(1, 0, 0, if compact then 52 else 92),
+		Position = UDim2.fromOffset(0, y + (if short then 28 elseif compact then 38 else 60)),
+		Size = UDim2.new(1, 0, 0, if short then 44 elseif compact then 52 else 92),
 		FontFace = Theme.FontHeavy,
 		RichText = true,
 		Text = 'Echo <font color="#F6C648">Chess</font>',
 		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = if compact then 44 else 84,
+		TextSize = if short then 38 elseif compact then 44 else 84,
 		Parent = page,
 	})
-	make("UITextSizeConstraint", { MaxTextSize = if compact then 44 else 84, Parent = title })
+	make("UITextSizeConstraint", { MaxTextSize = if short then 38 elseif compact then 44 else 84, Parent = title })
 	title.TextScaled = W < 420
 	text({
 		Name = "Tagline",
-		Position = UDim2.fromOffset(0, y + (if compact then 92 else 156)),
-		Size = UDim2.new(1, 0, 0, if compact then 36 else 30),
+		Position = UDim2.fromOffset(0, y + (if short then 74 elseif compact then 92 else 156)),
+		Size = UDim2.new(1, 0, 0, if short then 26 elseif compact then 36 else 30),
 		Text = if compact
 			then "Chess Puzzles  ·  Daily  ·  Duel  ·  Progression"
 			else "Chess Puzzles   •   Daily Challenges   •   Duel   •   Progression",
 		TextColor3 = Theme.TextMuted,
-		TextSize = if compact then 13 else 21,
+		TextSize = if short then 13 elseif compact then 13 else 21,
 		TextWrapped = true,
 		Parent = page,
 	})

@@ -377,9 +377,11 @@ function PuzzleMenu._layout(self: any)
 	local rail = if narrow or not expanded then MenuSidebar.COLLAPSED else MenuSidebar.EXPANDED
 	self.content.Position = UDim2.new(0.5, rail / 2, 0.5, 0)
 	self.content.Size = UDim2.new(1, -rail, 1, 0)
+	self.sidebar:setDense(size.Y < 480)
 	local width = size.X - rail
-	if self.homeWidth ~= width then
+	if self.homeWidth ~= width or self.homeHeight ~= size.Y then
 		self.homeWidth = width
+		self.homeHeight = size.Y
 		if self.gui.Enabled and self.view == "Home" then
 			self:_render()
 		end
@@ -912,7 +914,7 @@ end
 
 function PuzzleMenu._renderHome(self: any)
 	local left = self:_weeklyLeft()
-	self.homeTicking = HomeDashboard.render(self.home, self.home.AbsoluteSize.X, {
+	self.homeTicking = HomeDashboard.render(self.home, self.home.AbsoluteSize.X, self.home.AbsoluteSize.Y, {
 		progress = self.progress,
 		loading = self.progress == nil or self.saveStatus == "loading",
 		saveStatus = self.saveStatus,
