@@ -973,7 +973,7 @@ function PlayDesk.render(self: any, snap: any, saveStatus: string?)
 	local group = PuzzleDefinitions.byDifficulty[snap.difficulty]
 	local run = snap.endless
 	self.pill.Text = if run
-		then string.format("%s · BOARD %d", string.upper(snap.difficulty), run.board)
+		then string.upper(snap.difficulty)
 		else string.format("%s %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
 	self.pill.BackgroundColor3 = Theme.DifficultyColors[snap.difficulty] or Theme.PanelRaised
 

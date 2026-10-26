@@ -78,7 +78,7 @@ local ERROR_MESSAGES = {
 	teleport_failed = "Couldn't move you to the match server. Try again.",
 	opponent_missing = "Your opponent didn't make it to the match. Try again.",
 	no_undo = "No undo in Endless. A dead end costs a life instead.",
-	run_over = "This run is over. Start a new one from the Endless page.",
+	run_over = "This run is over. Tap New run to go again.",
 	not_cleared = "Clear this board first.",
 }
 
@@ -1180,8 +1180,9 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	self.difficultyPill.BackgroundColor3 = Theme.DifficultyColors[snap.difficulty] or Theme.PanelRaised
 	local group = PuzzleDefinitions.byDifficulty[snap.difficulty]
 	local run = snap.endless
+	-- The title already names an Endless board, so the pill only shows its tier.
 	self.difficultyPill.Text = if run
-		then string.format("%s  ·  BOARD %d", string.upper(snap.difficulty), run.board)
+		then string.upper(snap.difficulty)
 		else string.format("%s  %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
 	-- Narrow headers (phones) only have room for the mode name.
 	local mode = if snap.mode == DUEL_MODE then "PUZZLE DUEL" else string.upper(snap.mode or PLAY_MODES.Journey)
@@ -1439,8 +1440,10 @@ local function rewardText(snap: any): string
 				coins += item.coins
 			end
 		end
-		if xp > 0 or coins > 0 then
+		if coins > 0 then
 			table.insert(lines, 1, string.format("+%d XP   +%d coins", xp, coins))
+		elseif xp > 0 then
+			table.insert(lines, 1, string.format("+%d XP", xp))
 		end
 		return table.concat(lines, "\n")
 	end
@@ -1636,7 +1639,7 @@ function PuzzleHUD._renderEndlessResult(self: any, snap: any, previous: any)
 		r.subtitle.Text = string.format("Score: %d", run.cleared) .. (if result and result.newBest then "  ·  New best!" else "")
 		r.stats.Text = string.format("Moves %d    Time %s    Lives %s", snap.moveCount, formatTime(snap.elapsed), lives)
 		r.detail.Visible = true
-		r.detail.Text = "The next board is a little bigger."
+		r.detail.Text = "Boards get bigger as you go."
 		r.reward.Visible = true
 		if snap.reward then
 			r.reward.Text = rewardText(snap) .. saveNote(snap)
