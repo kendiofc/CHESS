@@ -30,7 +30,7 @@ PlayDesk.__index = PlayDesk
 
 -- The desk layout needs this much screen; smaller screens use the HUD's own.
 PlayDesk.MIN_WIDTH = 1000
-PlayDesk.MIN_HEIGHT = 600
+PlayDesk.MIN_HEIGHT = 640
 
 local NAV_ITEMS: { MenuSidebar.Item } = {
 	{ id = "Home", icon = "🏠", label = "Home" },
@@ -425,13 +425,14 @@ end
 
 function PlayDesk._placeRules(self: any)
 	local half = self.title.AbsoluteSize.X / 2 + 16
-	self.ruleLeft.Position = UDim2.new(0.5, -half, 0, 31)
-	self.ruleRight.Position = UDim2.new(0.5, half, 0, 31)
+	local mid = self.titleMid or 31
+	self.ruleLeft.Position = UDim2.new(0.5, -half, 0, mid)
+	self.ruleRight.Position = UDim2.new(0.5, half, 0, mid)
 	-- The difficulty sits just past the right rule, or at the row's edge
 	-- when a long name leaves no room.
 	local rowW = self.titleRow.AbsoluteSize.X
 	local x = math.min(rowW / 2 + half + 110 + 24 + 75, rowW - 75)
-	self.pill.Position = UDim2.fromOffset(x, 31)
+	self.pill.Position = UDim2.fromOffset(x, mid)
 end
 
 -- Stats strip: moves, captured, time, par ----------------------------------------------
@@ -864,6 +865,23 @@ end
 -- Places the desk's own parts in a `w` x `h` area and returns where the HUD
 -- should put the board, the tutorial card, the message line and the buttons.
 function PlayDesk.layout(self: any, w: number, h: number, coaching: boolean): Rects
+	-- A laptop-height screen gets a tighter column so the board stays large.
+	local short = h < 860
+	local titleH = if short then 38 else TITLE_H
+	local statsH = if short then 50 else STATS_H
+	local dotsH = if short then 24 else DOTS_H
+	local controlsH = if short then 50 else CONTROLS_H
+	local messageH = if short then 30 else MESSAGE_H
+	local step = if short then 4 else 6
+	self.modeLabel.Visible = not short
+	self.title.TextSize = if short then 28 else 34
+	self.title.Position = UDim2.new(0.5, 0, 0, if short then 2 else 12)
+	self.titleMid = if short then 19 else 31
+	for _, cell in pairs(self.cells) do
+		cell.value.TextSize = if short then 20 else 24
+		cell.value.Position = UDim2.fromOffset(0, if short then 20 else 24)
+		cell.head.Position = UDim2.fromOffset(0, if short then 5 else 8)
+	end
 	local sideW = math.clamp(math.floor(w * 0.25), 270, 380)
 	local centreW = w - PAD * 3 - sideW
 	local cx = PAD
@@ -874,28 +892,29 @@ function PlayDesk.layout(self: any, w: number, h: number, coaching: boolean): Re
 	local xpX = 70 + nameW + 20
 	place(self.xp, xpX, 6, math.min(440, w - PAD * 2 - xpX - 210), 46)
 
-	local y = 10 + TOP_H + 6
-	place(self.titleRow, cx, y, centreW, TITLE_H)
+	local y = 10 + TOP_H + step
+	place(self.titleRow, cx, y, centreW, titleH)
 	self:_placeRules()
-	y += TITLE_H + 8
+	y += titleH + step
 	local stripW = math.min(centreW, 680)
-	place(self.strip, cx + (centreW - stripW) / 2, y, stripW, STATS_H)
-	y += STATS_H + 6
+	place(self.strip, cx + (centreW - stripW) / 2, y, stripW, statsH)
+	y += statsH + step
 	local dotsShown = self.dotsRow.Visible
-	place(self.dotsRow, cx, y, centreW, DOTS_H)
+	place(self.dotsRow, cx, y, centreW, dotsH)
 	if dotsShown then
-		y += DOTS_H + 6
+		y += dotsH + step
 	end
 
-	local bottom = h - 12
-	local controls = { x = cx + (centreW - math.min(centreW, 680)) / 2, y = bottom - CONTROLS_H, w = math.min(centreW, 680), h = CONTROLS_H }
-	local below = if coaching then COACH_H else MESSAGE_H
+	local bottom = h - (if short then 8 else 12)
+	local controls = { x = cx + (centreW - math.min(centreW, 680)) / 2, y = bottom - controlsH, w = math.min(centreW, 680), h = controlsH }
+	local below = if coaching then COACH_H else messageH
 	local coachW = math.min(centreW, 840)
 	local coach = { x = cx + (centreW - coachW) / 2, y = controls.y - GAP - COACH_H, w = coachW, h = COACH_H }
-	local message = { x = cx, y = controls.y - GAP - MESSAGE_H, w = centreW, h = MESSAGE_H }
-	-- The board leaves room for its rim and the coordinates outside it.
-	local boardTop = y + 30
-	local boardBottom = controls.y - GAP - below - 34
+	local message = { x = cx, y = controls.y - GAP - messageH, w = centreW, h = messageH }
+	-- The board leaves room for its rim (24 px above, 36 below) and the
+	-- coordinates outside it.
+	local boardTop = y + 26
+	local boardBottom = controls.y - GAP - below - 40
 	local board = { x = cx + 30, y = boardTop, w = centreW - 60, h = math.max(120, boardBottom - boardTop) }
 
 	-- Side cards, top-aligned with the title.
