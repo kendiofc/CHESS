@@ -1354,7 +1354,8 @@ function PuzzleMenu._renderEndless(self: any)
 		end)
 	end
 
-	local info = card(self, 2, 108, "EndlessStats")
+	local rewardsHeight = if self.list.AbsoluteSize.X < 340 then 60 else 40
+	local info = card(self, 2, 68 + rewardsHeight, "EndlessStats")
 	text({
 		Text = "YOUR ENDLESS RUNS",
 		FontFace = Theme.FontBold,
@@ -1394,7 +1395,7 @@ function PuzzleMenu._renderEndless(self: any)
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextWrapped = true,
 		Position = UDim2.fromOffset(14, 62),
-		Size = UDim2.new(1, -28, 0, 40),
+		Size = UDim2.new(1, -28, 0, rewardsHeight),
 		Parent = info,
 	})
 end
