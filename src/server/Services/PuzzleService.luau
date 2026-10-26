@@ -14,13 +14,17 @@
 -- Puzzle Duels (DuelManager) use the same remotes and rate limit. While a
 -- player is in a duel, their move / undo / restart go to the duel board, and
 -- single-player actions that would change what they see are refused.
+-- Players left waiting are also offered to other servers (DuelMatchmaker);
+-- a cross-server match is played on a reserved server both are teleported to.
 
 local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
+local MemoryStoreService = game:GetService("MemoryStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
+local TeleportService = game:GetService("TeleportService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BoardState = require(Shared:WaitForChild("BoardState"))
@@ -33,6 +37,7 @@ local PuzzleValidator = require(Shared:WaitForChild("PuzzleValidator"))
 local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 local WeeklyChallenge = require(Shared:WaitForChild("WeeklyChallenge"))
 local DuelManager = require(script.Parent:WaitForChild("DuelManager"))
+local DuelMatchmaker = require(script.Parent:WaitForChild("DuelMatchmaker"))
 local ProfileStore = require(script.Parent:WaitForChild("ProfileStore"))
 
 local ACTIONS = GameConfig.ACTIONS
@@ -60,6 +65,8 @@ local PuzzleService = {}
 local states: { [Player]: PlayerState } = {}
 local profiles: any
 local duels: any
+local matchmaker: any -- nil when cross-server matching is off
+local synced: { [number]: boolean } = {} -- players whose client has loaded
 local stateRemote: RemoteEvent
 local actionRemote: RemoteEvent
 
@@ -199,6 +206,7 @@ local function snapshot(player: Player, state: PlayerState, event: string, err: 
 		reward = if event == "move" then state.reward else nil,
 		progress = Progression.summary(profileOf(player), today()),
 		saveStatus = profiles:status(player.UserId) or "loading",
+		duelsAllServers = matchmaker ~= nil,
 	}
 end
 
@@ -212,6 +220,7 @@ local function sendDuel(player: Player, snap: { [string]: any })
 	snap.saveStatus = profiles:status(player.UserId) or "loading"
 	snap.nextDailyIn = (today() + 1) * 86400 - os.time()
 	snap.nextWeeklyIn = WeeklyChallenge.secondsLeft(os.time())
+	snap.duelsAllServers = matchmaker ~= nil
 	stateRemote:FireClient(player, snap)
 end
 
@@ -274,6 +283,9 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 		local ok, err = duels:join(userId, player.DisplayName)
 		if not ok then
 			reply(player, state, "rejected", err)
+		elseif matchmaker and duels:stateOf(userId) == "queued" then
+			-- Nobody here was waiting: look on other servers too.
+			matchmaker:publish(userId, player.DisplayName)
 		end
 		return
 	elseif action == ACTIONS.DuelCancel then
@@ -295,6 +307,11 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 			reply(player, state, "rejected", "in_duel")
 		end
 		return
+	end
+	if action == ACTIONS.Sync then
+		-- The client has loaded: on a cross-server match server, that's arrival.
+		synced[userId] = true
+		duels:arrive(userId)
 	end
 	local duelState = duels:stateOf(userId)
 	if duelState == "countdown" or duelState == "playing" then
@@ -521,6 +538,134 @@ local function createDuels()
 	})
 end
 
+local function sortedMap(name: string): DuelMatchmaker.Map
+	local map = MemoryStoreService:GetSortedMap(name)
+	return {
+		get = function(_, key: string): any
+			return map:GetAsync(key)
+		end,
+		set = function(_, key: string, value: any, ttl: number, sortKey: number?)
+			map:SetAsync(key, value, ttl, sortKey)
+		end,
+		update = function(_, key: string, fn: (any) -> any, ttl: number): any
+			return map:UpdateAsync(key, function(value: any, sortKey: any)
+				local new = fn(value)
+				if new == nil then
+					return nil
+				end
+				return new, sortKey
+			end, ttl)
+		end,
+		remove = function(_, key: string)
+			map:RemoveAsync(key)
+		end,
+		range = function(_, count: number): { { key: string, value: any } }
+			local list = {}
+			for _, item in ipairs(map:GetRangeAsync(Enum.SortDirection.Ascending, count)) do
+				table.insert(list, { key = item.key, value = item.value })
+			end
+			return list
+		end,
+	}
+end
+
+-- A reserved server made by the matchmaker (not a player's private server).
+local function isMatchServer(): boolean
+	return game.PrivateServerId ~= "" and game.PrivateServerOwnerId == 0
+end
+
+-- Cross-server matching needs MemoryStore and teleports, which Studio doesn't
+-- have without API access, so Studio keeps same-server matching only.
+local function createMatchmaker()
+	local config = GameConfig.DUEL.CROSS_SERVER
+	if not config.ENABLED or RunService:IsStudio() or game.PlaceId == 0 then
+		return
+	end
+	matchmaker = DuelMatchmaker.new({
+		tickets = sortedMap("EchoChessDuelTickets_v1"),
+		matches = sortedMap("EchoChessDuelMatches_v1"),
+		now = os.time,
+		serverId = game.JobId,
+		newId = function()
+			return HttpService:GenerateGUID(false)
+		end,
+		reserve = function()
+			return TeleportService:ReserveServer(game.PlaceId)
+		end,
+		teleport = function(userId: number, accessCode: string): boolean
+			local player = Players:GetPlayerByUserId(userId)
+			if not player then
+				return false
+			end
+			local options = Instance.new("TeleportOptions")
+			options.ReservedServerAccessCode = accessCode
+			local ok, err = pcall(function()
+				TeleportService:TeleportAsync(game.PlaceId, { player }, options)
+			end)
+			if not ok then
+				warn("[PuzzleService] duel teleport failed: " .. tostring(err))
+			end
+			return ok
+		end,
+		pickPuzzleId = function()
+			return pickDuelPuzzle().id
+		end,
+		duels = duels,
+		log = function(message: string)
+			warn("[PuzzleService] " .. message)
+		end,
+		config = config,
+	})
+	duels.crossServer = true
+
+	TeleportService.TeleportInitFailed:Connect(function(player: Player)
+		matchmaker:teleportFailed(player.UserId)
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(config.POLL)
+			matchmaker:step()
+		end
+	end)
+
+	if isMatchServer() then
+		task.spawn(function()
+			local serverKey = game.PrivateServerId
+			local record = nil
+			for _ = 1, 5 do
+				local ok, result = pcall(matchmaker.hostedMatch, matchmaker, serverKey)
+				if ok then
+					record = result
+					break
+				end
+				task.wait(1)
+			end
+			if not record then
+				return -- an ordinary reserved server; nothing to host
+			end
+			-- Only puzzles a duel may use; the record is ours, but check anyway.
+			local puzzle = PuzzleDefinitions.get(record.puzzleId)
+			if not (puzzle and table.find(GameConfig.DUEL.DIFFICULTIES, puzzle.difficulty)) then
+				puzzle = pickDuelPuzzle()
+			end
+			duels:expect(record.matchId, puzzle, record.players, config.ARRIVAL_WAIT)
+			for _, entry in ipairs(record.players) do
+				if synced[entry.id] then
+					duels:arrive(entry.id)
+				end
+			end
+			-- Stop waiting early if the other server says its player isn't coming.
+			while duels.pending do
+				task.wait(3)
+				local ok, declined = pcall(matchmaker.declined, matchmaker, serverKey)
+				if ok and declined and duels.pending then
+					duels:abandonPending()
+				end
+			end
+		end)
+	end
+end
+
 -- Studio only: a server-side BindableFunction that adds a test opponent (user
 -- id -1) driven from Studio's command bar, so one person can play a whole duel
 -- in Studio. It doesn't exist in a live game, and clients can't call it.
@@ -565,6 +710,7 @@ function PuzzleService.Start()
 	ensureRemotes()
 	createProfiles()
 	createDuels()
+	createMatchmaker()
 	createStudioDuelHook()
 	actionRemote.OnServerEvent:Connect(onAction)
 
@@ -592,6 +738,7 @@ function PuzzleService.Start()
 		-- Settle any duel first, so the leaver's loss is saved with their profile
 		-- and the opponent gets their result straight away.
 		duels:disconnect(player.UserId)
+		synced[player.UserId] = nil
 		states[player] = nil
 		profiles:release(player.UserId)
 	end)

@@ -108,6 +108,18 @@ GameConfig.DUEL = {
 	REWARD_WIN = { xp = 25, coins = 6 },
 	REWARD_DRAW = { xp = 10, coins = 2 }, -- also a win because the opponent left
 	DAILY_REWARDED = 5, -- rewarded duels per player per UTC day
+	-- Searching other servers (MemoryStore tickets, then a teleport to a reserved
+	-- server). Off in Studio, where MemoryStore and teleports aren't available
+	-- without API access; players there are matched on their own server.
+	CROSS_SERVER = {
+		ENABLED = true,
+		POLL = 2, -- seconds between matchmaking steps
+		TICKET_TTL = 30, -- a ticket nobody refreshes is gone after this
+		STALE = 10, -- a ticket not refreshed for this long isn't offered
+		MATCH_TTL = 600, -- seconds the match record lives
+		RANGE = 50, -- tickets read per search
+		ARRIVAL_WAIT = 45, -- seconds the match server waits for both players
+	},
 	-- A player is paid for at most one duel per opponent per UTC day, so
 	-- matching the same second account again and again earns nothing.
 }

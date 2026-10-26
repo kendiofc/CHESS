@@ -2182,6 +2182,339 @@ test("level from XP: thresholds, progress within a level, and junk input", funct
 	end
 end)
 
+-- Cross-server duel matchmaking ------------------------------------------------------
+
+local DuelMatchmaker = require(Shared.DuelMatchmaker)
+local FakeMemoryMap = require(Shared.FakeMemoryMap)
+local CROSS = GameConfig.DUEL.CROSS_SERVER
+
+-- Several fake servers sharing one pair of MemoryStore maps and a wall clock.
+local function makeWorld()
+	local world = { t = 1000, reserved = 0, servers = {} }
+	local function clock()
+		return world.t
+	end
+	world.tickets = FakeMemoryMap.new(clock)
+	world.matches = FakeMemoryMap.new(clock)
+	function world.server(name: string)
+		local env = makeDuels()
+		env.duels.crossServer = true
+		env.teleports = {}
+		env.teleportOk = true
+		env.logs = {}
+		env.mm = DuelMatchmaker.new({
+			tickets = world.tickets,
+			matches = world.matches,
+			now = clock,
+			serverId = name,
+			newId = function()
+				world.reserved += 1
+				return name .. "-match-" .. world.reserved
+			end,
+			reserve = function()
+				world.reserved += 1
+				return "code-" .. world.reserved, "ps-" .. world.reserved
+			end,
+			teleport = function(userId: number, accessCode: string)
+				table.insert(env.teleports, { userId = userId, code = accessCode })
+				return env.teleportOk
+			end,
+			pickPuzzleId = function()
+				return DUEL_PUZZLE.id
+			end,
+			duels = env.duels,
+			log = function(message: string)
+				table.insert(env.logs, message)
+			end,
+			config = CROSS,
+		})
+		-- What PuzzleService does on DuelJoin.
+		function env.join(id: number)
+			local ok, err = env.duels:join(id, "P" .. id)
+			if ok and env.duels:stateOf(id) == "queued" then
+				env.mm:publish(id, "P" .. id)
+			end
+			return ok, err
+		end
+		world.servers[name] = env
+		return env
+	end
+	function world.ticket(id: number): any
+		return world.tickets:get(tostring(id))
+	end
+	return world
+end
+
+-- Player 1 waits on A, player 2 on B; B (the newer ticket) sets up the match.
+local function crossMatched(world: any): (any, any, any)
+	local a, b = world.server("A"), world.server("B")
+	a.join(1)
+	a.mm:step()
+	world.t += 1
+	b.join(2)
+	b.mm:step()
+	local record = assert(world.matches:get("ps-" .. world.reserved), "match record")
+	return a, b, record
+end
+
+test("duel cross-server: players on different servers are matched", function()
+	local world = makeWorld()
+	local a, b, record = crossMatched(world)
+	eq(#b.teleports, 1, "B sends its player straight away")
+	eq(b.teleports[1].userId, 2)
+	eq(b.last(2).duel.found, "P1", "B's player sees who they'll race")
+	eq(record.players[1].id, 1)
+	eq(record.players[2].id, 2)
+	eq(record.puzzleId, DUEL_PUZZLE.id)
+	eq(#a.teleports, 0, "A finds out on its next step")
+	a.mm:step()
+	eq(#a.teleports, 1)
+	eq(a.teleports[1].code, b.teleports[1].code, "both go to the same reserved server")
+	eq(a.last(1).duel.found, "P2")
+	eq(a.last(1).duel.allServers, true)
+	eq(select(2, a.duels:cancel(1)), "matching", "can't cancel once the match is set up")
+	eq(a.duels:stateOf(1), "queued")
+	-- Neither server matched anyone locally.
+	eq(#a.records + #b.records, 0)
+end)
+
+test("duel cross-server: the reserved server runs the match from its record", function()
+	local world = makeWorld()
+	local _, _, record = crossMatched(world)
+	local host = world.server("H")
+	local hosted = assert(host.mm:hostedMatch("ps-" .. world.reserved))
+	eq(hosted.matchId, record.matchId)
+	host.duels:expect(hosted.matchId, DUEL_PUZZLE, hosted.players, CROSS.ARRIVAL_WAIT)
+	eq(host.duels:stateOf(1), nil, "not there yet")
+	eq(host.duels:arrive(99), false, "strangers aren't expected")
+	eq(host.duels:arrive(1), true)
+	eq(host.duels:stateOf(1), "queued")
+	eq(host.last(1).duel.arriving, true)
+	eq(host.last(1).duel.found, "P2")
+	eq(select(2, host.duels:join(1, "P1")), "already_queued")
+	eq(host.duels:arrive(2), true)
+	eq(host.duels:stateOf(1), "countdown")
+	eq(host.last(2).duel.matchId, record.matchId, "the match keeps the record's id")
+	host.start()
+	assert(host.move(2, "c2", "b2"))
+	assert(host.move(2, "b2", "c3"))
+	assert(host.move(2, "c3", "c4"))
+	eq(host.last(2).duel.outcome, "win")
+	eq(host.last(1).duel.outcome, "loss")
+	eq(host.records[1].result.matchId, record.matchId)
+	eq(host.profileFor(2).duel.wins, 1, "the win is recorded as a normal duel")
+end)
+
+test("duel cross-server: a no-show calls the match off", function()
+	local world = makeWorld()
+	local host = world.server("H")
+	host.duels:expect("m-1", DUEL_PUZZLE, { { id = 1, name = "P1" }, { id = 2, name = "P2" } }, 30)
+	host.duels:arrive(1)
+	host.t += 29
+	host.duels:update()
+	eq(host.duels:stateOf(1), "queued", "still waiting")
+	host.t += 1
+	host.duels:update()
+	eq(host.duels:stateOf(1), nil)
+	eq(host.last(1).error, "opponent_missing")
+	eq(host.last(1).duel.phase, "idle")
+	eq(host.duels:arrive(2), false, "too late")
+	eq(#host.records, 0, "no result, no reward")
+	-- The waiting player can call it off, and so can the other server.
+	host.duels:expect("m-2", DUEL_PUZZLE, { { id = 1, name = "P1" }, { id = 2, name = "P2" } }, 30)
+	host.duels:arrive(1)
+	eq((host.duels:cancel(1)), true)
+	eq(host.duels:stateOf(1), nil)
+	host.duels:expect("m-3", DUEL_PUZZLE, { { id = 1, name = "P1" }, { id = 2, name = "P2" } }, 30)
+	host.duels:arrive(1)
+	host.duels:abandonPending()
+	eq(host.last(1).error, "opponent_missing")
+	-- Leaving the reserved server before the other arrives frees them too.
+	host.duels:expect("m-4", DUEL_PUZZLE, { { id = 1, name = "P1" }, { id = 2, name = "P2" } }, 30)
+	host.duels:arrive(1)
+	host.duels:disconnect(2)
+	eq(host.last(1).error, "opponent_missing")
+end)
+
+test("duel cross-server: bad match records are refused", function()
+	local world = makeWorld()
+	local host = world.server("H")
+	eq(host.mm:hostedMatch("ps-none"), nil)
+	world.matches:set("ps-x", { matchId = "m", players = { { id = 1, name = "A" } } }, 60)
+	eq(host.mm:hostedMatch("ps-x"), nil, "one player")
+	world.matches:set("ps-y", { matchId = "m", players = { { id = 1, name = "A" }, { id = 1, name = "A" } } }, 60)
+	eq(host.mm:hostedMatch("ps-y"), nil, "same player twice")
+	world.matches:set("ps-z", { matchId = "m", players = { { id = "1", name = "A" }, { id = 2, name = "B" } } }, 60)
+	eq(host.mm:hostedMatch("ps-z"), nil, "ids must be numbers")
+end)
+
+test("duel cross-server: same-server players are still matched locally", function()
+	local world = makeWorld()
+	local a = world.server("A")
+	a.join(1)
+	a.mm:step()
+	assert(world.ticket(1), "offered to other servers")
+	a.join(2)
+	eq(a.duels:stateOf(1), "countdown", "matched here at once")
+	a.mm:step()
+	eq(world.ticket(1), nil, "ticket withdrawn")
+	eq(a.mm:waitingCount(), 0)
+	eq(#a.teleports, 0)
+end)
+
+test("duel cross-server: stale, cancelled and newer tickets aren't claimed", function()
+	local world = makeWorld()
+	local a, b = world.server("A"), world.server("B")
+	a.join(1)
+	a.mm:step()
+	world.t += CROSS.STALE + 1 -- A stops refreshing (e.g. it crashed)
+	b.join(2)
+	b.mm:step()
+	eq(#b.teleports, 0, "a stale ticket isn't offered")
+	eq(b.duels:stateOf(2), "queued")
+	-- An older player only waits to be claimed; it never claims newer tickets.
+	a.mm:step()
+	eq(#a.teleports, 0)
+	b.mm:step()
+	eq(#b.teleports, 1, "fresh again: B claims it")
+	-- A cancelled ticket is withdrawn and never claimed.
+	local world2 = makeWorld()
+	local c, d = world2.server("C"), world2.server("D")
+	c.join(5)
+	c.mm:step()
+	assert(c.duels:cancel(5))
+	c.mm:step()
+	eq(world2.ticket(5), nil)
+	d.join(6)
+	d.mm:step()
+	eq(#d.teleports, 0)
+	-- Tickets expire when nobody refreshes them.
+	world2.t += CROSS.TICKET_TTL
+	eq(world2.ticket(6), nil)
+end)
+
+test("duel cross-server: a lost claim is released and nobody is stuck", function()
+	local world = makeWorld()
+	local a, c = world.server("A"), world.server("C")
+	a.join(1)
+	a.mm:step()
+	world.t += 1
+	c.join(3)
+	-- Another server claims player 1 just before C's claim reaches the store.
+	world.tickets.beforeUpdate = function(key: string)
+		if key == "1" then
+			world.tickets.beforeUpdate = nil
+			world.tickets:update("1", function(t)
+				t.claimedBy = "someone-else"
+				return t
+			end, 60)
+		end
+	end
+	c.mm:step()
+	eq(#c.teleports, 0)
+	eq(c.duels:stateOf(3), "queued", "still waiting")
+	eq(world.ticket(3).claimedBy, nil, "its own claim was released")
+	eq(world.ticket(1).claimedBy, "someone-else", "the winner's claim stands")
+	eq((c.duels:cancel(3)), true, "not left locked")
+end)
+
+test("duel cross-server: store errors leave players waiting locally", function()
+	local world = makeWorld()
+	local a = world.server("A")
+	a.join(1)
+	world.tickets.failNext = 100
+	a.mm:step()
+	a.mm:step()
+	assert(#a.logs >= 1, "logged")
+	eq(a.duels:stateOf(1), "queued")
+	a.join(2)
+	eq(a.duels:stateOf(1), "countdown", "same-server matching still works")
+	world.tickets.failNext = 0
+	-- Failing half way through a claim releases what was claimed.
+	local world2 = makeWorld()
+	local b, c = world2.server("B"), world2.server("C")
+	b.join(5)
+	b.mm:step()
+	world2.t += 1
+	c.join(6)
+	c.mm:step() -- first step writes the ticket, then claims...
+	eq(#c.teleports, 1)
+	local world3 = makeWorld()
+	local d, e = world3.server("D"), world3.server("E")
+	d.join(7)
+	d.mm:step()
+	world3.t += 1
+	e.join(8)
+	-- set(own), range, claim own, claim target, then the match record write fails.
+	local calls = 0
+	world3.matches.failNext = 1
+	e.mm:step()
+	eq(#e.teleports, 0)
+	eq(world3.ticket(7).claimedBy, nil, "target released")
+	eq(world3.ticket(8).claimedBy, nil, "own released")
+	eq(e.duels:stateOf(8), "queued")
+	eq((e.duels:cancel(8)), true)
+end)
+
+test("duel cross-server: a failed teleport drops the player and tells the host", function()
+	local world = makeWorld()
+	local a, b = world.server("A"), world.server("B")
+	a.join(1)
+	a.mm:step()
+	world.t += 1
+	b.teleportOk = false
+	b.join(2)
+	b.mm:step()
+	eq(b.duels:stateOf(2), nil)
+	eq(b.last(2).error, "teleport_failed")
+	local key = "ps-" .. world.reserved
+	eq(world.matches:get(key).declined, true)
+	local host = world.server("H")
+	eq(host.mm:declined(key), true)
+	-- A failure reported later (TeleportInitFailed) does the same.
+	local world2 = makeWorld()
+	local c, d = world2.server("C"), world2.server("D")
+	c.join(3)
+	c.mm:step()
+	world2.t += 1
+	d.join(4)
+	d.mm:step()
+	d.mm:teleportFailed(4)
+	eq(d.last(4).error, "teleport_failed")
+	eq(world2.matches:get("ps-" .. world2.reserved).declined, true)
+	d.mm:teleportFailed(4) -- twice is harmless
+end)
+
+test("duel cross-server: a player matched locally meanwhile declines the remote match", function()
+	local world = makeWorld()
+	local a, b = world.server("A"), world.server("B")
+	a.join(1)
+	a.mm:step()
+	world.t += 1
+	b.join(2)
+	b.mm:step() -- B set up a match with player 1
+	a.join(3) -- before A's next step, player 3 joins A and is matched with 1 here
+	eq(a.duels:stateOf(1), "countdown")
+	a.mm:step()
+	eq(#a.teleports, 0, "player 1 stays for the local match")
+	eq(world.matches:get("ps-" .. world.reserved).declined, true, "B's player won't wait in vain")
+end)
+
+test("duel cross-server: a locked player isn't matched locally until released", function()
+	local env = makeDuels()
+	local duels = env.duels
+	assert(duels:join(1, "P1"))
+	eq(duels:lockQueued(1), true)
+	eq(duels:lockQueued(1), false, "already locked")
+	eq(select(2, duels:cancel(1)), "matching")
+	assert(duels:join(2, "P2"))
+	eq(duels:stateOf(2), "queued", "1 is held for a cross-server claim")
+	duels:unlockQueued(1)
+	eq(duels:stateOf(1), "countdown", "released, so the two are matched here")
+	eq(duels:stateOf(2), "countdown")
+	eq(duels:markFound(5, "X"), false, "not waiting")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then
 	error("test failures")

@@ -467,6 +467,7 @@ function PuzzleMenu.updateDuel(self: any, snap: any)
 	end
 	if snap then
 		self.progress = snap.progress or self.progress
+		self.duelsAllServers = snap.duelsAllServers == true
 		self.saveStatus = snap.saveStatus or self.saveStatus
 		if self.gui.Enabled and not self.closing then
 			self:_render()
@@ -515,6 +516,7 @@ function PuzzleMenu.update(self: any, snap: any)
 	self.snapshot = snap
 	self.receivedAt = os.clock()
 	self.progress = snap.progress
+	self.duelsAllServers = snap.duelsAllServers == true
 	self.saveStatus = snap.saveStatus
 	-- The Settings view already shows the player's own changes; redrawing it
 	-- when the server confirms them would rebuild buttons mid-click.
@@ -764,14 +766,31 @@ end
 
 -- Puzzle Duel ----------------------------------------------------------------------------
 
+local DUEL_ERRORS = {
+	already_queued = "You're already in the queue.",
+	matching = "Matching you with an opponent, one moment.",
+	teleport_failed = "Couldn't move you to the match server. Try again.",
+	opponent_missing = "Your opponent didn't make it. Try again.",
+}
+
 function PuzzleMenu._renderDuel(self: any)
 	local progress = self.progress
 	local queued = self:isQueued()
+	local duel = self.duelState or {}
+	-- Matched with a player from another server: on the way to the match server.
+	local found = if queued then duel.found else nil
+	local joining = found ~= nil and not duel.arriving -- the teleport is under way
 	-- On a phone-width panel the body wraps to four lines, so give it room.
 	local bodyHeight = if self.list.AbsoluteSize.X < 340 then 72 else 54
 	local top = card(self, 1, 122 + bodyHeight, "DuelCard")
+	local title = "RACE ANOTHER PLAYER"
+	if found then
+		title = "OPPONENT FOUND"
+	elseif queued then
+		title = if duel.allServers then "SEARCHING ALL SERVERS..." else "SEARCHING FOR AN OPPONENT..."
+	end
 	text({
-		Text = if queued then "SEARCHING FOR AN OPPONENT..." else "RACE ANOTHER PLAYER",
+		Text = title,
 		FontFace = Theme.FontBold,
 		TextSize = 13,
 		TextColor3 = Theme.Gold,
@@ -781,8 +800,14 @@ function PuzzleMenu._renderDuel(self: any)
 		Parent = top,
 	})
 	local body
-	if queued then
-		local waiting = self.duelState.waiting or 1
+	if found and duel.arriving then
+		body = string.format("Waiting for %s to arrive. The countdown starts as soon as you're both here.", found)
+	elseif found then
+		body = string.format("You'll race %s from another server. Moving you both to a match server now...", found)
+	elseif queued and duel.allServers then
+		body = "Looking for an opponent here and on every other server. When one is found, you'll both get the same puzzle after a short countdown."
+	elseif queued then
+		local waiting = duel.waiting or 1
 		body = string.format(
 			"You're in the queue%s. When someone else in this server joins, you'll both get the same puzzle after a short countdown.",
 			if waiting > 1 then string.format(" (%d waiting)", waiting) else ""
@@ -816,7 +841,7 @@ function PuzzleMenu._renderDuel(self: any)
 	if queued and self.queuedAt then
 		status.Text = "Waiting " .. duration(os.clock() - self.queuedAt)
 	elseif self.duelError then
-		status.Text = self.duelError == "already_queued" and "You're already in the queue." or "That didn't go through. Try again."
+		status.Text = DUEL_ERRORS[self.duelError] or "That didn't go through. Try again."
 		status.TextColor3 = Theme.Danger
 	end
 	local action = make("TextButton", {
@@ -825,15 +850,18 @@ function PuzzleMenu._renderDuel(self: any)
 		Position = UDim2.new(0, 14, 1, -12),
 		Size = UDim2.new(1, -28, 0, 48),
 		BackgroundColor3 = if queued then Theme.PanelRaised else Theme.Accent,
+		AutoButtonColor = not joining,
 		FontFace = Theme.FontBold,
-		Text = if queued then "Cancel" else "Find opponent",
+		Text = if joining then "Joining match..." else if queued then "Cancel" else "Find opponent",
 		TextColor3 = Theme.Text,
 		TextSize = 18,
 		Parent = top,
 	}, { corner(12) })
 	Decor.sheen(action, 0.2)
 	action.Activated:Connect(function()
-		if queued then
+		if joining then
+			return
+		elseif queued then
 			self.handlers.duelCancel()
 		else
 			self.handlers.duelJoin()
@@ -952,6 +980,7 @@ function PuzzleMenu._renderHome(self: any)
 		avatar = self.avatar,
 		queued = self:isQueued(),
 		serverPlayers = #Players:GetPlayers(),
+		allServers = self.duelsAllServers == true,
 		weeklyLeftText = if left then duration(left) else nil,
 		continue = self:_continueData(),
 	}, {

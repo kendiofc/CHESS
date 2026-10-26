@@ -74,6 +74,9 @@ local ERROR_MESSAGES = {
 	already_queued = "You're already looking for an opponent.",
 	not_queued = "You're not in the duel queue.",
 	bad_action = "That action isn't available in a duel.",
+	matching = "Matching you with an opponent, one moment.",
+	teleport_failed = "Couldn't move you to the match server. Try again.",
+	opponent_missing = "Your opponent didn't make it to the match. Try again.",
 }
 
 -- Duel result lines, by the server's reason.

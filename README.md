@@ -12,10 +12,10 @@ capturing every black piece, and each capture turns you into the piece you took.
 - progress saved in a DataStore
 
 **Phase 6** adds a Weekly Challenge (four puzzles a week, the same for everyone)
-and Puzzle Duel, the first multiplayer mode: two players on the same server race
-to clear the same puzzle.
+and Puzzle Duel, the first multiplayer mode: two players race to clear the same
+puzzle. Opponents are found on the same server first, then on any other server.
 
-Cross-server matchmaking, ratings, monetization and other rule sets are not built yet.
+Ratings, monetization and other rule sets are not built yet.
 
 ## Rules: Echo Clear mode
 
@@ -71,6 +71,7 @@ layout = {
 | `ServerScriptService.ServerMain` | `src/server/ServerMain.server.luau` | Boots services and keeps avatars still while the GUI is in use |
 | `ServerScriptService.Services.PuzzleService` | `src/server/Services/PuzzleService.luau` | Per-player authoritative sessions, modes, hints, rewards |
 | `ServerScriptService.Services.DuelManager` | `src/server/Services/DuelManager.luau` | Duel queue, matches, countdown, timer and results (pure; the clock and sends are passed in) |
+| `ServerScriptService.Services.DuelMatchmaker` | `src/server/Services/DuelMatchmaker.luau` | Cross-server duel tickets, claims and match records (pure; the MemoryStore maps and teleports are passed in) |
 | `ServerScriptService.Services.ProfileStore` | `src/server/Services/ProfileStore.luau` | DataStore loading and saving |
 | `StarterPlayerScripts.ClientController` | `src/client/ClientController.client.luau` | Wires the HUD to the remotes and hides the mobile thumbstick |
 | `StarterPlayerScripts.AnimationController` | `src/client/AnimationController.luau` | Tween helpers |
@@ -195,9 +196,11 @@ saves `completed` or `skipped` (a completion is never replaced by a skip).
 
 Two players race on the same puzzle, each on their own board.
 
-1. **Queue.** Find opponent joins the queue on this server; Cancel leaves it. A
-   player is in the queue at most once, can't be matched with themselves and
-   can't queue while in a match. The first two players in the queue are matched.
+1. **Queue.** Find opponent joins the queue; Cancel leaves it. A player is in
+   the queue at most once, can't be matched with themselves and can't queue
+   while in a match. Two waiting players on the same server are matched at
+   once; anyone left waiting is also offered to every other server (see
+   Cross-server matching below).
 2. **Countdown.** The server picks an Easy or Medium puzzle and gives the match a
    unique id. Both players get the same 3-second countdown, and moves before it
    ends are refused.
@@ -220,10 +223,43 @@ Two players race on the same puzzle, each on their own board.
 
 **Limitations.**
 
-- **Same server only.** Cross-server matchmaking would need MemoryStore queues and teleports, so it isn't built. On a quiet server, a player can wait with nobody to match.
+- **Cross-server matching is untested live.** It needs MemoryStore and TeleportService, which only work in a published place (Studio would need API access, which is off). It is covered by the CLI tests against in-memory maps, and Studio keeps same-server matching only.
 - **Two-player testing.** The full flow has only been run in Studio against a server-side test opponent, not with two real players.
 - **Studio test opponent.** The test opponent exists only in Studio (`ServerStorage.EchoChessDuelTestHook`, created only when `RunService:IsStudio()`), and clients can't reach it.
 - **Single-player timer.** The puzzle a player left behind keeps its timer running during a duel.
+
+### Cross-server matching
+
+A player still waiting after the same-server check gets a ticket in the
+MemoryStore sorted map `EchoChessDuelTickets_v1` (key: user id, sorted by when
+they joined). Each server runs `DuelMatchmaker:step()` every 2 seconds for its
+own waiting players:
+
+1. **Refresh.** The ticket is rewritten with the current time. Tickets expire
+   after 30 seconds, and one not refreshed in the last 10 isn't offered, so a
+   crashed server's players drop out on their own.
+2. **Claim.** Only the newer of two players claims, and only an older, live,
+   unclaimed ticket from another server. Both tickets are claimed with
+   `UpdateAsync`, which only one server can win; a lost or failed claim is
+   released and the player keeps waiting. While a claim is in progress the
+   player can't be matched on their own server or cancel.
+3. **Reserve.** The claiming server reserves a server, picks the puzzle, and
+   stores the match record (match id, puzzle id, both players) in
+   `EchoChessDuelMatches_v1` under the reserved server's private server id.
+   It writes the match onto both tickets and teleports its player; the other
+   server sees the match on its next step and teleports theirs. Players see
+   "Opponent found" with their opponent's name.
+4. **Host.** The reserved server reads its own record by `game.PrivateServerId`
+   (never from a client or teleport data), and starts the normal duel when both
+   players' clients have loaded. If either hasn't arrived within 45 seconds, or
+   their server reports a failed teleport or that they stopped waiting, the
+   match is called off with "Your opponent didn't make it" and nobody is
+   rewarded. Results, rewards and caps work exactly as on one server.
+
+Cross-server matching is off in Studio and if `GameConfig.DUEL.CROSS_SERVER.ENABLED`
+is false. Store errors leave players waiting on their own server. After a
+cross-server duel, both players stay on the match server and can keep playing
+or queue again from there.
 
 ### Saving (ProfileStore)
 
@@ -335,6 +371,7 @@ The suite checks:
 - opponent progress without their board, first clear wins, simultaneous finishes, and no client-declared win
 - timeout draws, disconnects at each stage, Leave, and the result screen
 - reward caps, the same-opponent rule, a save round trip, and that the duel puzzle pool passes `PuzzleCheck`
+- cross-server matching, against `tests/lib/FakeMemoryMap`: two servers matched, the reserved server running the match from its record, no-shows and cancels, bad records, same-server players still matched locally, stale/cancelled/expired tickets, a lost claim race, store errors mid-claim, failed teleports, and a player matched locally meanwhile
 
 ### Other scripts
 

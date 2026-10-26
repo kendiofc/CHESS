@@ -21,8 +21,13 @@
 -- tests/run.luau can drive whole matches without Roblox. Players are keyed by
 -- user id; one user id is one player.
 --
--- Matching is per server. Cross-server matchmaking would need MemoryStore
--- queues and teleports, and is not built yet.
+-- Players on the same server are matched here straight away. Players left
+-- waiting are also offered to other servers by DuelMatchmaker, which can lock
+-- a waiting entry while it claims an opponent (lockQueued / unlockQueued),
+-- mark it found before the teleport (markFound), or drop it if the teleport
+-- fails (dropQueued). The reserved server that hosts a cross-server match is
+-- told who to expect (expect) and starts the match once both have arrived
+-- (arrive), or gives up after the arrival wait.
 
 local DuelManager = {}
 DuelManager.__index = DuelManager
@@ -50,6 +55,18 @@ type Side = {
 	rewardNote: string?,
 }
 
+-- lock: a cross-server claim is in progress. found: the opponent's name once
+-- a cross-server match is set up and the player is on their way to it.
+type QueueEntry = { id: number, name: string, lock: boolean?, found: string? }
+
+type Pending = {
+	matchId: string,
+	puzzle: any,
+	order: { number },
+	sides: { [number]: { id: number, name: string, present: boolean } },
+	deadline: number,
+}
+
 type Match = {
 	id: string,
 	puzzle: any,
@@ -65,11 +82,13 @@ type Match = {
 function DuelManager.new(deps: Deps)
 	return setmetatable({
 		deps = deps,
-		queue = {} :: { { id: number, name: string } },
+		queue = {} :: { QueueEntry },
 		active = {} :: { [number]: Match }, -- player -> their unfinished match
 		results = {} :: { [number]: Match }, -- player -> their last finished match
 		matches = {} :: { [string]: Match },
 		matchCount = 0,
+		pending = nil :: Pending?, -- a cross-server match waiting for its players
+		crossServer = false, -- shown to clients: the queue also searches other servers
 	}, DuelManager)
 end
 
@@ -87,9 +106,22 @@ function DuelManager._queueIndex(self: any, id: number): number?
 	return nil
 end
 
--- "queued", "countdown", "playing", or nil.
+function DuelManager._queueEntry(self: any, id: number): QueueEntry?
+	local index = self:_queueIndex(id)
+	return index and self.queue[index]
+end
+
+-- The player's side of the pending cross-server match, once they've arrived.
+function DuelManager._arrived(self: any, id: number): any
+	local pending = self.pending
+	local side = pending and pending.sides[id]
+	return if side and side.present then side else nil
+end
+
+-- "queued", "countdown", "playing", or nil. Waiting for a cross-server
+-- opponent to arrive counts as queued.
 function DuelManager.stateOf(self: any, id: number): string?
-	if self:_queueIndex(id) then
+	if self:_queueIndex(id) or self:_arrived(id) then
 		return "queued"
 	end
 	local match = self.active[id]
@@ -99,7 +131,7 @@ end
 -- Whether the player is looking at a duel screen: queued, in a match, or on
 -- a match result they haven't closed.
 function DuelManager.hasScreen(self: any, id: number): boolean
-	return self:_queueIndex(id) ~= nil or self.active[id] ~= nil or self.results[id] ~= nil
+	return self:_queueIndex(id) ~= nil or self:_arrived(id) ~= nil or self.active[id] ~= nil or self.results[id] ~= nil
 end
 
 function DuelManager.queueSize(self: any): number
@@ -115,12 +147,29 @@ end
 
 function DuelManager.snapshot(self: any, id: number, event: string, err: string?): { [string]: any }
 	local now = self.deps.now()
-	if self:_queueIndex(id) then
+	local entry = self:_queueEntry(id)
+	if entry then
 		return {
 			event = event,
 			error = err,
 			mode = "Duel",
-			duel = { phase = "queued", waiting = #self.queue },
+			duel = { phase = "queued", waiting = #self.queue, allServers = self.crossServer, found = entry.found },
+		}
+	end
+	if self:_arrived(id) then
+		local pending = self.pending
+		local other = if pending.order[1] == id then pending.order[2] else pending.order[1]
+		return {
+			event = event,
+			error = err,
+			mode = "Duel",
+			duel = {
+				phase = "queued",
+				waiting = 1,
+				allServers = self.crossServer,
+				found = pending.sides[other].name,
+				arriving = true,
+			},
 		}
 	end
 	local match = self.active[id] or self.results[id]
@@ -199,14 +248,19 @@ function DuelManager.join(self: any, id: number, name: string): (boolean, string
 	if self:_queueIndex(id) then
 		return false, "already_queued"
 	end
+	if self:_arrived(id) then
+		return false, "already_queued"
+	end
 	if self.active[id] then
 		return false, "in_duel"
 	end
 	self.results[id] = nil
 	-- Nobody else is ever this player: the queue holds each id once and the
-	-- joining player isn't in it.
-	local opponent = table.remove(self.queue, 1)
-	if opponent then
+	-- joining player isn't in it. Entries tied up in a cross-server match are
+	-- skipped.
+	local index = self:_freeIndex()
+	if index then
+		local opponent = table.remove(self.queue, index)
 		self:_createMatch(opponent, { id = id, name = name })
 	else
 		table.insert(self.queue, { id = id, name = name })
@@ -215,23 +269,168 @@ function DuelManager.join(self: any, id: number, name: string): (boolean, string
 	return true, nil
 end
 
+-- The first waiting entry that isn't tied up in a cross-server match.
+function DuelManager._freeIndex(self: any, skip: number?): number?
+	for index, entry in ipairs(self.queue) do
+		if index ~= skip and not entry.lock and not entry.found then
+			return index
+		end
+	end
+	return nil
+end
+
+-- Matches two free waiting players, if there are two.
+function DuelManager._pairQueue(self: any)
+	local first = self:_freeIndex()
+	local second = first and self:_freeIndex(first)
+	if first and second then
+		local b = table.remove(self.queue, second)
+		local a = table.remove(self.queue, first)
+		self:_createMatch(a, b)
+	end
+end
+
 function DuelManager.cancel(self: any, id: number): (boolean, string?)
+	if self:_arrived(id) then
+		self:_abandonPending("opponent_missing", id)
+		self:_send(id, "duel_cancelled")
+		return true, nil
+	end
 	local index = self:_queueIndex(id)
 	if not index then
 		return false, "not_queued"
+	end
+	local entry = self.queue[index]
+	if entry.lock or entry.found then
+		-- A cross-server match is being set up for them; it can't be undone now.
+		return false, "matching"
 	end
 	table.remove(self.queue, index)
 	self:_send(id, "duel_cancelled")
 	return true, nil
 end
 
-function DuelManager._createMatch(self: any, a: { id: number, name: string }, b: { id: number, name: string })
+-- Cross-server matching -------------------------------------------------------------
+
+-- The waiting player's name, or nil if they aren't waiting.
+function DuelManager.queuedName(self: any, id: number): string?
+	local entry = self:_queueEntry(id)
+	return entry and entry.name
+end
+
+-- Holds a waiting player for a cross-server claim, so nobody here matches
+-- them meanwhile. False if they aren't free to claim.
+function DuelManager.lockQueued(self: any, id: number): boolean
+	local entry = self:_queueEntry(id)
+	if not entry or entry.lock or entry.found then
+		return false
+	end
+	entry.lock = true
+	return true
+end
+
+-- The claim didn't happen: free the player, and match them here if someone
+-- else on this server started waiting meanwhile.
+function DuelManager.unlockQueued(self: any, id: number)
+	local entry = self:_queueEntry(id)
+	if entry and entry.lock then
+		entry.lock = nil
+		self:_pairQueue()
+	end
+end
+
+-- A cross-server match is ready: the player is about to be teleported to it.
+-- False if they stopped waiting meanwhile.
+function DuelManager.markFound(self: any, id: number, opponentName: string): boolean
+	local entry = self:_queueEntry(id)
+	if not entry then
+		return false
+	end
+	entry.lock = nil
+	entry.found = opponentName
+	self:_send(id, "duel_matched")
+	return true
+end
+
+-- Takes a waiting player out of the queue with an error, e.g. a failed teleport.
+function DuelManager.dropQueued(self: any, id: number, err: string)
+	local index = self:_queueIndex(id)
+	if index then
+		table.remove(self.queue, index)
+		self:_send(id, "duel_cancelled", err)
+	end
+end
+
+-- On a reserved match server: the two players of the cross-server match it
+-- hosts, and the puzzle they'll race on. The match starts once both arrive,
+-- and is called off if they haven't within `wait` seconds.
+function DuelManager.expect(self: any, matchId: string, puzzle: any, players: { { id: number, name: string } }, wait: number)
+	local pending: Pending = {
+		matchId = matchId,
+		puzzle = puzzle,
+		order = { players[1].id, players[2].id },
+		sides = {},
+		deadline = self.deps.now() + wait,
+	}
+	for _, player in ipairs(players) do
+		pending.sides[player.id] = { id = player.id, name = player.name, present = false }
+	end
+	self.pending = pending
+end
+
+-- The player's client is ready on the reserved server. Starts the match once
+-- both are. False if this server isn't expecting them.
+function DuelManager.arrive(self: any, id: number): boolean
+	local pending = self.pending
+	local side = pending and pending.sides[id]
+	if not side or side.present then
+		return false
+	end
+	side.present = true
+	self.results[id] = nil
+	for _, other in pairs(pending.sides) do
+		if not other.present then
+			self:_send(id, "duel_arriving")
+			return true
+		end
+	end
+	self.pending = nil
+	self:_createMatch(pending.sides[pending.order[1]], pending.sides[pending.order[2]], pending.puzzle, pending.matchId)
+	return true
+end
+
+-- Calls off the pending match. Everyone who arrived (but `except`) is told why.
+function DuelManager._abandonPending(self: any, reason: string, except: number?)
+	local pending = self.pending
+	if not pending then
+		return
+	end
+	self.pending = nil
+	for _, id in ipairs(pending.order) do
+		if id ~= except and pending.sides[id].present then
+			self:_send(id, "duel_cancelled", reason)
+		end
+	end
+end
+
+-- The other server reported that its player isn't coming.
+function DuelManager.abandonPending(self: any)
+	self:_abandonPending("opponent_missing")
+end
+
+function DuelManager._createMatch(
+	self: any,
+	a: { id: number, name: string },
+	b: { id: number, name: string },
+	chosenPuzzle: any?,
+	chosenId: string?
+)
 	local deps = self.deps
 	self.matchCount += 1
-	local puzzle = deps.pickPuzzle(self.matchCount)
+	local puzzle = chosenPuzzle or deps.pickPuzzle(self.matchCount)
 	local now = deps.now()
 	local match: Match = {
-		id = deps.newId(),
+		id = chosenId or deps.newId(),
 		puzzle = puzzle,
 		phase = "countdown",
 		startsAt = now + deps.config.COUNTDOWN,
@@ -268,6 +467,9 @@ end
 -- regularly (the service does, a few times a second).
 function DuelManager.update(self: any)
 	local now = self.deps.now()
+	if self.pending and now >= self.pending.deadline then
+		self:_abandonPending("opponent_missing")
+	end
 	for _, match in pairs(self.matches) do
 		if match.phase == "countdown" and now >= match.startsAt then
 			match.phase = "playing"
@@ -386,7 +588,7 @@ end
 
 -- Forfeits the current match, or leaves the queue.
 function DuelManager.leave(self: any, id: number): (boolean, string?)
-	if self:_queueIndex(id) then
+	if self:_queueIndex(id) or self:_arrived(id) then
 		return self:cancel(id)
 	end
 	local match = self.active[id]
@@ -404,6 +606,10 @@ function DuelManager.disconnect(self: any, id: number)
 	if index then
 		table.remove(self.queue, index)
 	end
+	if self.pending and self.pending.sides[id] then
+		-- They won't come back to this reserved server.
+		self:_abandonPending("opponent_missing", id)
+	end
 	local match = self.active[id]
 	if match then
 		match.sides[id].connected = false
@@ -414,7 +620,7 @@ end
 
 -- Closes the result screen. Returns false while the player is queued or in a match.
 function DuelManager.exit(self: any, id: number): boolean
-	if self:_queueIndex(id) or self.active[id] then
+	if self:_queueIndex(id) or self:_arrived(id) or self.active[id] then
 		return false
 	end
 	self.results[id] = nil

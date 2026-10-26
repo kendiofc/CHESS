@@ -42,6 +42,7 @@ export type Data = {
 	avatar: string?,
 	queued: boolean,
 	serverPlayers: number,
+	allServers: boolean?, -- duels also search other servers
 	weeklyLeftText: string?,
 	continue: Continue,
 }
@@ -591,6 +592,8 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 		badge(duelCard, "SEARCHING", Theme.Gold, false)
 	elseif data.serverPlayers > 1 then
 		badge(duelCard, string.format("● %d HERE", data.serverPlayers), Theme.Legal, false)
+	elseif data.allServers then
+		badge(duelCard, "● ALL SERVERS", Theme.Legal, false)
 	else
 		badge(duelCard, "● JUST YOU", Theme.TextMuted, false)
 	end
