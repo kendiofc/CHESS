@@ -231,7 +231,9 @@ local function modeCard(
 	hoverLift(card)
 	text({
 		Name = "Icon",
-		Position = UDim2.fromOffset(0, if small then 18 else 26),
+		-- On a small card the corner badge sits where the icon would, so the
+		-- icon and the text below it start lower.
+		Position = UDim2.fromOffset(0, if small then 38 else 26),
 		Size = UDim2.new(1, 0, 0, if small then 48 else 62),
 		FontFace = Theme.FontBold,
 		Text = content.icon,
@@ -240,7 +242,7 @@ local function modeCard(
 	})
 	local title = text({
 		Name = "Title",
-		Position = UDim2.fromOffset(10, if small then 72 else 96),
+		Position = UDim2.fromOffset(10, if small then 92 else 96),
 		Size = UDim2.new(1, -20, 0, if small then 26 else 32),
 		FontFace = Theme.FontHeavy,
 		Text = content.title,
@@ -251,7 +253,7 @@ local function modeCard(
 	make("UITextSizeConstraint", { MaxTextSize = if small then 20 else 26, MinTextSize = 12, Parent = title })
 	text({
 		Name = "Desc",
-		Position = UDim2.fromOffset(12, if small then 102 else 134),
+		Position = UDim2.fromOffset(12, if small then 122 else 134),
 		Size = UDim2.new(1, -24, 0, if small then 36 else 42),
 		Text = content.desc,
 		TextColor3 = Theme.TextMuted,
@@ -354,15 +356,20 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	local coinsH = if compact then 40 else 50
 	local nameX = avatarSize + 12
 	local nameW = if compact then W - nameX - coinsW - 8 else 230
-	text({
+	local welcome = text({
 		Name = "Welcome",
 		Position = UDim2.fromOffset(nameX, if compact then 2 else 6),
 		Size = UDim2.fromOffset(nameW, 18),
 		Text = "Welcome back,",
 		TextColor3 = Theme.TextMuted,
-		TextSize = if tiny then 11 elseif compact then 13 else 15,
+		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = page,
+	})
+	make("UITextSizeConstraint", {
+		MaxTextSize = if tiny then 11 elseif compact then 13 else 15,
+		MinTextSize = 8,
+		Parent = welcome,
 	})
 	local nameLabel = text({
 		Name = "PlayerName",
@@ -549,7 +556,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	-- Mode cards ---------------------------------------------------------------------------
 	local columns = if wide then 4 elseif W >= 260 then 2 else 1
 	local cardW = math.floor((W - gap * (columns - 1)) / columns)
-	local cardH = if wide then 236 elseif compact then 188 else 214
+	local cardH = if wide then 236 elseif compact then 206 else 214
 	local small = cardW < 200
 	local function cardRect(index: number)
 		local column = (index - 1) % columns
@@ -589,7 +596,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 		icon = "📅",
 		title = "Daily Puzzle",
 		desc = "A new puzzle every day",
-		status = if daily == nil then "" elseif daily.completed then "Cleared today ✓" else "Not cleared yet today",
+		status = if daily == nil then "" elseif daily.completed then "Cleared today ✓" elseif small then "Not cleared yet" else "Not cleared yet today",
 	}, small, function()
 		actions.open("Daily")
 	end)
@@ -647,28 +654,28 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	local textX = rookSize + (if compact then 18 else 34)
 	local buttonW = if compact then continueW - 28 else 176
 	local textW = if compact then continueW - textX - 14 else continueW - textX - buttonW - 40
-	text({
+	local contTitle = text({
 		Name = "Title",
 		Position = UDim2.fromOffset(textX, if compact then 18 else 26),
 		Size = UDim2.fromOffset(textW, 30),
 		FontFace = Theme.FontHeavy,
 		Text = cont.title,
-		TextSize = if compact then 20 else 26,
+		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
 		Parent = panel,
 	})
-	text({
+	make("UITextSizeConstraint", { MaxTextSize = if compact then 20 else 26, MinTextSize = 11, Parent = contTitle })
+	local contSub = text({
 		Name = "Sub",
 		Position = UDim2.fromOffset(textX, if compact then 48 else 62),
 		Size = UDim2.fromOffset(textW, 22),
 		Text = cont.sub,
 		TextColor3 = Theme.TextMuted,
-		TextSize = if compact then 14 else 17,
+		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
 		Parent = panel,
 	})
+	make("UITextSizeConstraint", { MaxTextSize = if compact then 14 else 17, MinTextSize = 9, Parent = contSub })
 	if cont.fraction then
 		progressBar(
 			panel,
