@@ -487,6 +487,9 @@ end
 function PuzzleMenu.open(self: any, view: string?)
 	local target = if view and table.find(VIEWS, view) then view else "Home"
 	self.shopAnimate = target == "Shop" and (self.view ~= "Shop" or not self.gui.Enabled)
+	if self.shopAnimate then
+		self.shopNotice = nil
+	end
 	self.view = target
 	local wasOpen = self.gui.Enabled
 	self.gui.Enabled = true
@@ -502,6 +505,9 @@ end
 
 function PuzzleMenu.show(self: any, view: string)
 	self.shopAnimate = view == "Shop" and self.view ~= "Shop"
+	if self.shopAnimate then
+		self.shopNotice = nil -- an old notice would describe a state that may have changed
+	end
 	self.view = view
 	self.list.CanvasPosition = Vector2.zero
 	self:_render()
