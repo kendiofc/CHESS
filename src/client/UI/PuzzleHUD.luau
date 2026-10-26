@@ -588,6 +588,9 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	container:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 		self:_layout()
 	end)
+	gui:GetAttributeChangedSignal("SimulatedSize"):Connect(function()
+		self:_layout()
+	end)
 	self:_layout()
 
 	-- The result card gets its own full-bleed ScreenGui so the dim covers the top bar too.
@@ -774,7 +777,13 @@ end
 -- Short, wide screens (phones in landscape) put the board on the left and the
 -- panels in a column on the right; everything else stacks vertically.
 function PuzzleHUD._layout(self: any)
-	local screen = self.gui.AbsoluteSize
+	-- In Studio a "SimulatedSize" attribute (Vector2) on the HUD lays it out
+	-- for another screen size, for layout checks.
+	local simulated = if RunService:IsStudio() then self.gui:GetAttribute("SimulatedSize") else nil
+	if typeof(simulated) ~= "Vector2" then
+		simulated = nil
+	end
+	local screen = simulated or self.gui.AbsoluteSize
 	if screen.X <= 0 or screen.Y <= 0 then
 		return
 	end
@@ -789,7 +798,9 @@ function PuzzleHUD._layout(self: any)
 	p.header.Visible = not desk
 	if desk then
 		local sidebarW = self.desk:sidebarWidth(screen.X, GuiService:GetGuiInset().Y)
-		self.container.Size = UDim2.new(1, -sidebarW, 1, 0)
+		self.container.Size = if simulated
+			then UDim2.fromOffset(screen.X - sidebarW, screen.Y)
+			else UDim2.new(1, -sidebarW, 1, 0)
 		self.container.Position = UDim2.new(0.5, sidebarW / 2, 0.5, 0)
 		self.layoutMode = "desk"
 		local coaching = p.coach.Visible
@@ -805,7 +816,7 @@ function PuzzleHUD._layout(self: any)
 		end
 		return
 	end
-	self.container.Size = UDim2.fromScale(1, 1)
+	self.container.Size = if simulated then UDim2.fromOffset(screen.X, screen.Y) else UDim2.fromScale(1, 1)
 	self.container.Position = UDim2.fromScale(0.5, 0.5)
 	local size = self.container.AbsoluteSize
 	if size.X <= 0 or size.Y <= 0 then

@@ -276,11 +276,6 @@ function PlayDesk._buildTopBar(self: any, root: Frame)
 		Parent = xp,
 	})
 	make("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = self.levelPill })
-	make("UIGradient", {
-		Color = ColorSequence.new(Color3.fromRGB(150, 118, 255), Theme.AccentPressed),
-		Rotation = 90,
-		Parent = self.levelPill,
-	})
 	self.xpAmount = text({
 		Name = "Amount",
 		AnchorPoint = Vector2.new(1, 0),
@@ -413,7 +408,7 @@ function PlayDesk._buildTitle(self: any, root: Frame)
 	self.ruleRight = rule(1)
 	self.pill = text({
 		Name = "Difficulty",
-		AnchorPoint = Vector2.new(1, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
 		Size = UDim2.fromOffset(150, 30),
 		BackgroundColor3 = Theme.Legal,
 		BackgroundTransparency = 0,
@@ -432,6 +427,11 @@ function PlayDesk._placeRules(self: any)
 	local half = self.title.AbsoluteSize.X / 2 + 16
 	self.ruleLeft.Position = UDim2.new(0.5, -half, 0, 31)
 	self.ruleRight.Position = UDim2.new(0.5, half, 0, 31)
+	-- The difficulty sits just past the right rule, or at the row's edge
+	-- when a long name leaves no room.
+	local rowW = self.titleRow.AbsoluteSize.X
+	local x = math.min(rowW / 2 + half + 110 + 24 + 75, rowW - 75)
+	self.pill.Position = UDim2.fromOffset(x, 31)
 end
 
 -- Stats strip: moves, captured, time, par ----------------------------------------------
@@ -723,7 +723,7 @@ function PlayDesk._renderStreak(self: any, progress: any)
 	local current = if progress and progress.streak then progress.streak.current else 0
 	self.streakDays.Text = if progress == nil
 		then "..."
-		else string.format("%d day%s streak", current, if current == 1 then "" else "s")
+		else string.format("%d day streak", current)
 end
 
 -- Board frame: a gold rim with a glow, and the coordinates outside the squares --------
@@ -876,7 +876,6 @@ function PlayDesk.layout(self: any, w: number, h: number, coaching: boolean): Re
 
 	local y = 10 + TOP_H + 6
 	place(self.titleRow, cx, y, centreW, TITLE_H)
-	self.pill.Position = UDim2.new(1, 0, 0, 31)
 	self:_placeRules()
 	y += TITLE_H + 8
 	local stripW = math.min(centreW, 680)
