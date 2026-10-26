@@ -907,28 +907,43 @@ function PlayDesk.layout(self: any, w: number, h: number, coaching: boolean): Re
 
 	local bottom = h - (if short then 8 else 12)
 	local controls = { x = cx + (centreW - math.min(centreW, 680)) / 2, y = bottom - controlsH, w = math.min(centreW, 680), h = controlsH }
-	local below = if coaching then COACH_H else messageH
+	-- On a short screen the tutorial card and the status line move to the
+	-- side column, under the goal card, so the board keeps the height.
+	local below = if short then 0 elseif coaching then COACH_H else messageH
 	local coachW = math.min(centreW, 840)
 	local coach = { x = cx + (centreW - coachW) / 2, y = controls.y - GAP - COACH_H, w = coachW, h = COACH_H }
 	local message = { x = cx, y = controls.y - GAP - messageH, w = centreW, h = messageH }
 	-- The board leaves room for its rim (24 px above, 36 below) and the
 	-- coordinates outside it.
 	local boardTop = y + 26
-	local boardBottom = controls.y - GAP - below - 40
+	local boardBottom = controls.y - (if short then 0 else GAP) - below - 40
 	local board = { x = cx + 30, y = boardTop, w = centreW - 60, h = math.max(120, boardBottom - boardTop) }
 
 	-- Side cards, top-aligned with the title.
 	local sx = w - PAD - sideW
-	place(self.column, sx, 10 + TOP_H + 26, sideW, h - (10 + TOP_H + 26))
-	local cy = 0
-	for _, c in ipairs({ self.goal, self.streak, self.weekly }) do
-		c.Position = UDim2.fromOffset(0, cy)
-		cy += c.Size.Y.Offset + 18
+	local colTop = 10 + TOP_H + 26
+	local room = h - colTop - 8
+	place(self.column, sx, colTop, sideW, room)
+	self.goal.Position = UDim2.fromOffset(0, 0)
+	local cy = GOAL_H + 18
+	if short then
+		if coaching then
+			coach = { x = sx, y = colTop + cy, w = sideW, h = 150 }
+			cy += 150 + 18
+		else
+			message = { x = sx, y = colTop + cy, w = sideW, h = 60 }
+			cy += 60 + 18
+		end
 	end
-	-- Hide the lower cards on a short screen rather than squeezing them.
-	local room = h - (10 + TOP_H + 26)
-	self.weekly.Visible = room >= GOAL_H + STREAK_H + WEEKLY_H + 36
-	self.streak.Visible = room >= GOAL_H + STREAK_H + 18
+	-- The lower cards show only when they fit whole.
+	for _, c in ipairs({ self.streak, self.weekly }) do
+		local fits = cy + c.Size.Y.Offset <= room
+		c.Visible = fits
+		if fits then
+			c.Position = UDim2.fromOffset(0, cy)
+			cy += c.Size.Y.Offset + 18
+		end
+	end
 
 	return { board = board, coach = coach, message = message, controls = controls }
 end
