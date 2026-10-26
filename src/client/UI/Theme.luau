@@ -3,19 +3,25 @@
 
 local Theme = {}
 
-Theme.Background = Color3.fromRGB(20, 24, 22)
-Theme.BackgroundDeep = Color3.fromRGB(14, 40, 31)
-Theme.Panel = Color3.fromRGB(30, 36, 33)
-Theme.PanelRaised = Color3.fromRGB(40, 48, 44)
-Theme.Stroke = Color3.fromRGB(58, 70, 63)
+-- Midnight indigo screens around a warm wooden board.
+Theme.Background = Color3.fromRGB(16, 17, 32)
+Theme.BackgroundDeep = Color3.fromRGB(40, 28, 78)
+Theme.Panel = Color3.fromRGB(30, 31, 54)
+Theme.PanelRaised = Color3.fromRGB(45, 46, 76)
+Theme.Stroke = Color3.fromRGB(74, 76, 118)
 
-Theme.Text = Color3.fromRGB(238, 234, 222)
-Theme.TextMuted = Color3.fromRGB(152, 164, 156)
+Theme.Text = Color3.fromRGB(240, 236, 226)
+Theme.TextMuted = Color3.fromRGB(160, 162, 192)
 
-Theme.SquareLight = Color3.fromRGB(238, 230, 206)
-Theme.SquareDark = Color3.fromRGB(117, 148, 103)
-Theme.BlockedBase = Color3.fromRGB(92, 30, 34)
-Theme.BlockedHatch = Color3.fromRGB(196, 66, 66)
+Theme.SquareLight = Color3.fromRGB(240, 218, 182)
+Theme.SquareDark = Color3.fromRGB(182, 136, 98)
+Theme.BlockedBase = Color3.fromRGB(54, 50, 72)
+Theme.BlockedHatch = Color3.fromRGB(96, 90, 124)
+
+-- Board frame: a wooden rim with a gold inlay, over a soft shadow.
+Theme.BoardRim = Color3.fromRGB(104, 66, 40)
+Theme.BoardRimLight = Color3.fromRGB(150, 100, 62)
+Theme.BoardInlay = Color3.fromRGB(222, 176, 92)
 
 Theme.Accent = Color3.fromRGB(122, 92, 250)
 Theme.AccentPressed = Color3.fromRGB(98, 72, 214)

@@ -23,6 +23,7 @@ local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
 
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
 local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
+local Decor = require(script.Parent:WaitForChild("Decor"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local PLAY_MODES = GameConfig.PLAY_MODES
@@ -137,6 +138,7 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		make("UIStroke", { Color = Theme.Stroke, Thickness = 1.5 }),
 		make("UISizeConstraint", { MaxSize = Vector2.new(560, 760) }),
 	})
+	Decor.sheen(panel, 0.3)
 	self.panel = panel
 	self.scale = make("UIScale", { Parent = panel })
 
@@ -159,13 +161,14 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		Name = "Title",
 		FontFace = Theme.FontHeavy,
 		TextSize = 22,
-		TextColor3 = Theme.Gold,
+		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Position = UDim2.fromOffset(18, 12),
 		Size = UDim2.new(1, -130, 0, 28),
 		Parent = panel,
 	})
+	Decor.goldText(self.title)
 	self.wallet = text({
 		Name = "Wallet",
 		TextSize = 13,
@@ -301,13 +304,15 @@ end
 -- Building blocks ------------------------------------------------------------------
 
 local function card(self: any, order: number, height: number, name: string?): Frame
-	return make("Frame", {
+	local frame = make("Frame", {
 		Name = name or ("Card" .. order),
 		LayoutOrder = order,
 		Size = UDim2.new(1, -8, 0, height),
 		BackgroundColor3 = Theme.PanelRaised,
 		Parent = self.list,
-	}, { corner(12) })
+	}, { corner(12), make("UIStroke", { Color = Theme.Stroke, Thickness = 1, Transparency = 0.5 }) })
+	Decor.sheen(frame, 0.16)
+	return frame
 end
 
 -- A full-width button with a title and a muted line under it.
@@ -320,7 +325,16 @@ local function rowButton(self: any, order: number, name: string, title: string, 
 		AutoButtonColor = true,
 		Text = "",
 		Parent = self.list,
-	}, { corner(12) })
+	}, {
+		corner(12),
+		make("UIStroke", {
+			Color = if color then Color3.new(1, 1, 1) else Theme.Stroke,
+			Thickness = 1,
+			Transparency = if color then 0.7 else 0.5,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}),
+	})
+	Decor.sheen(button, if color then 0.24 else 0.16)
 	text({
 		Name = "Title",
 		Text = title,

@@ -10,6 +10,7 @@
 
 local TweenService = game:GetService("TweenService")
 
+local Decor = require(script.Parent:WaitForChild("Decor"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local TutorialCoach = {}
@@ -42,7 +43,7 @@ local function corner(radius: number): UICorner
 end
 
 local function smallButton(name: string, label: string, primary: boolean): TextButton
-	return make("TextButton", {
+	local b = make("TextButton", {
 		Name = name,
 		Size = UDim2.fromOffset(BUTTON_W, BUTTON_H),
 		BackgroundColor3 = if primary then Theme.Accent else Theme.PanelRaised,
@@ -53,6 +54,8 @@ local function smallButton(name: string, label: string, primary: boolean): TextB
 		TextSize = 15,
 		ZIndex = 21,
 	}, { corner(10) })
+	Decor.sheen(b, 0.18)
+	return b
 end
 
 function TutorialCoach.new(parent: Instance, callbacks: Callbacks)

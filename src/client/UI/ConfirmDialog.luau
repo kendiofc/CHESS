@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local InputRules = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("InputRules"))
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
+local Decor = require(script.Parent:WaitForChild("Decor"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local ConfirmDialog = {}
@@ -47,7 +48,7 @@ local function corner(radius: number): UICorner
 end
 
 local function dialogButton(name: string, primary: boolean): TextButton
-	return make("TextButton", {
+	local b = make("TextButton", {
 		Name = name,
 		Size = UDim2.new(0.5, -6, 1, 0),
 		BackgroundColor3 = if primary then Theme.Danger else Theme.PanelRaised,
@@ -57,6 +58,8 @@ local function dialogButton(name: string, primary: boolean): TextButton
 		TextSize = 18,
 		ZIndex = 52,
 	}, { corner(12) })
+	Decor.sheen(b, 0.18)
+	return b
 end
 
 function ConfirmDialog.new(playerGui: Instance)

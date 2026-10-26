@@ -25,6 +25,7 @@ local TutorialFlow = require(Shared:WaitForChild("TutorialFlow"))
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
 local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local ConfirmDialog = require(script.Parent:WaitForChild("ConfirmDialog"))
+local Decor = require(script.Parent:WaitForChild("Decor"))
 local PieceArt = require(script.Parent:WaitForChild("PieceArt"))
 local PuzzleMenu = require(script.Parent:WaitForChild("PuzzleMenu"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
@@ -121,7 +122,7 @@ local function label(props: { [string]: any }): TextLabel
 end
 
 local function button(text: string, primary: boolean): TextButton
-	return make("TextButton", {
+	local b = make("TextButton", {
 		Size = UDim2.new(0, 150, 1, 0),
 		BackgroundColor3 = if primary then Theme.Accent else Theme.PanelRaised,
 		AutoButtonColor = true,
@@ -131,8 +132,10 @@ local function button(text: string, primary: boolean): TextButton
 		TextSize = 18,
 	}, {
 		corner(12),
-		stroke(if primary then Theme.AccentPressed else Theme.Stroke, 1.5),
+		stroke(if primary then Theme.AccentPressed else Theme.Stroke, 1.5, if primary then 0 else 0.3),
 	})
+	Decor.sheen(b, if primary then 0.2 else 0.16)
+	return b
 end
 
 -- Bottom-row button: shares the row's width but never grows past MaxSize.
@@ -219,17 +222,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		DisplayOrder = 0,
 		Parent = playerGui,
 	})
-	make("Frame", {
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BorderSizePixel = 0,
-		Parent = backdrop,
-	}, {
-		make("UIGradient", {
-			Color = ColorSequence.new(Theme.Background, Theme.BackgroundDeep),
-			Rotation = 115,
-		}),
-	})
+	Decor.backdrop(backdrop)
 
 	local gui = make("ScreenGui", {
 		Name = "EchoChessHUD",
@@ -264,11 +257,12 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		Text = "ECHO CHESS",
 		FontFace = Theme.FontHeavy,
 		TextSize = 13,
-		TextColor3 = Theme.Gold,
+		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Size = UDim2.new(1, -160, 0, 18),
 		Parent = header,
 	})
+	Decor.goldText(self.brandLabel)
 	self.titleLabel = label({
 		FontFace = Theme.FontBold,
 		TextSize = 26,
@@ -346,7 +340,8 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			Size = UDim2.new(1 / 3, -7, 1, 0),
 			BackgroundColor3 = Theme.Panel,
 			Parent = stats,
-		}, { corner(12), stroke(Theme.Stroke, 1) })
+		}, { corner(12), stroke(Theme.Stroke, 1, 0.35) })
+		Decor.sheen(card, 0.22)
 		label({
 			Text = title,
 			TextSize = 12,
@@ -407,10 +402,11 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Parent = boardArea,
-	}, { stroke(Theme.Stroke, 4) })
+	})
+	Decor.boardFrame(self.boardFrame) -- rim and shadow sit under the layers below
 	self.aspect = make("UIAspectRatioConstraint", {
 		AspectRatio = 1,
 		AspectType = Enum.AspectType.FitWithinMaxSize,
@@ -420,14 +416,14 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		Name = "Squares",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		ZIndex = 1,
+		ZIndex = 3,
 		Parent = self.boardFrame,
 	})
 	self.pieceLayer = make("Frame", {
 		Name = "Pieces",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		ZIndex = 2,
+		ZIndex = 4,
 		Parent = self.boardFrame,
 	})
 
@@ -552,6 +548,7 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 	})
 	local cardStroke = stroke(Theme.Gold, 2)
 	cardStroke.Parent = card
+	Decor.sheen(card, 0.3)
 	local cardScale = make("UIScale", { Parent = card })
 	local function line(order: number, name: string, props: { [string]: any }): TextLabel
 		local defaults: { [string]: any } = {
@@ -786,6 +783,7 @@ function PuzzleHUD._buildSquares(self: any)
 			Text = "",
 			Parent = self.squareLayer,
 		})
+		Decor.sheen(square, 0.09)
 		if board.blocked[index] then
 			addHatch(square)
 		end
@@ -870,7 +868,9 @@ function PuzzleHUD._pieceFrame(self: any, index: number, kind: string, color: "w
 	art.AnchorPoint = Vector2.new(0.5, 0.5)
 	art.Position = UDim2.fromScale(0.5, 0.52)
 	art.Size = UDim2.fromScale(0.84, 0.84)
+	art.ZIndex = 3
 	art.Parent = holder
+	Decor.pieceShadow(art)
 	make("UIScale", { Parent = holder })
 	return holder
 end
@@ -1009,6 +1009,7 @@ function PuzzleHUD._renderPieces(self: any, snap: any)
 		if piece.color == "white" then
 			frame.ZIndex = 2
 			self.playerFrame = frame
+			Decor.aura(frame)
 		end
 	end
 
@@ -1021,6 +1022,8 @@ function PuzzleHUD._renderPieces(self: any, snap: any)
 			Anim.tween(self.playerFrame, 0.18, { Position = target })
 		end
 		if move.capturedKind then
+			local position, size = self:_squareRect(move.to)
+			Decor.ripple(self.pieceLayer, position, size, Theme.Gold)
 			local ghost = self:_pieceFrame(move.to, move.capturedKind, "black")
 			ghost.ZIndex = 1
 			local ghostScale = ghost:FindFirstChildOfClass("UIScale") :: UIScale
