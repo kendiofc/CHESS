@@ -531,7 +531,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 	})
 	local title = text({
 		Name = "Title",
-		Position = UDim2.fromOffset(0, y + (if short then 28 elseif compact then 38 else 60)),
+		Position = UDim2.fromOffset(0, y + (if short then 34 elseif compact then 38 else 60)),
 		Size = UDim2.new(1, 0, 0, if short then 44 elseif compact then 52 else 92),
 		FontFace = Theme.FontHeavy,
 		RichText = true,
@@ -544,7 +544,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 	title.TextScaled = W < 420
 	text({
 		Name = "Tagline",
-		Position = UDim2.fromOffset(0, y + (if short then 74 elseif compact then 92 else 156)),
+		Position = UDim2.fromOffset(0, y + (if short then 78 elseif compact then 92 else 156)),
 		Size = UDim2.new(1, 0, 0, if short then 26 elseif compact then 36 else 30),
 		Text = if compact
 			then "Chess Puzzles  ·  Daily  ·  Duel  ·  Progression"
