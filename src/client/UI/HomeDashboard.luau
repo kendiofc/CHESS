@@ -316,8 +316,9 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	end
 	local progress = data.progress
 	local loading = data.loading or progress == nil
-	local pad = if width >= 760 then 32 else 14
-	local W = math.max(240, width - pad * 2)
+	local pad = if width >= 760 then 32 elseif width >= 360 then 14 else 10
+	local W = math.max(180, width - pad * 2)
+	local tiny = W < 320
 	local compact = W < 600
 	local wide = W >= 880
 	local gap = if compact then 12 else 18
@@ -349,7 +350,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 			Parent = avatar,
 		})
 	end
-	local coinsW = if compact then 116 else 150
+	local coinsW = if tiny then 92 elseif compact then 116 else 150
 	local coinsH = if compact then 40 else 50
 	local nameX = avatarSize + 12
 	local nameW = if compact then W - nameX - coinsW - 8 else 230
@@ -359,21 +360,22 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 		Size = UDim2.fromOffset(nameW, 18),
 		Text = "Welcome back,",
 		TextColor3 = Theme.TextMuted,
-		TextSize = if compact then 13 else 15,
+		TextSize = if tiny then 11 elseif compact then 13 else 15,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = page,
 	})
-	text({
+	local nameLabel = text({
 		Name = "PlayerName",
 		Position = UDim2.fromOffset(nameX, if compact then 20 else 26),
-		Size = UDim2.fromOffset(nameW, if compact then 26 else 30),
+		Size = UDim2.fromOffset(nameW, if compact then 24 else 30),
 		FontFace = Theme.FontHeavy,
 		Text = data.playerName,
-		TextSize = if compact then 19 else 24,
+		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
 		Parent = page,
 	})
+	-- Long names shrink to fit beside the coins rather than being cut off.
+	make("UITextSizeConstraint", { MaxTextSize = if compact then 19 else 24, MinTextSize = 10, Parent = nameLabel })
 
 	-- Coins (cosmetic currency; nothing can be bought, so there's no "+").
 	local coins = make("Frame", {
@@ -561,6 +563,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 		desc = "Progress through curated puzzles",
 		status = if loading
 			then "Loading..."
+			elseif small then string.format("%s  ·  %d / %d", unlocked, progress.totals.cleared, progress.totals.puzzles)
 			else string.format("%s unlocked  ·  %d / %d", unlocked, progress.totals.cleared, progress.totals.puzzles),
 	}, small, function()
 		actions.open("Journey")
@@ -794,17 +797,24 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, data: Data,
 	y = streakY + streakH + gap + (if compact then 2 else 6)
 
 	-- Stats ------------------------------------------------------------------------------------
-	local statColumns = if wide then 4 else 2
+	local statColumns = if wide then 4 elseif W >= 300 then 2 else 1
 	local statW = math.floor((W - gap * (statColumns - 1)) / statColumns)
 	local statH = if compact then 76 else 92
 	local totals = if loading then nil else progress.totals
+	-- Short labels where the tiles are narrow (two columns on a phone).
+	local short = statW < 190
 	local stats = {
-		{ "🏆", "Wins (Duel)", if duel then commas(duel.wins) else "-", "Duel" },
-		{ "📊", "Puzzles Solved", if totals then string.format("%d / %d", totals.cleared, totals.puzzles) else "-", "Stats" },
-		{ "⭐", "Total Stars", if totals then string.format("%d / %d", totals.stars, totals.maxStars) else "-", "Stats" },
+		{ "🏆", if short then "Duel wins" else "Wins (Duel)", if duel then commas(duel.wins) else "-", "Duel" },
+		{
+			"📊",
+			if short then "Solved" else "Puzzles Solved",
+			if totals then string.format("%d / %d", totals.cleared, totals.puzzles) else "-",
+			"Stats",
+		},
+		{ "⭐", if short then "Stars" else "Total Stars", if totals then string.format("%d / %d", totals.stars, totals.maxStars) else "-", "Stats" },
 		{
 			"📅",
-			"Current Week",
+			if short then "This week" else "Current Week",
 			if weekly then string.format("%d / %d", weekly.clearedCount, weekly.size) else "-",
 			"Weekly",
 		},
