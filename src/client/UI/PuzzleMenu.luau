@@ -370,6 +370,44 @@ local function rowButton(self: any, order: number, name: string, title: string, 
 	return button
 end
 
+-- A piece from the sheet in a round badge on the row's left; the row's
+-- text moves over to make room.
+local function rowIcon(button: TextButton, kind: string, black: boolean?)
+	if Theme.PieceSheet == "" then
+		return
+	end
+	local badge = make("Frame", {
+		Name = "Icon",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 12, 0.5, 0),
+		Size = UDim2.fromOffset(40, 40),
+		BackgroundColor3 = Theme.Background,
+		BackgroundTransparency = 0.45,
+		Parent = button,
+	}, { corner(20) })
+	make("ImageLabel", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.78, 0.78),
+		BackgroundTransparency = 1,
+		Image = Theme.PieceSheet,
+		ImageRectSize = Vector2.new(Theme.PieceCell, Theme.PieceCell),
+		ImageRectOffset = Vector2.new(
+			(Theme.PieceSheetColumns[kind] or 5) * Theme.PieceCell,
+			if black then Theme.PieceCell else 0
+		),
+		ScaleType = Enum.ScaleType.Fit,
+		Parent = badge,
+	})
+	for _, name in ipairs({ "Title", "Sub" }) do
+		local line = button:FindFirstChild(name) :: TextLabel?
+		if line then
+			line.Position = UDim2.fromOffset(64, line.Position.Y.Offset)
+			line.Size = UDim2.new(1, -96, 0, line.Size.Y.Offset)
+		end
+	end
+end
+
 local function progressBar(parent: Instance, position: UDim2, size: UDim2, fraction: number, color: Color3)
 	local track = make("Frame", {
 		Name = "ProgressBar",
@@ -425,6 +463,7 @@ function PuzzleMenu._renderHome(self: any)
 	end
 	local continue = rowButton(self, 1, "ContinueButton", title, sub, if loading then Theme.PanelRaised else Theme.Accent)
 	continue.Size = UDim2.new(1, -8, 0, 72)
+	rowIcon(continue, "N")
 	continue.AutoButtonColor = not loading
 	continue.Activated:Connect(function()
 		if action then
@@ -461,10 +500,10 @@ function PuzzleMenu._renderHome(self: any)
 	end
 	local settings = Sound.getSettings()
 	local rows = {
-		{ "Journey", "Journey", journeySub },
-		{ "Daily", "Daily Puzzle", dailySub },
-		{ "Practice", "Practice", "Any puzzle, any difficulty, free hints, no rewards" },
-		{ "Stats", "Statistics", statsSub },
+		{ "Journey", "Journey", journeySub, "K" },
+		{ "Daily", "Daily Puzzle", dailySub, "Q" },
+		{ "Practice", "Practice", "Any puzzle, any difficulty, free hints, no rewards", "B" },
+		{ "Stats", "Statistics", statsSub, "R" },
 		{
 			"Settings",
 			"Settings",
@@ -473,18 +512,24 @@ function PuzzleMenu._renderHome(self: any)
 				if settings.sound then "on" else "off",
 				math.floor(settings.volume * 100 + 0.5)
 			),
+			"N",
+			true,
 		},
 	}
 	for order, row in ipairs(rows) do
 		local view = row[1]
-		rowButton(self, order + 1, view .. "Button", row[2], row[3]).Activated:Connect(function()
+		local button = rowButton(self, order + 1, view .. "Button", row[2], row[3])
+		rowIcon(button, row[4], row[5])
+		button.Activated:Connect(function()
 			self:show(view)
 		end)
 	end
 	local tutorialSub = if progress and progress.tutorialDone
 		then "Replay the guided first puzzle"
 		else "A one-minute guided first puzzle"
-	rowButton(self, #rows + 2, "TutorialButton", "How to play", tutorialSub).Activated:Connect(function()
+	local tutorialButton = rowButton(self, #rows + 2, "TutorialButton", "How to play", tutorialSub)
+	rowIcon(tutorialButton, "P")
+	tutorialButton.Activated:Connect(function()
 		if not loading then
 			self.handlers.tutorial()
 		end

@@ -83,13 +83,14 @@ function Decor.backdrop(gui: ScreenGui)
 			Parent = base,
 		})
 		make("UIAspectRatioConstraint", { AspectRatio = 1, Parent = holder })
-		for i, scale in ipairs({ 1, 0.78, 0.56, 0.36 }) do
+		for i = 1, 10 do
+			local scale = 1.1 - i * 0.1
 			local circle = make("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
 				Size = UDim2.fromScale(scale, scale),
 				BackgroundColor3 = color,
-				BackgroundTransparency = 0.955 - i * 0.004,
+				BackgroundTransparency = 0.984,
 				BorderSizePixel = 0,
 				Parent = holder,
 			})
@@ -124,7 +125,7 @@ function Decor.backdrop(gui: ScreenGui)
 			ImageRectSize = Vector2.new(Theme.PieceCell, Theme.PieceCell),
 			ImageRectOffset = Vector2.new((Theme.PieceSheetColumns[d[4]] or 5) * Theme.PieceCell, 0),
 			ImageColor3 = Color3.fromRGB(200, 196, 255),
-			ImageTransparency = 0.93,
+			ImageTransparency = 0.95,
 			Parent = base,
 		})
 		forever(image, d[6], {
