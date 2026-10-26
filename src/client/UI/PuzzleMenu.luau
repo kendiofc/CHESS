@@ -230,14 +230,14 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 	Decor.goldText(self.title)
 	self.wallet = text({
 		Name = "Wallet",
-		TextSize = 13,
+		TextScaled = true,
 		TextColor3 = Theme.TextMuted,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
 		Position = UDim2.fromOffset(18, 40),
 		Size = UDim2.new(1, -130, 0, 18),
 		Parent = panel,
 	})
+	make("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 9, Parent = self.wallet })
 	self.closeButton = make("TextButton", {
 		Name = "CloseButton",
 		AnchorPoint = Vector2.new(1, 0),
@@ -983,17 +983,17 @@ local function difficultyRow(self: any, order: number, difficulty: string, index
 	if locked and previous then
 		local need = if unlockRow then unlockRow.required else GameConfig.UNLOCK_REQUIREMENT
 		local have = if unlockRow then math.min(unlockRow.credited, need) else 0
-		text({
+		local unlockNote = text({
 			Name = "UnlockNote",
 			Text = string.format("Clear %d %s puzzles to unlock  (%d/%d)", need, previous, have, need),
-			TextSize = 13,
+			TextScaled = true,
 			TextColor3 = Theme.Text,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			TextTruncate = Enum.TextTruncate.AtEnd,
 			Position = UDim2.fromOffset(12, 28),
 			Size = UDim2.new(1, -24, 0, 16),
 			Parent = row,
 		})
+		make("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 9, Parent = unlockNote })
 		progressBar(row, UDim2.fromOffset(12, 48), UDim2.new(1, -24, 0, 6), have / need, Theme.DifficultyColors[previous] or Theme.Legal)
 	end
 	local grid = make("Frame", {
@@ -1527,16 +1527,19 @@ function PuzzleMenu._render(self: any)
 	self.wallet.Position = UDim2.fromOffset(if home then 18 else 66, 40)
 	self.closeButton.Visible = self:_canClose()
 
+	-- On a narrow panel the wallet has little room, so drop the streak and
+	-- shorten the offline note rather than letting the line get cut off.
+	local tightWallet = self.panel.AbsoluteSize.X < 360
 	local progress = self.progress
 	local wallet = "Loading progress..."
 	if progress then
 		wallet = string.format("%d XP  ·  %d coins", progress.xp, progress.coins)
-		if progress.streak and progress.streak.current > 0 then
+		if not tightWallet and progress.streak and progress.streak.current > 0 then
 			wallet ..= string.format("  ·  🔥 %d", progress.streak.current)
 		end
 	end
 	if self.saveStatus == "offline" then
-		wallet ..= "  ·  not saving"
+		wallet ..= if tightWallet then "  ·  offline" else "  ·  not saving"
 	end
 	self.wallet.Text = wallet
 
