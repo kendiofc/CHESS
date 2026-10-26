@@ -10,6 +10,7 @@
 -- so one press is never read as both. Leaving an attempt with moves in it
 -- (Restart, the puzzle arrows, starting another puzzle) asks first.
 
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -27,6 +28,7 @@ local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local ConfirmDialog = require(script.Parent:WaitForChild("ConfirmDialog"))
 local Decor = require(script.Parent:WaitForChild("Decor"))
 local PieceArt = require(script.Parent:WaitForChild("PieceArt"))
+local PlayDesk = require(script.Parent:WaitForChild("PlayDesk"))
 local PuzzleMenu = require(script.Parent:WaitForChild("PuzzleMenu"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 local TutorialCoach = require(script.Parent:WaitForChild("TutorialCoach"))
@@ -253,7 +255,7 @@ function PuzzleHUD.new(playerGui: Instance, handlers: Handlers)
 	UserInputService.InputEnded:Connect(function(input)
 		self:_pressEnded(input)
 	end)
-	for _, name in ipairs({ "EchoChessHUD", "EchoChessResult", "EchoChessMenu", "EchoChessDialog" }) do
+	for _, name in ipairs({ "EchoChessHUD", "EchoChessResult", "EchoChessMenu", "EchoChessDialog", "EchoChessPlayNav" }) do
 		Sound.watchButtons(playerGui:WaitForChild(name))
 	end
 	-- The home screen is the first thing a player sees; it shows a loading
@@ -467,6 +469,21 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		Parent = boardArea,
 	})
 	Decor.boardFrame(self.boardFrame) -- rim and shadow sit under the layers below
+	-- Large screens get the desktop dress around the board (PlayDesk).
+	self.desk = PlayDesk.new(playerGui, container, {
+		nav = function(id: string)
+			self:_deskNav(id)
+		end,
+		switch = function(offset: number)
+			self:_confirmLeave(function()
+				self:_switchPuzzle(offset)
+			end)
+		end,
+		openView = function(view: string)
+			self:_deskNav(view)
+		end,
+	})
+	self.desk:attachBoard(self.boardFrame)
 	self.aspect = make("UIAspectRatioConstraint", {
 		AspectRatio = 1,
 		AspectType = Enum.AspectType.FitWithinMaxSize,
@@ -523,7 +540,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			Padding = UDim.new(0, 12),
 		}),
 	})
-	self.undoButton = controlButton("Undo", false)
+	self.undoButton = controlButton("↩  Undo", false)
 	self.undoButton.Name = "UndoButton"
 	self.undoButton.LayoutOrder = 1
 	self.undoButton.Parent = controls
@@ -533,7 +550,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			self.handlers.undo()
 		end
 	end)
-	self.hintButton = controlButton("Hint", false)
+	self.hintButton = controlButton("💡  Hint", false)
 	self.hintButton.Name = "HintButton"
 	self.hintButton.LayoutOrder = 2
 	self.hintButton.Parent = controls
@@ -543,7 +560,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			self.handlers.hint()
 		end
 	end)
-	local restartButton = controlButton("Restart", true)
+	local restartButton = controlButton("🔄  Restart", true)
 	restartButton.Name = "RestartButton"
 	restartButton.LayoutOrder = 3
 	restartButton.Parent = controls
@@ -757,11 +774,43 @@ end
 -- Short, wide screens (phones in landscape) put the board on the left and the
 -- panels in a column on the right; everything else stacks vertically.
 function PuzzleHUD._layout(self: any)
+	local screen = self.gui.AbsoluteSize
+	if screen.X <= 0 or screen.Y <= 0 then
+		return
+	end
+	local p = self.parts
+	local desk = PlayDesk.fits(screen)
+	if desk ~= self.desk.visible then
+		self.desk:setVisible(desk)
+		for _, coord in ipairs(self.innerCoords or {}) do
+			coord.Visible = not desk
+		end
+	end
+	p.header.Visible = not desk
+	if desk then
+		local sidebarW = self.desk:sidebarWidth(screen.X, GuiService:GetGuiInset().Y)
+		self.container.Size = UDim2.new(1, -sidebarW, 1, 0)
+		self.container.Position = UDim2.new(0.5, sidebarW / 2, 0.5, 0)
+		self.layoutMode = "desk"
+		local coaching = p.coach.Visible
+		p.message.Visible = not coaching
+		p.stats.Visible = false
+		local rects = self.desk:layout(screen.X - sidebarW, screen.Y, coaching)
+		place(p.boardArea, rects.board.x, rects.board.y, rects.board.w, rects.board.h)
+		place(p.coach, rects.coach.x, rects.coach.y, rects.coach.w, rects.coach.h)
+		place(p.message, rects.message.x, rects.message.y, rects.message.w, rects.message.h)
+		place(p.controls, rects.controls.x, rects.controls.y, rects.controls.w, rects.controls.h)
+		if self.snapshot then
+			self:_renderHighlights()
+		end
+		return
+	end
+	self.container.Size = UDim2.fromScale(1, 1)
+	self.container.Position = UDim2.fromScale(0.5, 0.5)
 	local size = self.container.AbsoluteSize
 	if size.X <= 0 or size.Y <= 0 then
 		return
 	end
-	local p = self.parts
 	local w = size.X - MARGIN * 2
 	local h = size.Y - MARGIN * 2
 	local wide = size.X >= size.Y * 1.3 and size.Y < 640
@@ -846,7 +895,9 @@ end
 function PuzzleHUD._buildSquares(self: any)
 	self.squareLayer:ClearAllChildren()
 	self.squares = {}
+	self.innerCoords = {}
 	local board = self.board
+	self.desk:setBoardSize(board.width, board.height)
 	self.aspect.AspectRatio = board.width / board.height
 	for index = 1, board.width * board.height do
 		local col, row = BoardState.toCoord(board, index)
@@ -903,7 +954,9 @@ function PuzzleHUD._buildSquares(self: any)
 			Parent = square,
 		}, { round(), ringStroke })
 		if col == 1 then
-			label({
+			table.insert(self.innerCoords, label({
+				Name = "Coord",
+				Visible = not self.desk.visible,
 				Text = tostring(row),
 				FontFace = Theme.FontBold,
 				TextSize = 12,
@@ -913,10 +966,12 @@ function PuzzleHUD._buildSquares(self: any)
 				TextXAlignment = Enum.TextXAlignment.Left,
 				ZIndex = 2,
 				Parent = square,
-			})
+			}))
 		end
 		if row == 1 then
-			label({
+			table.insert(self.innerCoords, label({
+				Name = "Coord",
+				Visible = not self.desk.visible,
 				Text = string.sub("abcdefgh", col, col),
 				FontFace = Theme.FontBold,
 				TextSize = 12,
@@ -927,7 +982,7 @@ function PuzzleHUD._buildSquares(self: any)
 				TextXAlignment = Enum.TextXAlignment.Right,
 				ZIndex = 2,
 				Parent = square,
-			})
+			}))
 		end
 		square:SetAttribute("Silent", true) -- squares play their own sounds
 		square.Activated:Connect(function()
@@ -1108,7 +1163,7 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	self.timeTitle.Text = if snap.duel then "TIME LEFT" else "TIME"
 	local hintsLeft = snap.hintsLeft or 0
 	local hintsOn = hintsLeft ~= 0 and snap.status ~= "won"
-	self.hintButton.Text = if hintsLeft > 0 then string.format("Hint (%d)", hintsLeft) else "Hint"
+	self.hintButton.Text = if hintsLeft > 0 then string.format("💡  Hint (%d)", hintsLeft) else "💡  Hint"
 	self.hintButton.BackgroundTransparency = if hintsOn then 0 else 0.6
 	self.hintButton.TextTransparency = if hintsOn then 0 else 0.5
 	self.movesValue.Text = tostring(snap.moveCount)
@@ -1118,6 +1173,12 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	Anim.tween(self.progressFill, 0.3, { Size = UDim2.fromScale(captured / math.max(1, snap.targetsTotal), 1) })
 	self.undoButton.BackgroundTransparency = if snap.canUndo then 0 else 0.6
 	self.undoButton.TextTransparency = if snap.canUndo then 0 else 0.5
+	self.desk:render(snap)
+	self.desk:setNav(if snap.mode == DUEL_MODE then "Duel" else snap.mode, dueling)
+	-- The dots row comes and goes with the mode, which moves the board.
+	if self.desk.visible then
+		self:_layout()
+	end
 	self:_updateTimer()
 end
 
@@ -1135,6 +1196,7 @@ function PuzzleHUD._updateTimer(self: any)
 		end
 		self.timeValue.Text = formatTime(math.ceil(math.max(0, left)))
 		self.timeValue.TextColor3 = if duel.phase == "playing" and left < 30 then Theme.Danger else Theme.Text
+		self.desk:setTime(self.timeValue.Text, self.timeValue.TextColor3)
 		local count = self.countdownLabel
 		if duel.phase == "countdown" then
 			local startsIn = duel.startsIn - since
@@ -1155,6 +1217,7 @@ function PuzzleHUD._updateTimer(self: any)
 		seconds += since
 	end
 	self.timeValue.Text = formatTime(seconds)
+	self.desk:setTime(self.timeValue.Text, Theme.Text)
 end
 
 function PuzzleHUD._renderPieces(self: any, snap: any)
@@ -1785,6 +1848,30 @@ function PuzzleHUD._confirmLeave(self: any, action: () -> ())
 		confirm = "Leave",
 		onConfirm = action,
 	})
+end
+
+-- A desk sidebar press or card tap. Every page lives in the menu; a live
+-- duel asks to forfeit first, as the Menu button does.
+function PuzzleHUD._deskNav(self: any, id: string)
+	if id == "Collapse" then
+		self.desk:toggleSidebar()
+		self:_layout()
+		return
+	end
+	local snap = self.snapshot
+	if snap and snap.duel and snap.duel.phase ~= "finished" then
+		self:_confirmForfeit()
+		return
+	end
+	if id == "Tutorial" then
+		if snap then
+			self:_confirmLeave(function()
+				self:startTutorial()
+			end)
+		end
+		return
+	end
+	self.menu:open(id)
 end
 
 function PuzzleHUD._confirmForfeit(self: any)

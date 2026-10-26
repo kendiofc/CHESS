@@ -75,11 +75,11 @@ function TutorialCoach.new(parent: Instance, callbacks: Callbacks)
 		Name = "Count",
 		BackgroundTransparency = 1,
 		FontFace = Theme.FontHeavy,
-		TextSize = 12,
+		TextSize = 14,
 		TextColor3 = Theme.Gold,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.fromOffset(12, 6),
-		Size = UDim2.new(1, -104, 0, 14),
+		Position = UDim2.fromOffset(14, 8),
+		Size = UDim2.new(1, -104, 0, 18),
 		ZIndex = 21,
 		Parent = frame,
 	})
@@ -92,11 +92,11 @@ function TutorialCoach.new(parent: Instance, callbacks: Callbacks)
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
-		Position = UDim2.fromOffset(12, 22),
-		Size = UDim2.new(1, -104, 1, -26),
+		Position = UDim2.fromOffset(14, 30),
+		Size = UDim2.new(1, -104, 1, -34),
 		ZIndex = 21,
 		Parent = frame,
-	}, { make("UITextSizeConstraint", { MinTextSize = 11, MaxTextSize = 14 }) })
+	}, { make("UITextSizeConstraint", { MinTextSize = 11, MaxTextSize = 17 }) })
 	self.text.TextScaled = true
 	local buttons = make("Frame", {
 		Name = "Buttons",
@@ -150,7 +150,7 @@ end
 -- Shows `step` (a TutorialFlow step) as number `index` of `total`.
 function TutorialCoach.show(self: any, step: any, index: number, total: number)
 	self.frame.Visible = true
-	self.count.Text = string.format("HOW TO PLAY  ·  %d/%d", index, total)
+	self.count.Text = string.format("📖  HOW TO PLAY  ·  %d/%d", index, total)
 	self.text.Text = step.text
 	self.nextButton.Visible = step.waitFor == "next"
 	self:_arrange()
@@ -166,8 +166,8 @@ function TutorialCoach._arrange(self: any)
 	local height = if column then count * BUTTON_H + (count - 1) * BUTTON_GAP else BUTTON_H
 	self.buttons.Size = UDim2.fromOffset(width, height)
 	local textWidth = -(width + 28)
-	self.count.Size = UDim2.new(1, textWidth, 0, 14)
-	self.text.Size = UDim2.new(1, textWidth, 1, -28)
+	self.count.Size = UDim2.new(1, textWidth, 0, 18)
+	self.text.Size = UDim2.new(1, textWidth, 1, -36)
 end
 
 function TutorialCoach.hide(self: any)
