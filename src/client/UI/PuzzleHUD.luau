@@ -636,7 +636,8 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 	local subtitle = line(3, "Subtitle", { TextSize = 15, TextColor3 = Theme.TextMuted })
 	local statsLine = line(4, "Stats", { FontFace = Theme.FontBold, TextSize = 18 })
 	local detail = line(5, "Detail", { TextSize = 13, TextColor3 = Theme.TextMuted })
-	local rewardLine = line(6, "Reward", { FontFace = Theme.FontBold, TextSize = 15, TextColor3 = Theme.Legal })
+	local rewardLine =
+		line(6, "Reward", { FontFace = Theme.FontBold, TextSize = 15, TextColor3 = Theme.Legal, RichText = true })
 	local banner = make("TextLabel", {
 		Name = "UnlockBanner",
 		LayoutOrder = 7,
@@ -1283,6 +1284,14 @@ function PuzzleHUD._renderMessage(self: any, snap: any)
 	end
 	self.messageLabel.Text = text
 	self.messageLabel.TextColor3 = color
+	if snap.duel and snap.duel.phase == "playing" and snap.status == "playing" then
+		-- Move feedback is brief in a duel; then the opponent's progress comes back.
+		task.delay(2.5, function()
+			if self.snapshot == snap and snap.duel.phase == "playing" then
+				self:_renderDuelMessage(snap)
+			end
+		end)
+	end
 end
 
 -- The win card's lines about stars.
@@ -1338,7 +1347,9 @@ end
 -- working, say so instead of implying they're safe.
 local function saveNote(snap: any): string
 	if snap.saveStatus == "offline" then
-		return "\nSaving is unavailable right now, so this isn't saved yet."
+		-- Gold, not the reward's green, so it doesn't read as confirmed. The
+		-- reward label is RichText for this.
+		return '\n<font color="#F6C648">Saving is unavailable right now, so this isn\'t saved yet.</font>'
 	end
 	return ""
 end

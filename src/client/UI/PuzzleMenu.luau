@@ -167,11 +167,13 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		TextSize = 22,
 		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
+		-- Long titles shrink to fit narrow panels instead of truncating.
+		TextScaled = true,
 		Position = UDim2.fromOffset(18, 12),
 		Size = UDim2.new(1, -130, 0, 28),
 		Parent = panel,
 	})
+	make("UITextSizeConstraint", { MaxTextSize = 22, MinTextSize = 12, Parent = self.title })
 	Decor.goldText(self.title)
 	self.wallet = text({
 		Name = "Wallet",
@@ -207,9 +209,14 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Position = UDim2.fromOffset(18, 66),
-		Size = UDim2.new(1, -36, 0, 36),
+		Size = UDim2.new(1, -36, 0, 56),
 		Parent = panel,
 	})
+	-- On narrow panels a note can wrap to three or four lines; the list
+	-- starts below however many it takes.
+	self.note:GetPropertyChangedSignal("TextBounds"):Connect(function()
+		self:_placeList()
+	end)
 	self.list = make("ScrollingFrame", {
 		Name = "List",
 		Position = UDim2.fromOffset(12, 108),
@@ -551,7 +558,7 @@ function PuzzleMenu._renderWeekly(self: any)
 				"%s  ·  par %d  ·  %s",
 				puzzle.difficulty,
 				puzzle.par,
-				if cleared then "cleared this week ✓" else "not cleared yet"
+				if cleared then "cleared ✓" else "not cleared"
 			)
 			if record and record.stars and record.stars > 0 then
 				sub ..= "  ·  " .. starText(record.stars)
@@ -1343,7 +1350,7 @@ local NOTES = {
 	Daily = "A new puzzle every day at 00:00 UTC. One free hint and one reward per day.",
 	Weekly = "Four puzzles, the same for everyone, new every Monday 00:00 UTC. One hint per attempt. Each reward is paid once.",
 	Duel = "Opponents come from this server. Leaving a duel counts as a loss.",
-	Stats = "Your numbers, as saved on the server.",
+	Stats = "Your numbers, as the server has them.",
 	Settings = "",
 }
 
@@ -1357,6 +1364,18 @@ local TITLES = {
 	Stats = "STATISTICS",
 	Settings = "SETTINGS",
 }
+
+function PuzzleMenu._placeList(self: any)
+	if not self.list then
+		return
+	end
+	local top = 70
+	if self.note.Visible then
+		top = 66 + math.clamp(self.note.TextBounds.Y, 26, 56) + 16
+	end
+	self.list.Position = UDim2.fromOffset(12, top)
+	self.list.Size = UDim2.new(1, -24, 1, -(top + 12))
+end
 
 function PuzzleMenu._render(self: any)
 	local home = self.view == "Home"
@@ -1387,9 +1406,7 @@ function PuzzleMenu._render(self: any)
 	local note = string.format(NOTES[self.view], if progress then progress.unlockRequirement else GameConfig.UNLOCK_REQUIREMENT)
 	self.note.Text = note
 	self.note.Visible = note ~= ""
-	local top = if note ~= "" then 108 else 70
-	self.list.Position = UDim2.fromOffset(12, top)
-	self.list.Size = UDim2.new(1, -24, 1, -(top + 12))
+	self:_placeList()
 
 	self.countdown = nil
 	self.weeklyCountdown = nil
