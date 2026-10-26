@@ -1,7 +1,8 @@
 --!strict
--- PuzzleMenu: the home screen and everything reached from it.
+-- PuzzleMenu: the full-screen menu. A sidebar (MenuSidebar) stays on the left;
+-- the page beside it is either Home (HomeDashboard) or one of the panels below.
 --
---   Home      Continue / Resume, then Journey, Daily, Practice, Stats, Settings
+--   Home      profile, level and coins, the four modes, Continue, streak, stats
 --   Journey   difficulties unlock in order; rows show clears, stars and what
 --             unlocks the next difficulty
 --   Practice  every puzzle, any difficulty, free hints, no rewards
@@ -14,6 +15,7 @@
 -- reported (snapshot.progress) and sends requests; the server checks locks,
 -- rewards and settings again before acting on anything.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -24,10 +26,30 @@ local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
 local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local Decor = require(script.Parent:WaitForChild("Decor"))
+local HomeDashboard = require(script.Parent:WaitForChild("HomeDashboard"))
+local MenuSidebar = require(script.Parent:WaitForChild("MenuSidebar"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local PLAY_MODES = GameConfig.PLAY_MODES
 local VIEWS = { "Home", "Journey", "Practice", "Daily", "Weekly", "Duel", "Stats", "Settings" }
+
+-- Below this screen width the sidebar is a rail of icons, and opening it
+-- floats it over the page instead of pushing the page over.
+local NARROW = 900
+
+local NAV_ITEMS: { MenuSidebar.Item } = {
+	{ id = "Home", icon = "🏠", label = "Home" },
+	{ id = "Play", icon = "▶", label = "Play" },
+	{ id = "Journey", icon = "🏔", label = "Journey" },
+	{ id = "Daily", icon = "📅", label = "Daily Puzzle" },
+	{ id = "Weekly", icon = "🏆", label = "Weekly Challenge" },
+	{ id = "Practice", icon = "🧩", label = "Practice" },
+	{ id = "Duel", icon = "⚔️", label = "Puzzle Duel" },
+	{ id = "Stats", icon = "📊", label = "Statistics" },
+	{ id = "Tutorial", icon = "🎓", label = "How to Play" },
+	{ id = "Settings", icon = "⚙️", label = "Settings", footer = true },
+	{ id = "Collapse", icon = "<", label = "Collapse", footer = true },
+}
 
 local PuzzleMenu = {}
 PuzzleMenu.__index = PuzzleMenu
@@ -115,36 +137,67 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		Parent = playerGui,
 	})
 	self.gui = gui
-	local dim = make("TextButton", {
-		Name = "Dim",
+	-- The menu is its own screen: the backdrop covers the board behind it.
+	Decor.backdrop(gui)
+	self.root = make("Frame", {
+		Name = "Root",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Theme.Background,
-		BackgroundTransparency = 0.15,
-		AutoButtonColor = false,
-		Text = "",
+		BackgroundTransparency = 1,
 		Parent = gui,
 	})
-	dim:SetAttribute("Silent", true)
-	dim.Activated:Connect(function()
-		if self:_canClose() then
-			self:close()
-		end
+	self.sidebarPrefs = { narrow = false, wide = true } -- true = expanded
+	self.sidebar = MenuSidebar.new(self.root, NAV_ITEMS, function(id: string)
+		self:_navigate(id)
 	end)
+	-- Tapping the page while the sidebar floats over it folds the sidebar away.
+	self.scrim = make("TextButton", {
+		Name = "Scrim",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.5,
+		AutoButtonColor = false,
+		Text = "",
+		Visible = false,
+		ZIndex = 15,
+		Parent = self.root,
+	})
+	self.scrim:SetAttribute("Silent", true)
+	self.scrim.Activated:Connect(function()
+		self.sidebarPrefs.narrow = false
+		self:_layout()
+	end)
+	local content = make("Frame", {
+		Name = "Content",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Parent = self.root,
+	})
+	self.content = content
+	self.scale = make("UIScale", { Parent = content })
+	self.home = make("ScrollingFrame", {
+		Name = "Home",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = Theme.Stroke,
+		CanvasSize = UDim2.new(),
+		Parent = content,
+	})
 	local panel = make("Frame", {
 		Name = "Panel",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.new(1, -24, 1, -24),
 		BackgroundColor3 = Theme.Panel,
-		Parent = gui,
+		Parent = content,
 	}, {
 		corner(16),
 		make("UIStroke", { Color = Theme.Stroke, Thickness = 1.5 }),
-		make("UISizeConstraint", { MaxSize = Vector2.new(560, 760) }),
+		make("UISizeConstraint", { MaxSize = Vector2.new(600, 780) }),
 	})
 	Decor.sheen(panel, 0.3)
 	self.panel = panel
-	self.scale = make("UIScale", { Parent = panel })
 
 	-- Header: back, title, close.
 	self.backButton = make("TextButton", {
@@ -254,9 +307,110 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 			if self.gui.Enabled and queue and queue.Parent and self.queuedAt then
 				queue.Text = "Waiting " .. duration(os.clock() - self.queuedAt)
 			end
+			local badge = self.homeTicking and self.homeTicking.weeklyBadge
+			local left = self:_weeklyLeft()
+			if self.gui.Enabled and badge and badge.Parent and left then
+				badge.Text = "⏱ " .. duration(left)
+			end
 		end
 	end)
+
+	self.root:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		self:_layout()
+	end)
+	-- The Duel card shows how many players are on this server.
+	local function playersChanged()
+		if self.gui.Enabled and not self.closing then
+			self:_render()
+		end
+	end
+	Players.PlayerAdded:Connect(playersChanged)
+	Players.PlayerRemoving:Connect(function()
+		task.defer(playersChanged)
+	end)
+	local player = Players.LocalPlayer
+	self.playerName = if player then player.DisplayName else "Player"
+	if player then
+		task.spawn(function()
+			local ok, image = pcall(function()
+				return Players:GetUserThumbnailAsync(
+					player.UserId,
+					Enum.ThumbnailType.HeadShot,
+					Enum.ThumbnailSize.Size150x150
+				)
+			end)
+			if ok and image then
+				self.avatar = image
+				if self.gui.Enabled and self.view == "Home" then
+					self:_render()
+				end
+			end
+		end)
+	end
+	self:_layout()
 	return self
+end
+
+function PuzzleMenu._weeklyLeft(self: any): number?
+	if self.snapshot and self.snapshot.nextWeeklyIn then
+		return self.snapshot.nextWeeklyIn - (os.clock() - self.receivedAt)
+	end
+	return nil
+end
+
+-- Sidebar width and mode for the screen size, then the page beside it.
+function PuzzleMenu._layout(self: any)
+	local size = self.root.AbsoluteSize
+	if size.X <= 0 then
+		return
+	end
+	local narrow = size.X < NARROW
+	local expanded = if narrow then self.sidebarPrefs.narrow else self.sidebarPrefs.wide
+	local floating = narrow and expanded
+	self.sidebar:setMode(not expanded, floating)
+	self.sidebar:setLabel("Collapse", if expanded then "Collapse" else "Expand")
+	local collapseEntry = self.sidebar.items.Collapse
+	if collapseEntry then
+		collapseEntry.icon.Text = if expanded then "<" else ">"
+	end
+	self.scrim.Visible = floating
+	local rail = if narrow or not expanded then MenuSidebar.COLLAPSED else MenuSidebar.EXPANDED
+	self.content.Position = UDim2.new(0.5, rail / 2, 0.5, 0)
+	self.content.Size = UDim2.new(1, -rail, 1, 0)
+	local width = size.X - rail
+	if self.homeWidth ~= width then
+		self.homeWidth = width
+		if self.gui.Enabled and self.view == "Home" then
+			self:_render()
+		end
+	end
+end
+
+-- A sidebar press.
+function PuzzleMenu._navigate(self: any, id: string)
+	local narrow = self.root.AbsoluteSize.X < NARROW
+	if id == "Collapse" then
+		local key = if narrow then "narrow" else "wide"
+		self.sidebarPrefs[key] = not self.sidebarPrefs[key]
+		self:_layout()
+		return
+	end
+	if narrow and self.sidebarPrefs.narrow then
+		-- A floating sidebar folds away once something is picked.
+		self.sidebarPrefs.narrow = false
+		self:_layout()
+	end
+	if id == "Play" then
+		if self:_canClose() then
+			self:close()
+		end
+	elseif id == "Tutorial" then
+		if self.progress and not self:isQueued() then
+			self.handlers.tutorial()
+		end
+	elseif table.find(VIEWS, id) then
+		self:show(id)
+	end
 end
 
 -- Close only when there is a puzzle behind the menu to return to, and not
@@ -293,6 +447,7 @@ function PuzzleMenu.open(self: any, view: string?)
 	local wasOpen = self.gui.Enabled
 	self.gui.Enabled = true
 	self.list.CanvasPosition = Vector2.zero
+	self.home.CanvasPosition = Vector2.zero
 	self:_render()
 	if not wasOpen then
 		Sound.play("open")
@@ -700,126 +855,78 @@ end
 
 -- Home ---------------------------------------------------------------------------------
 
-function PuzzleMenu._renderHome(self: any)
+-- What Home's Continue panel offers: the attempt in progress, else the next
+-- Journey puzzle, else the Journey list.
+function PuzzleMenu._continueData(self: any): HomeDashboard.Continue
 	local progress = self.progress
 	local snap = self.snapshot
-	local loading = progress == nil or self.saveStatus == "loading"
-	local title, sub, action = "Loading your progress...", "One moment.", nil
-	if not loading then
-		local resume = progress.resumeId and PuzzleDefinitions.get(progress.resumeId)
-		if snap and snap.status == "playing" and snap.moveCount > 0 then
-			title = "Resume"
+	if progress == nil or self.saveStatus == "loading" then
+		return { title = "Loading your progress...", sub = "One moment.", button = "Continue" }
+	end
+	if snap and snap.status == "playing" and snap.moveCount > 0 and snap.mode ~= GameConfig.DUEL_MODE then
+		return {
+			title = "Resume",
 			sub = string.format(
-				"%s  ·  %s  ·  %d %s in",
+				"%s  •  %s  •  %d %s in",
 				snap.name,
 				snap.mode,
 				snap.moveCount,
 				if snap.moveCount == 1 then "move" else "moves"
-			)
+			),
+			button = "Resume",
 			action = function()
 				self:close()
+			end,
+		}
+	end
+	local resume = progress.resumeId and PuzzleDefinitions.get(progress.resumeId)
+	if resume then
+		local group = PuzzleDefinitions.byDifficulty[resume.difficulty] or {}
+		local cleared = 0
+		for _, puzzle in ipairs(group) do
+			local record = progress.completed[puzzle.id]
+			if record and record.credited then
+				cleared += 1
 			end
-		elseif resume then
-			title = if progress.totals.cleared == 0 then "Start Journey" else "Continue Journey"
-			sub = string.format("%s %d  ·  %s", resume.difficulty, resume.number, resume.name)
+		end
+		return {
+			title = if progress.totals.cleared == 0 then "Start Journey" else "Continue Journey",
+			sub = string.format("%s %d/%d  •  %s", resume.difficulty, resume.number, #group, resume.name),
+			button = if progress.totals.cleared == 0 then "Start" else "Continue",
+			fraction = if #group > 0 then cleared / #group else 0,
 			action = function()
 				self:_start(resume.id, PLAY_MODES.Journey)
-			end
-		else
-			title = "Journey complete"
-			sub = "Every puzzle cleared. Replay any for more stars."
-			action = function()
-				self:show("Journey")
-			end
-		end
+			end,
+		}
 	end
-	local continue = rowButton(self, 1, "ContinueButton", title, sub, if loading then Theme.PanelRaised else Theme.Accent)
-	continue.Size = UDim2.new(1, -8, 0, 72)
-	rowIcon(continue, "N")
-	continue.AutoButtonColor = not loading
-	continue.Activated:Connect(function()
-		if action then
-			action()
-		end
-	end)
-
-	local journeySub = "Five difficulties, unlocked in order"
-	local dailySub = "A new puzzle every day"
-	local statsSub = "Your clears, stars and achievements"
-	if progress then
-		local unlocked = GameConfig.DIFFICULTIES[progress.unlockedIndex] or "Beginner"
-		journeySub = string.format(
-			"%s unlocked  ·  %d/%d cleared  ·  %d★",
-			unlocked,
-			progress.totals.cleared,
-			progress.totals.puzzles,
-			progress.totals.stars
-		)
-		local streak = progress.streak
-		local streakText = if streak.current > 0 then string.format("🔥 %d-day streak", streak.current) else "No streak yet"
-		dailySub = streakText .. "  ·  " .. (if progress.daily.completed then "cleared today ✓" else "not cleared today")
-		local earned = 0
-		for _ in pairs(progress.achievements) do
-			earned += 1
-		end
-		statsSub = string.format(
-			"%d★ of %d  ·  %d/%d achievements",
-			progress.totals.stars,
-			progress.totals.maxStars,
-			earned,
-			#Achievements.list
-		)
-	end
-	local weeklySub = "Four puzzles a week, rewards for clearing them"
-	local duelSub = "Race a player on the same puzzle"
-	if progress and progress.weekly then
-		local weekly = progress.weekly
-		weeklySub = if weekly.completed
-			then "Complete this week ✓"
-			else string.format("%d / %d cleared this week", weekly.clearedCount, weekly.size)
-	end
-	if progress and progress.duel and progress.duel.played > 0 then
-		local duel = progress.duel
-		duelSub = string.format("%d W  ·  %d L  ·  %d D", duel.wins, duel.losses, duel.draws)
-	end
-	local settings = Sound.getSettings()
-	local rows = {
-		{ "Journey", "Journey", journeySub, "K" },
-		{ "Daily", "Daily Puzzle", dailySub, "Q" },
-		{ "Weekly", "Weekly Challenge", weeklySub, "R", true },
-		{ "Duel", "Puzzle Duel", duelSub, "K", true },
-		{ "Practice", "Practice", "Any puzzle, any difficulty, free hints, no rewards", "B" },
-		{ "Stats", "Statistics", statsSub, "R" },
-		{
-			"Settings",
-			"Settings",
-			string.format(
-				"Sound %s  ·  volume %d%%",
-				if settings.sound then "on" else "off",
-				math.floor(settings.volume * 100 + 0.5)
-			),
-			"N",
-			true,
-		},
+	return {
+		title = "Journey complete",
+		sub = "Every puzzle cleared. Replay any for more stars.",
+		button = "View",
+		fraction = 1,
+		action = function()
+			self:show("Journey")
+		end,
 	}
-	for order, row in ipairs(rows) do
-		local view = row[1]
-		local button = rowButton(self, order + 1, view .. "Button", row[2], row[3])
-		rowIcon(button, row[4], row[5])
-		button.Activated:Connect(function()
+end
+
+function PuzzleMenu._renderHome(self: any)
+	local left = self:_weeklyLeft()
+	self.homeTicking = HomeDashboard.render(self.home, self.home.AbsoluteSize.X, {
+		progress = self.progress,
+		loading = self.progress == nil or self.saveStatus == "loading",
+		saveStatus = self.saveStatus,
+		playerName = self.playerName or "Player",
+		avatar = self.avatar,
+		queued = self:isQueued(),
+		serverPlayers = #Players:GetPlayers(),
+		weeklyLeftText = if left then duration(left) else nil,
+		continue = self:_continueData(),
+	}, {
+		open = function(view: string)
 			self:show(view)
-		end)
-	end
-	local tutorialSub = if progress and progress.tutorialDone
-		then "Replay the guided first puzzle"
-		else "A one-minute guided first puzzle"
-	local tutorialButton = rowButton(self, #rows + 2, "TutorialButton", "How to play", tutorialSub)
-	rowIcon(tutorialButton, "P")
-	tutorialButton.Activated:Connect(function()
-		if not loading then
-			self.handlers.tutorial()
-		end
-	end)
+		end,
+	})
 end
 
 -- Journey and Practice -----------------------------------------------------------------
@@ -1387,7 +1494,32 @@ function PuzzleMenu._render(self: any)
 		self.view = "Duel"
 		home = false
 	end
-	self.backButton.Visible = not home and not self:isQueued()
+	-- Sidebar: the current page, what can be used now, and a dot on Duel
+	-- while searching or when someone else is on this server to play.
+	local queued = self:isQueued()
+	self.sidebar:setSelected(self.view)
+	for _, item in ipairs(NAV_ITEMS) do
+		local usable = not queued or item.id == "Duel" or item.id == "Collapse"
+		if item.id == "Play" then
+			usable = self:_canClose()
+		elseif item.id == "Tutorial" then
+			usable = usable and self.progress ~= nil
+		end
+		self.sidebar:setEnabled(item.id, usable)
+	end
+	self.sidebar:setDot("Duel", queued or #Players:GetPlayers() > 1)
+	self.home.Visible = home
+	self.panel.Visible = not home
+	if home then
+		self.countdown = nil
+		self.weeklyCountdown = nil
+		self.queueLabel = nil
+		self:_renderHome()
+		return
+	end
+	self.homeTicking = nil
+
+	self.backButton.Visible = not self:isQueued()
 	self.title.Text = TITLES[self.view]
 	self.title.Position = UDim2.fromOffset(if home then 18 else 66, 12)
 	self.wallet.Position = UDim2.fromOffset(if home then 18 else 66, 40)
@@ -1419,9 +1551,7 @@ function PuzzleMenu._render(self: any)
 			child:Destroy()
 		end
 	end
-	if home then
-		self:_renderHome()
-	elseif self.view == "Daily" then
+	if self.view == "Daily" then
 		self:_renderDaily()
 	elseif self.view == "Weekly" then
 		self:_renderWeekly()

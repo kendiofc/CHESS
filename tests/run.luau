@@ -2153,6 +2153,35 @@ test("rate limiter: bursts are allowed, floods are refused, then it refills", fu
 	eq(odd:take(50), false)
 end)
 
+test("level from XP: thresholds, progress within a level, and junk input", function()
+	local function at(xp: number): (number, number, number)
+		local view = Progression.levelOf(xp)
+		return view.level, view.into, view.needed
+	end
+	eq(select(1, at(0)), 1)
+	eq(select(1, at(99)), 1)
+	eq(select(1, at(100)), 2, "level 2 at 100 XP")
+	eq(select(1, at(299)), 2)
+	eq(select(1, at(300)), 3, "level 3 at 300 XP")
+	eq(select(1, at(600)), 4, "level 4 at 600 XP")
+	local level, into, needed = at(450)
+	eq(level, 3)
+	eq(into, 150, "150 XP into level 3")
+	eq(needed, 300, "level 3 to 4 takes 300 XP")
+	eq(select(1, at(-5)), 1, "negative XP is level 1")
+	eq(select(1, at(0 / 0)), 1, "NaN is level 1")
+	eq((Progression.levelOf :: any)(nil).level, 1, "missing XP is level 1")
+	local huge = Progression.levelOf(math.huge)
+	assert(huge.level > 1000 and huge.into >= 0, "infinite XP is capped, not a hang")
+	-- Big totals stay quick and monotonic.
+	local previous = 1
+	for xp = 0, 200000, 997 do
+		local now = Progression.levelOf(xp).level
+		assert(now >= previous, "level never goes down as XP grows")
+		previous = now
+	end
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then
 	error("test failures")

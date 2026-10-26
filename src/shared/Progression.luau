@@ -337,6 +337,29 @@ function Progression.starsFor(puzzle: PuzzleDefinitions.Puzzle, moves: number): 
 	return 1
 end
 
+-- Level -------------------------------------------------------------------------
+
+-- A level shown on the home screen, worked out from total XP. It's display
+-- only: nothing is saved for it and nothing is paid for reaching one. Going
+-- from level L to L + 1 takes LEVEL_STEP * L XP, so level 2 is at 100 XP,
+-- level 3 at 300, level 4 at 600.
+Progression.LEVEL_STEP = 100
+
+function Progression.levelOf(xp: number): { level: number, into: number, needed: number }
+	local total = tonumber(xp) or 0
+	if total ~= total or total < 0 then
+		total = 0
+	end
+	-- Capped so a corrupt value can't make the loop run forever.
+	xp = math.floor(math.min(total, 1e9))
+	local level, floor = 1, 0
+	while xp >= floor + Progression.LEVEL_STEP * level do
+		floor += Progression.LEVEL_STEP * level
+		level += 1
+	end
+	return { level = level, into = xp - floor, needed = Progression.LEVEL_STEP * level }
+end
+
 -- Daily streak ------------------------------------------------------------------
 
 local function shieldReady(streak: Streak, day: number): boolean
