@@ -359,7 +359,8 @@ function PuzzleMenu._weeklyLeft(self: any): number?
 end
 
 -- Sidebar width and mode for the screen size, then the page beside it.
-function PuzzleMenu._layout(self: any)
+-- `fromRender` is set when _render calls this, so it does not render again.
+function PuzzleMenu._layout(self: any, fromRender: boolean?)
 	local size = self.root.AbsoluteSize
 	if size.X <= 0 then
 		return
@@ -367,14 +368,20 @@ function PuzzleMenu._layout(self: any)
 	local narrow = size.X < NARROW
 	local expanded = if narrow then self.sidebarPrefs.narrow else self.sidebarPrefs.wide
 	local floating = narrow and expanded
+	-- On a phone a sub-page needs the whole width (its rows were laid out
+	-- for ~300 px), so the rail steps aside and Back returns to Home.
+	local pageOnly = narrow and self.view ~= "Home"
+	self.sidebar.frame.Visible = not pageOnly
 	self.sidebar:setMode(not expanded, floating)
 	self.sidebar:setLabel("Collapse", if expanded then "Collapse" else "Expand")
 	local collapseEntry = self.sidebar.items.Collapse
 	if collapseEntry then
 		collapseEntry.icon.Text = if expanded then "<" else ">"
 	end
-	self.scrim.Visible = floating
-	local rail = if narrow or not expanded then MenuSidebar.COLLAPSED else MenuSidebar.EXPANDED
+	self.scrim.Visible = floating and not pageOnly
+	local rail = if pageOnly then 0
+		elseif narrow or not expanded then MenuSidebar.COLLAPSED
+		else MenuSidebar.EXPANDED
 	self.content.Position = UDim2.new(0.5, rail / 2, 0.5, 0)
 	self.content.Size = UDim2.new(1, -rail, 1, 0)
 	self.sidebar:setDense(size.Y < 480)
@@ -382,7 +389,7 @@ function PuzzleMenu._layout(self: any)
 	if self.homeWidth ~= width or self.homeHeight ~= size.Y then
 		self.homeWidth = width
 		self.homeHeight = size.Y
-		if self.gui.Enabled and self.view == "Home" then
+		if not fromRender and self.gui.Enabled and self.view == "Home" then
 			self:_render()
 		end
 	end
@@ -1510,6 +1517,7 @@ function PuzzleMenu._render(self: any)
 		self.sidebar:setEnabled(item.id, usable)
 	end
 	self.sidebar:setDot("Duel", queued or #Players:GetPlayers() > 1)
+	self:_layout(true)
 	self.home.Visible = home
 	self.panel.Visible = not home
 	if home then
