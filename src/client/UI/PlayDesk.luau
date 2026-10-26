@@ -650,8 +650,9 @@ function PlayDesk._buildCards(self: any, root: Frame)
 		make("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 8),
+			Padding = UDim.new(0, 6),
 		}),
+		make("UISizeConstraint", { MaxSize = Vector2.new(7 * 34 + 6 * 6, 34) }),
 	})
 	streak.Activated:Connect(function()
 		self.actions.openView("Daily")
@@ -710,7 +711,8 @@ function PlayDesk._renderStreak(self: any, progress: any)
 		local box = text({
 			Name = "Day" .. i,
 			LayoutOrder = i,
-			Size = UDim2.fromOffset(30, 30),
+			-- Seven boxes share the card's width, at most 34 px each.
+			Size = UDim2.new(1 / 7, -6, 1, 0),
 			BackgroundColor3 = style.bg,
 			BackgroundTransparency = 0,
 			FontFace = Theme.FontHeavy,
