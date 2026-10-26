@@ -880,6 +880,19 @@ end
 function PuzzleHUD.render(self: any, snap: any)
 	local previous = self.snapshot
 	local newPuzzle = not previous or previous.puzzleId ~= snap.puzzleId or snap.event == "start"
+	-- Only the winning move's snapshot carries the rating and reward. A later
+	-- snapshot for the same finished attempt (tutorial saved, settings, a
+	-- rejected request) keeps them, so the win card doesn't lose its lines.
+	if
+		snap.status == "won"
+		and snap.event ~= "move"
+		and not newPuzzle
+		and previous.status == "won"
+		and snap.result == nil
+	then
+		snap.result = previous.result
+		snap.reward = snap.reward or previous.reward
+	end
 	self.snapshot = snap
 	self.receivedAt = os.clock()
 	self.pending = false
