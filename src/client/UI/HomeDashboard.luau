@@ -210,6 +210,7 @@ local CARD_STYLES = {
 	Duel = { top = Color3.fromRGB(72, 54, 142), bottom = Color3.fromRGB(34, 30, 72), edge = Color3.fromRGB(132, 106, 240), width = 1.5 },
 	Daily = { top = Color3.fromRGB(42, 62, 132), bottom = Color3.fromRGB(24, 30, 68), edge = Color3.fromRGB(92, 124, 232), width = 1.5 },
 	Weekly = { top = Color3.fromRGB(92, 54, 164), bottom = Color3.fromRGB(40, 26, 90), edge = Color3.fromRGB(166, 116, 255), width = 1.5 },
+	Endless = { top = Color3.fromRGB(30, 96, 112), bottom = Color3.fromRGB(20, 36, 58), edge = Color3.fromRGB(86, 210, 220), width = 1.5 },
 }
 
 local function modeCard(
