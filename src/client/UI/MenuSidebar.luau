@@ -48,6 +48,7 @@ function MenuSidebar.new(parent: Instance, items: { Item }, onSelect: (string) -
 	self.selected = nil
 	self.collapsed = false
 	self.dense = false
+	self.topInset = 0
 
 	local frame = make("Frame", {
 		Name = "Sidebar",
@@ -323,15 +324,12 @@ function MenuSidebar.setDense(self: any, dense: boolean)
 	local itemH = if dense then DENSE_ITEM_HEIGHT else ITEM_HEIGHT
 	local logoH = if dense then DENSE_LOGO_HEIGHT else LOGO_HEIGHT
 	local footerHeight = self.footerCount * (itemH + 6) + (if dense then 14 else 22)
-	self.logo.Size = UDim2.new(1, 0, 0, logoH)
 	if self.logoIcon then
 		self.logoIcon.Size = UDim2.fromOffset(if dense then 28 else 36, if dense then 28 else 36)
 		self.logoIcon.Position = UDim2.fromOffset(self.logoIcon.Position.X.Offset, logoH / 2)
 	end
 	self.logoText.Position = UDim2.fromOffset(62, logoH / 2 - 16)
 	self.logoText.TextSize = if dense then 18 else 22
-	self.list.Position = UDim2.fromOffset(0, logoH + 4)
-	self.list.Size = UDim2.new(1, 0, 1, -(logoH + 4 + footerHeight))
 	self.footer.Size = UDim2.new(1, 0, 0, footerHeight)
 	-- On a short screen the rail has to scroll, so make the bar easy to see.
 	self.list.ScrollBarThickness = if dense then 5 else 3
@@ -343,7 +341,27 @@ function MenuSidebar.setDense(self: any, dense: boolean)
 		entry.icon.TextSize = if dense then 19 else 22
 		entry.label.TextSize = if dense then 15 else 16
 	end
+	self:_place()
 	self:setMode(self.collapsed, self.floating or false)
+end
+
+-- The panel runs to the top of the screen, under Roblox's own buttons;
+-- `top` pushes the logo and items down below them.
+function MenuSidebar.setTopInset(self: any, top: number)
+	if self.topInset ~= top then
+		self.topInset = top
+		self:_place()
+	end
+end
+
+function MenuSidebar._place(self: any)
+	local itemH = if self.dense then DENSE_ITEM_HEIGHT else ITEM_HEIGHT
+	local logoH = if self.dense then DENSE_LOGO_HEIGHT else LOGO_HEIGHT
+	local footerHeight = self.footerCount * (itemH + 6) + (if self.dense then 14 else 22)
+	self.logo.Position = UDim2.fromOffset(0, self.topInset)
+	self.logo.Size = UDim2.new(1, 0, 0, logoH)
+	self.list.Position = UDim2.fromOffset(0, self.topInset + logoH + 4)
+	self.list.Size = UDim2.new(1, 0, 1, -(self.topInset + logoH + 4 + footerHeight))
 end
 
 -- Collapsed: icons only, centred in the rail, with the dot on the icon.

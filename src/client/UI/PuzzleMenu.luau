@@ -146,16 +146,14 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
-	-- The backdrop runs under Roblox's top bar, but the menu itself starts
-	-- below it so the Roblox buttons never cover the logo or the coins.
-	local function fitBelowTopBar()
-		local top = GuiService:GetGuiInset().Y
-		self.root.Position = UDim2.fromOffset(0, top)
-		self.root.Size = UDim2.new(1, 0, 1, -top)
-	end
-	fitBelowTopBar()
+	-- The menu fills the screen, but its contents start below Roblox's top
+	-- bar so the Roblox buttons never cover the logo or the coins.
+	self.topInset = GuiService:GetGuiInset().Y
 	pcall(function()
-		GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(fitBelowTopBar)
+		GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(function()
+			self.topInset = GuiService:GetGuiInset().Y
+			self:_layout()
+		end)
 	end)
 	self.sidebarPrefs = { narrow = false, wide = true } -- true = expanded
 	self.sidebar = MenuSidebar.new(self.root, NAV_ITEMS, function(id: string)
@@ -394,13 +392,15 @@ function PuzzleMenu._layout(self: any, fromRender: boolean?)
 	local rail = if pageOnly then 0
 		elseif narrow or not expanded then MenuSidebar.COLLAPSED
 		else MenuSidebar.EXPANDED
-	self.content.Position = UDim2.new(0.5, rail / 2, 0.5, 0)
-	self.content.Size = UDim2.new(1, -rail, 1, 0)
-	self.sidebar:setDense(size.Y < 480)
+	local top = self.topInset or 0
+	self.sidebar:setTopInset(top)
+	self.content.Position = UDim2.new(0.5, rail / 2, 0.5, top / 2)
+	self.content.Size = UDim2.new(1, -rail, 1, -top)
+	self.sidebar:setDense(size.Y - top < 480)
 	local width = size.X - rail
-	if self.homeWidth ~= width or self.homeHeight ~= size.Y then
+	if self.homeWidth ~= width or self.homeHeight ~= size.Y - top then
 		self.homeWidth = width
-		self.homeHeight = size.Y
+		self.homeHeight = size.Y - top
 		if not fromRender and self.gui.Enabled and self.view == "Home" then
 			self:_render()
 		end
