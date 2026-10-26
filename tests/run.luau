@@ -2712,6 +2712,286 @@ test("endless: catalogue starts can't claim to be Endless boards", function()
 	eq(GameConfig.HINTS.Endless, 0, "no hints in a score run")
 end)
 
+-- Shop -------------------------------------------------------------------------------
+
+local ShopCatalog = require(Shared.ShopCatalog)
+local GamePassConfig = require(Shared.GamePassConfig)
+local Entitlements = require(Shared.Entitlements)
+
+local function richProfile(coins: number): any
+	local profile = Progression.newProfile()
+	profile.coins = coins
+	return profile
+end
+
+local shopOpCount = 0
+local function shopOp(kind: string, slot: string, item: string, extra: any?): any
+	shopOpCount += 1
+	local op = { id = "shop:" .. shopOpCount, kind = kind, slot = slot, item = item }
+	for k, v in pairs(extra or {}) do
+		op[k] = v
+	end
+	return op
+end
+
+test("shop: every item is well formed and every slot has its free default", function()
+	for _, slot in ipairs(ShopCatalog.SLOTS) do
+		local default = GameConfig.COSMETIC_SLOTS[slot]
+		local item = assert(ShopCatalog.get(slot, default), "default for " .. slot)
+		eq(item.free, true)
+	end
+	for _, item in ipairs(ShopCatalog.list) do
+		local sources = (if item.free then 1 else 0) + (if item.coins then 1 else 0) + (if item.pass then 1 else 0)
+		eq(sources, 1, item.id .. " has exactly one source")
+		if item.coins then
+			assert(item.coins > 0 and item.coins == math.floor(item.coins), item.id .. " price")
+		end
+		if item.pass then
+			assert(GamePassConfig.PASSES[item.pass], item.id .. " names a real pass key")
+		end
+		assert(table.find(ShopCatalog.SLOTS, item.slot), item.id .. " slot")
+	end
+	-- Each pass includes what it promises.
+	eq(#ShopCatalog.forPass("RoyalBoards"), 4)
+	eq(#ShopCatalog.forPass("LegendarySkins"), 5, "3 skins and 2 effects")
+	eq(#ShopCatalog.forPass("RoyalVIP"), 1, "the VIP board")
+	eq(ShopCatalog.get("board", 42 :: any), nil)
+	eq(ShopCatalog.get("nope", "classic"), nil)
+end)
+
+test("shop: passes stay unconfigured until real IDs are set", function()
+	for _, key in ipairs(GamePassConfig.ORDER) do
+		eq(GamePassConfig.PASSES[key].id, nil, key .. " has no invented ID")
+		eq(GamePassConfig.isConfigured(key), false)
+	end
+	eq(GamePassConfig.keyForId(0), nil)
+	eq(GamePassConfig.keyForId(123), nil)
+	eq(GamePassConfig.keyForId("123"), nil)
+end)
+
+test("shop: buying with coins charges once and needs enough coins", function()
+	local profile = richProfile(300)
+	eq(Progression.buyBlock(profile, "board", "emerald"), "not_enough_coins")
+	eq(Progression.buyBlock(profile, "board", "royal_purple"), "not_for_coins", "pass items can't be bought with coins")
+	eq(Progression.buyBlock(profile, "board", "classic"), "not_for_coins")
+	eq(Progression.buyBlock(profile, "board", "bogus"), "unknown_item")
+	eq(Progression.buyBlock(profile, "board", nil), "unknown_item")
+	eq(Progression.buyBlock(profile, "board", "marble"), nil)
+	Progression.apply(profile, shopOp("buy", "board", "marble"))
+	eq(profile.coins, 50)
+	eq(profile.cosmetics.owned["board:marble"], true)
+	eq(Progression.buyBlock(profile, "board", "marble"), "owned")
+	-- The same purchase again (a second op, e.g. a double click that slipped
+	-- through) charges nothing: it's re-checked when applied.
+	Progression.apply(profile, shopOp("buy", "board", "marble"))
+	eq(profile.coins, 50)
+	-- Not enough coins at apply time: nothing happens, never negative.
+	Progression.apply(profile, shopOp("buy", "effect", "verdant"))
+	eq(profile.coins, 50)
+	eq(profile.cosmetics.owned["effect:verdant"], nil)
+end)
+
+test("shop: a purchase applied twice to the store charges once", function()
+	local profile = richProfile(1000)
+	local op = shopOp("buy", "pieces", "ruby")
+	Progression.apply(profile, op)
+	Progression.apply(profile, op) -- same op id: the store's retry
+	eq(profile.coins, 500)
+	-- Two servers applying different ops for the same item: still one charge.
+	local stored = richProfile(1000)
+	Progression.apply(stored, shopOp("buy", "pieces", "ruby"))
+	Progression.apply(stored, shopOp("buy", "pieces", "ruby"))
+	eq(stored.coins, 500)
+end)
+
+test("shop: equipping needs the item, and pass items need a verified pass", function()
+	local profile = richProfile(1000)
+	eq(Progression.equipBlock(profile, "board", "marble"), "not_owned")
+	eq(Progression.equipBlock(profile, "board", "golden"), "needs_pass")
+	eq(Progression.equipBlock(profile, "board", "golden", { RoyalBoards = false }), "needs_pass")
+	eq(Progression.equipBlock(profile, "board", "golden", { LegendarySkins = true }), "needs_pass", "the wrong pass")
+	eq(Progression.equipBlock(profile, "board", "golden", { RoyalBoards = true }), nil)
+	eq(Progression.equipBlock(profile, "board", "classic"), nil, "defaults are always allowed")
+	eq(Progression.equipBlock(profile, "pieces", "marble"), "unknown_item", "a board id in the pieces slot")
+	-- A forged equip op (no verified pass, not owned) changes nothing.
+	Progression.apply(profile, shopOp("equip", "board", "golden"))
+	eq(profile.cosmetics.equipped.board, "classic")
+	Progression.apply(profile, shopOp("equip", "board", "marble"))
+	eq(profile.cosmetics.equipped.board, "classic")
+	-- Owned and verified ones go on.
+	Progression.apply(profile, shopOp("buy", "board", "marble"))
+	Progression.apply(profile, shopOp("equip", "board", "marble"))
+	eq(profile.cosmetics.equipped.board, "marble")
+	Progression.apply(profile, shopOp("equip", "board", "golden", { passVerified = true }))
+	eq(profile.cosmetics.equipped.board, "golden")
+	-- Unequipping is equipping the default.
+	Progression.apply(profile, shopOp("equip", "board", "classic"))
+	eq(profile.cosmetics.equipped.board, "classic")
+end)
+
+test("shop: pass items only show while the pass is verified, and survive a save", function()
+	local profile = richProfile(0)
+	Progression.apply(profile, shopOp("equip", "pieces", "crystal", { passVerified = true }))
+	eq(profile.cosmetics.equipped.pieces, "crystal")
+	eq(Progression.effectiveCosmetics(profile, { LegendarySkins = true }).pieces, "crystal")
+	eq(Progression.effectiveCosmetics(profile, {}).pieces, "classic", "not verified this session: default shown")
+	eq(Progression.effectiveCosmetics(profile, nil).pieces, "classic")
+	-- The choice is kept through a save so it comes back once the pass is checked.
+	local loaded = Progression.normalize(profile)
+	eq(loaded.cosmetics.equipped.pieces, "crystal")
+	-- Junk in a stored profile is dropped, and owned items are kept.
+	local junk = Progression.normalize({
+		coins = 10,
+		cosmetics = {
+			owned = { ["board:marble"] = true, [5] = true, bad = "yes" },
+			equipped = { board = "marble", pieces = "made_up", effect = 7 },
+		},
+	})
+	eq(junk.cosmetics.owned["board:marble"], true)
+	eq(junk.cosmetics.owned.bad, nil)
+	eq(junk.cosmetics.equipped.board, "marble")
+	eq(junk.cosmetics.equipped.pieces, "classic")
+	eq(junk.cosmetics.equipped.effect, "none")
+	eq(junk.coins, 10, "coins untouched")
+	-- An equipped coin item that isn't owned falls back to the default.
+	eq(Progression.normalize({ cosmetics = { equipped = { board = "emerald" } } }).cosmetics.equipped.board, "classic")
+end)
+
+test("shop: old profiles load unchanged", function()
+	-- A profile saved before the Shop existed.
+	local old = Progression.newProfile()
+	old.coins = 77
+	old.xp = 340
+	local before = Progression.normalize(old)
+	eq(before.coins, 77)
+	eq(before.xp, 340)
+	eq(before.cosmetics.equipped.board, "classic")
+	eq(before.cosmetics.equipped.pieces, "classic")
+	eq(before.cosmetics.equipped.effect, "none")
+	local summary = Progression.summary(before, 1)
+	eq(summary.coins, 77)
+	eq(next(summary.owned), nil)
+end)
+
+-- A fake config with one configured pass, for the entitlement tests.
+local function fakePasses(): any
+	return {
+		PASSES = {
+			RoyalVIP = { key = "RoyalVIP", id = 111 },
+			RoyalBoards = { key = "RoyalBoards", id = nil },
+		},
+		ORDER = { "RoyalVIP", "RoyalBoards" },
+		isConfigured = function(key: string): boolean
+			return key == "RoyalVIP"
+		end,
+		keyForId = function(id: any): string?
+			return if id == 111 then "RoyalVIP" else nil
+		end,
+	}
+end
+
+local function makeEntitlements(answers: { any }): (any, { any })
+	local calls = {}
+	local env = { waits = 0 }
+	local ent = Entitlements.new({
+		owns = function(userId: number, passId: number): boolean
+			table.insert(calls, { userId = userId, passId = passId })
+			local answer = table.remove(answers, 1)
+			if answer == "error" then
+				error("MarketplaceService unavailable (fake)")
+			end
+			return answer == true
+		end,
+		wait = function()
+			env.waits += 1
+		end,
+		config = fakePasses(),
+		log = function() end,
+		purchaseRetries = { 0, 1, 1 },
+	})
+	return ent, calls
+end
+
+test("shop: owned passes are found on join; unconfigured ones are never checked", function()
+	local ent, calls = makeEntitlements({ true })
+	ent:join(5)
+	eq(ent:refresh(5), true)
+	eq(ent:has(5, "RoyalVIP"), true)
+	eq(ent:has(5, "RoyalBoards"), false)
+	eq(#calls, 1, "only the configured pass was checked")
+	eq(calls[1].passId, 111)
+	eq(ent:refresh(5), false, "already known: no new check needed")
+	eq(#calls, 1)
+	local copy = ent:passes(5)
+	copy.RoyalBoards = true
+	eq(ent:has(5, "RoyalBoards"), false, "passes() is a copy")
+end)
+
+test("shop: failed ownership checks grant nothing and don't crash", function()
+	local ent = makeEntitlements({ "error", false })
+	ent:join(6)
+	eq(ent:refresh(6), false)
+	eq(ent:has(6, "RoyalVIP"), false)
+	eq(ent:refresh(6), false, "a plain 'no' grants nothing")
+	eq(ent:has(6, "RoyalVIP"), false)
+end)
+
+test("shop: a purchase is granted only when Roblox confirms it", function()
+	-- Cancelled: no check at all, nothing granted.
+	local ent, calls = makeEntitlements({})
+	ent:join(7)
+	eq(ent:purchaseFinished(7, 111, false), nil)
+	eq(#calls, 0)
+	eq(ent:has(7, "RoyalVIP"), false)
+	-- "Purchased" but Roblox keeps saying no (or erroring): nothing granted.
+	local ent2 = makeEntitlements({ false, "error", false })
+	ent2:join(7)
+	eq(ent2:purchaseFinished(7, 111, true), nil)
+	eq(ent2:has(7, "RoyalVIP"), false)
+	-- Confirmed on the second try.
+	local ent3 = makeEntitlements({ false, true })
+	ent3:join(7)
+	eq(ent3:purchaseFinished(7, 111, true), "RoyalVIP")
+	eq(ent3:has(7, "RoyalVIP"), true)
+	eq(ent3:purchaseFinished(7, 111, true), nil, "no second grant")
+	-- Unknown or unconfigured pass ids are ignored.
+	local ent4, calls4 = makeEntitlements({ true })
+	ent4:join(7)
+	eq(ent4:purchaseFinished(7, 999, true), nil)
+	eq(ent4:purchaseFinished(7, "111" :: any, true), nil)
+	eq(#calls4, 0)
+	-- A player who left before the check finished gets nothing stored.
+	local ent5 = makeEntitlements({ true })
+	ent5:forget(8)
+	eq(ent5:purchaseFinished(8, 111, true), nil)
+	eq(ent5:has(8, "RoyalVIP"), false)
+end)
+
+test("shop: cosmetics never touch duel puzzles or rules", function()
+	-- Duel snapshots are built from the match alone; equipping changes nothing in them.
+	local env = makeDuels()
+	matched(env, 1, 2)
+	local before = env.last(1)
+	local profile = env.profileFor(1)
+	profile.coins = 1000
+	Progression.apply(profile, shopOp("buy", "board", "emerald"))
+	Progression.apply(profile, shopOp("equip", "board", "emerald"))
+	env.start()
+	local after = env.last(1)
+	eq(table.concat(after.layout, "/"), table.concat(before.layout, "/"), "same board for both players")
+	eq(env.last(2).puzzleId, after.puzzleId)
+	eq(GameConfig.HINTS.Duel, 0)
+	-- No catalogue item carries any gameplay field.
+	for _, item in ipairs(ShopCatalog.list) do
+		for key in pairs(item) do
+			assert(
+				table.find({ "id", "slot", "name", "description", "coins", "pass", "free", "featured", "light", "dark", "tint", "glow", "sparks", "icon" }, key),
+				item.id .. " has an unexpected field " .. key
+			)
+		end
+	end
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then
 	error("test failures")

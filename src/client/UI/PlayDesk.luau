@@ -40,6 +40,7 @@ local NAV_ITEMS: { MenuSidebar.Item } = {
 	{ id = "Endless", icon = "🌀", label = "Endless" },
 	{ id = "Duel", icon = "⚔️", label = "Puzzle Duel" },
 	{ id = "Practice", icon = "🧩", label = "Practice" },
+	{ id = "Shop", icon = "🛍️", label = "Shop" },
 	{ id = "Stats", icon = "📊", label = "Statistics" },
 	{ id = "Tutorial", icon = "🎓", label = "How to Play" },
 	{ id = "Settings", icon = "⚙️", label = "Settings", footer = true },
@@ -249,14 +250,23 @@ function PlayDesk._buildTopBar(self: any, root: Frame)
 		Size = UDim2.fromOffset(54, 54),
 		BackgroundColor3 = Theme.PanelRaised,
 		Parent = top,
-	}, { corner(12), stroke(Theme.Stroke, 1.5, 0.1) })
+	}, { corner(12) })
+	self.avatarStroke = stroke(Theme.Stroke, 1.5, 0.1)
+	self.avatarStroke.Parent = self.avatar
 	local player = Players.LocalPlayer
+	-- Shown as rich text (for the VIP title), so escape it.
+	self.displayName = string.gsub(if player.DisplayName ~= "" then player.DisplayName else player.Name, "[&<>]", {
+		["&"] = "&amp;",
+		["<"] = "&lt;",
+		[">"] = "&gt;",
+	})
 	self.nameLabel = text({
 		Name = "PlayerName",
 		Position = UDim2.fromOffset(70, 0),
 		Size = UDim2.fromOffset(220, 58),
 		FontFace = Theme.FontHeavy,
-		Text = if player.DisplayName ~= "" then player.DisplayName else player.Name,
+		Text = self.displayName,
+		RichText = true,
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = top,
@@ -966,6 +976,13 @@ function PlayDesk.render(self: any, snap: any, saveStatus: string?)
 		self.coinAmount.Text = HomeDashboard.commas(progress.coins)
 	end
 	self.saveNote.Visible = (saveStatus or snap.saveStatus) == "offline"
+	-- Royal VIP (verified by the server): a gold frame and a VIP title.
+	local vip = snap.shop ~= nil and snap.shop.passes ~= nil and snap.shop.passes.RoyalVIP == true
+	self.avatarStroke.Color = if vip then Theme.Gold else Theme.Stroke
+	self.avatarStroke.Thickness = if vip then 3 else 1.5
+	self.nameLabel.Text = if vip
+		then self.displayName .. '  <font color="#F6C648">👑 VIP</font>'
+		else self.displayName
 
 	local modeName = if snap.mode == DUEL_MODE then "PUZZLE DUEL" else string.upper(snap.mode or PLAY_MODES.Journey)
 	self.modeLabel.Text = "ECHO CHESS  ·  " .. modeName

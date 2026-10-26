@@ -26,6 +26,7 @@ local TutorialFlow = require(Shared:WaitForChild("TutorialFlow"))
 local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
 local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local ConfirmDialog = require(script.Parent:WaitForChild("ConfirmDialog"))
+local Cosmetics = require(script.Parent:WaitForChild("Cosmetics"))
 local Decor = require(script.Parent:WaitForChild("Decor"))
 local PieceArt = require(script.Parent:WaitForChild("PieceArt"))
 local PlayDesk = require(script.Parent:WaitForChild("PlayDesk"))
@@ -46,6 +47,8 @@ export type Handlers = {
 	duelCancel: () -> (),
 	duelLeave: () -> (),
 	duelExit: () -> (),
+	shopBuy: (slot: string, item: string) -> (),
+	shopEquip: (slot: string, item: string) -> (),
 }
 
 local PLAY_MODES = GameConfig.PLAY_MODES
@@ -80,6 +83,15 @@ local ERROR_MESSAGES = {
 	no_undo = "No undo in Endless. A dead end costs a life instead.",
 	run_over = "This run is over. Tap New run to go again.",
 	not_cleared = "Clear this board first.",
+	not_enough_coins = "You need more coins for that.",
+	owned = "You already own that.",
+	not_owned = "You don't own that yet.",
+	needs_pass = "That item comes with a gamepass.",
+	unknown_item = "That item isn't available.",
+	not_for_coins = "That item can't be bought with coins.",
+	not_loaded = "Your progress is still loading. Try again in a moment.",
+	purchase_cancelled = "Purchase cancelled. Nothing was charged.",
+	purchase_unconfirmed = "Roblox hasn't confirmed that purchase yet. It will be checked again next time you join.",
 }
 
 -- Duel result lines, by the server's reason.
@@ -252,6 +264,12 @@ function PuzzleHUD.new(playerGui: Instance, handlers: Handlers)
 		end,
 		duelCancel = function()
 			self.handlers.duelCancel()
+		end,
+		shopBuy = function(slot: string, item: string)
+			self.handlers.shopBuy(slot, item)
+		end,
+		shopEquip = function(slot: string, item: string)
+			self.handlers.shopEquip(slot, item)
 		end,
 	})
 	self.menu.dragEnabled = self.dragEnabled
@@ -928,15 +946,16 @@ function PuzzleHUD._buildSquares(self: any)
 	local board = self.board
 	self.desk:setBoardSize(board.width, board.height)
 	self.aspect.AspectRatio = board.width / board.height
+	local light, dark = Cosmetics.board(self.equipped)
 	for index = 1, board.width * board.height do
 		local col, row = BoardState.toCoord(board, index)
 		local isDark = (col + row) % 2 == 0
-		local base = if isDark then Theme.SquareDark else Theme.SquareLight
+		local base = if isDark then dark else light
 		-- Walls keep their coordinates too, in light text over the hatching.
 		local coordColor = if board.blocked[index]
 			then Theme.Text
-			elseif isDark then Theme.SquareLight
-			else Theme.SquareDark
+			elseif isDark then light
+			else dark
 		local position, size = self:_squareRect(index)
 		local square = make("TextButton", {
 			Name = BoardState.squareName(board, index),
@@ -1110,9 +1129,15 @@ function PuzzleHUD.render(self: any, snap: any)
 	self.board = BoardState.fromLayout(snap.layout)
 	self.playerSquare = BoardState.findPlayer(self.board)
 
-	if newPuzzle or #self.squares ~= self.board.width * self.board.height then
+	-- The board theme is cosmetic: changing it only repaints this screen.
+	local equipped = snap.shop and snap.shop.equipped
+	local boardTheme = equipped and equipped.board or "classic"
+	if newPuzzle or #self.squares ~= self.board.width * self.board.height or boardTheme ~= self.boardTheme then
+		self.boardTheme = boardTheme
+		self.equipped = equipped
 		self:_buildSquares()
 	end
+	self.equipped = equipped
 
 	if snap.status == "playing" and (snap.event == "move" or snap.event == "undo") then
 		self.selected = self.playerSquare
@@ -1260,12 +1285,18 @@ function PuzzleHUD._renderPieces(self: any, snap: any)
 	self.coach:pointAt(nil) -- the pointer may sit on a piece about to be cleared
 	self.pieceLayer:ClearAllChildren()
 	self.playerFrame = nil
+	local tint, glow = Cosmetics.pieces(self.equipped)
 	for index, piece in pairs(self.board.pieces) do
 		local frame = self:_pieceFrame(index, piece.kind, piece.color)
 		if piece.color == "white" then
 			frame.ZIndex = 2
 			self.playerFrame = frame
-			Decor.aura(frame)
+			-- Chess skins only tint the player's own piece, so targets always look the same.
+			local art = frame:FindFirstChild("Piece")
+			if art and art:IsA("ImageLabel") then
+				art.ImageColor3 = tint
+			end
+			Decor.aura(frame, glow)
 		end
 	end
 
@@ -1279,7 +1310,11 @@ function PuzzleHUD._renderPieces(self: any, snap: any)
 		end
 		if move.capturedKind then
 			local position, size = self:_squareRect(move.to)
-			Decor.ripple(self.pieceLayer, position, size, Theme.Gold)
+			local rippleColor, sparks = Cosmetics.effect(self.equipped)
+			Decor.ripple(self.pieceLayer, position, size, rippleColor)
+			if sparks then
+				Cosmetics.sparks(self.pieceLayer, position, size, rippleColor)
+			end
 			local ghost = self:_pieceFrame(move.to, move.capturedKind, "black")
 			ghost.ZIndex = 1
 			local ghostScale = ghost:FindFirstChildOfClass("UIScale") :: UIScale
@@ -1584,6 +1619,7 @@ function PuzzleHUD._renderDuelResult(self: any, snap: any, previous: any)
 		end)
 		if outcome == "win" then
 			Anim.burst(r.dim, Theme.Gold, 18)
+			self:_vipCrowns(snap)
 			Sound.play("win")
 			Sound.haptic("heavy")
 		else
@@ -1680,12 +1716,22 @@ function PuzzleHUD._renderEndlessResult(self: any, snap: any, previous: any)
 		self:_popResult()
 		if state == "won" then
 			Anim.burst(r.dim, Theme.Gold, 14)
+			self:_vipCrowns(snap)
 			Sound.play("win")
 			Sound.haptic("heavy")
 		else
 			Sound.play("fail")
 			Sound.haptic("medium")
 		end
+	end
+end
+
+-- Royal VIP's victory animation: crowns over the win card. Only on this
+-- player's screen, and only for a pass the server has verified.
+function PuzzleHUD._vipCrowns(self: any, snap: any)
+	local passes = snap.shop and snap.shop.passes
+	if passes and passes.RoyalVIP then
+		Cosmetics.crowns(self.result.dim)
 	end
 end
 
@@ -1774,6 +1820,7 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 		if snap.status == "won" then
 			-- Sparks go on the overlay: the card's list layout would place them as rows.
 			Anim.burst(r.dim, Theme.Gold, 18)
+			self:_vipCrowns(snap)
 			Sound.play("win")
 			Sound.haptic("heavy")
 			if unlocked then

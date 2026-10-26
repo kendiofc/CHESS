@@ -11,6 +11,11 @@
 -- Progress is kept by ProfileStore (DataStore). A win is re-checked by
 -- replaying the server's own move log before it is recorded.
 --
+-- The Shop uses them too: coin purchases and equips are Progression ops the
+-- server checks (price, coins, ownership), and gamepasses are only ever
+-- believed when Roblox confirms them (Entitlements). Cosmetics change nothing
+-- but how a player's own screen looks.
+--
 -- Puzzle Duels (DuelManager) use the same remotes and rate limit. While a
 -- player is in a duel, their move / undo / restart go to the duel board, and
 -- single-player actions that would change what they see are refused.
@@ -19,6 +24,7 @@
 
 local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local MemoryStoreService = game:GetService("MemoryStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +35,8 @@ local TeleportService = game:GetService("TeleportService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BoardState = require(Shared:WaitForChild("BoardState"))
 local EndlessRun = require(Shared:WaitForChild("EndlessRun"))
+local GamePassConfig = require(Shared:WaitForChild("GamePassConfig"))
+local ShopCatalog = require(Shared:WaitForChild("ShopCatalog"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local Progression = require(Shared:WaitForChild("Progression"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
@@ -39,6 +47,7 @@ local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 local WeeklyChallenge = require(Shared:WaitForChild("WeeklyChallenge"))
 local DuelManager = require(script.Parent:WaitForChild("DuelManager"))
 local DuelMatchmaker = require(script.Parent:WaitForChild("DuelMatchmaker"))
+local Entitlements = require(script.Parent:WaitForChild("Entitlements"))
 local ProfileStore = require(script.Parent:WaitForChild("ProfileStore"))
 
 local ACTIONS = GameConfig.ACTIONS
@@ -68,6 +77,7 @@ local states: { [Player]: PlayerState } = {}
 local profiles: any
 local duels: any
 local matchmaker: any -- nil when cross-server matching is off
+local entitlements: any
 local synced: { [number]: boolean } = {} -- players whose client has loaded
 local stateRemote: RemoteEvent
 local actionRemote: RemoteEvent
@@ -159,6 +169,16 @@ local function requestSave(player: Player)
 	end)
 end
 
+-- What the Shop and the cosmetics need: the passes the server has verified,
+-- and what each slot shows (pass items only while their pass is verified).
+local function shopView(player: Player): { [string]: any }
+	local passes = entitlements:passes(player.UserId)
+	return {
+		passes = passes,
+		equipped = Progression.effectiveCosmetics(profileOf(player), passes),
+	}
+end
+
 local function snapshot(player: Player, state: PlayerState, event: string, err: string?)
 	local session = state.session
 	local puzzle = session.puzzle
@@ -210,6 +230,7 @@ local function snapshot(player: Player, state: PlayerState, event: string, err: 
 		saveStatus = profiles:status(player.UserId) or "loading",
 		duelsAllServers = matchmaker ~= nil,
 		endless = if state.endless then state.endless:view(profileOf(player).endless.best) else nil,
+		shop = shopView(player),
 	}
 end
 
@@ -224,6 +245,7 @@ local function sendDuel(player: Player, snap: { [string]: any })
 	snap.nextDailyIn = (today() + 1) * 86400 - os.time()
 	snap.nextWeeklyIn = WeeklyChallenge.secondsLeft(os.time())
 	snap.duelsAllServers = matchmaker ~= nil
+	snap.shop = shopView(player)
 	stateRemote:FireClient(player, snap)
 end
 
@@ -288,6 +310,42 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 	end
 	local data = if type(payload) == "table" then payload :: { [any]: any } else {}
 	local userId = player.UserId
+
+	-- Shop ------------------------------------------------------------------
+	-- Allowed on any screen (cosmetics never touch a puzzle or a duel). Only
+	-- the slot and item id are read; price, coins, ownership and passes are
+	-- the server's.
+	if action == ACTIONS.ShopBuy or action == ACTIONS.ShopEquip then
+		if not profiles:get(userId) then
+			reply(player, state, "rejected", "not_loaded")
+			return
+		end
+		local profile = profileOf(player)
+		local slot, item = data.slot, data.item
+		if action == ACTIONS.ShopBuy then
+			local block = Progression.buyBlock(profile, slot, item)
+			if block then
+				reply(player, state, "rejected", block)
+				return
+			end
+			record(player, { kind = "buy", slot = slot, item = item })
+			-- A new purchase is put on straight away.
+			record(player, { kind = "equip", slot = slot, item = item })
+			requestSave(player)
+			reply(player, state, "shop_bought")
+		else
+			local block = Progression.equipBlock(profile, slot, item, entitlements:passes(userId))
+			if block then
+				reply(player, state, "rejected", block)
+				return
+			end
+			local entry = ShopCatalog.get(slot, item)
+			record(player, { kind = "equip", slot = slot, item = item, passVerified = entry ~= nil and entry.pass ~= nil })
+			requestSave(player)
+			reply(player, state, "shop_equipped")
+		end
+		return
+	end
 
 	-- Puzzle Duel ----------------------------------------------------------
 	if action == ACTIONS.DuelJoin then
@@ -732,6 +790,65 @@ local function createMatchmaker()
 	end
 end
 
+local function createShop()
+	entitlements = Entitlements.new({
+		owns = function(userId: number, passId: number): boolean
+			return MarketplaceService:UserOwnsGamePassAsync(userId, passId)
+		end,
+		wait = function(seconds: number)
+			task.wait(seconds)
+		end,
+		config = GamePassConfig,
+		log = function(message: string)
+			warn("[PuzzleService] " .. message)
+		end,
+	})
+	-- Roblox fires this on the server too; one connection for the whole game.
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player: Player, passId: number, purchased: boolean)
+		if not GamePassConfig.keyForId(passId) then
+			return -- not one of ours (or not configured)
+		end
+		local granted = entitlements:purchaseFinished(player.UserId, passId, purchased)
+		local state = states[player]
+		if state and player.Parent then
+			if granted then
+				reply(player, state, "shop_pass")
+			elseif purchased then
+				-- Roblox didn't confirm it yet; nothing is granted. It's checked
+				-- again the next time they join.
+				reply(player, state, "rejected", "purchase_unconfirmed")
+			else
+				reply(player, state, "rejected", "purchase_cancelled")
+			end
+		end
+	end)
+end
+
+-- Studio only: pretend the Studio player owns a pass, to check how owned
+-- items look and equip without spending Robux. Invoke("grant", key) or
+-- ("revoke", key) from the command bar. It doesn't exist in a live game.
+local function createStudioShopHook()
+	if not RunService:IsStudio() then
+		return
+	end
+	local hook = Instance.new("BindableFunction")
+	hook.Name = "EchoChessShopTestHook"
+	hook.OnInvoke = function(command: string, key: string): any
+		if not GamePassConfig.PASSES[key] then
+			return false, "unknown pass"
+		end
+		for _, player in ipairs(Players:GetPlayers()) do
+			entitlements:override(player.UserId, key, command == "grant")
+			local state = states[player]
+			if state then
+				reply(player, state, "sync")
+			end
+		end
+		return true
+	end
+	hook.Parent = ServerStorage
+end
+
 -- Studio only: a server-side BindableFunction that adds a test opponent (user
 -- id -1) driven from Studio's command bar, so one person can play a whole duel
 -- in Studio. It doesn't exist in a live game, and clients can't call it.
@@ -777,10 +894,22 @@ function PuzzleService.Start()
 	createProfiles()
 	createDuels()
 	createMatchmaker()
+	createShop()
 	createStudioDuelHook()
+	createStudioShopHook()
 	actionRemote.OnServerEvent:Connect(onAction)
 
 	local function onPlayerAdded(player: Player)
+		entitlements:join(player.UserId)
+		-- Passes they already own are checked on join, without holding anything up.
+		task.spawn(function()
+			if entitlements:refresh(player.UserId) then
+				local state = states[player]
+				if state and player.Parent then
+					reply(player, state, "sync")
+				end
+			end
+		end)
 		startPuzzle(player, PuzzleDefinitions.list[1], PLAY_MODES.Journey, today())
 		profiles:load(player.UserId)
 		local state = states[player]
@@ -805,6 +934,7 @@ function PuzzleService.Start()
 		-- and the opponent gets their result straight away.
 		duels:disconnect(player.UserId)
 		synced[player.UserId] = nil
+		entitlements:forget(player.UserId)
 		states[player] = nil
 		profiles:release(player.UserId)
 	end)

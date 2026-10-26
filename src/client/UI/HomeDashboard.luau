@@ -40,6 +40,7 @@ export type Data = {
 	saveStatus: string?,
 	playerName: string,
 	avatar: string?,
+	vip: boolean?, -- Royal VIP, verified by the server: a gold frame and title
 	queued: boolean,
 	serverPlayers: number,
 	allServers: boolean?, -- duels also search other servers
@@ -349,7 +350,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 		Image = data.avatar or "",
 		ScaleType = Enum.ScaleType.Crop,
 		Parent = page,
-	}, { corner(14), stroke(Theme.Stroke, 1.5) })
+	}, { corner(14), if data.vip then stroke(Theme.Gold, 3) else stroke(Theme.Stroke, 1.5) })
 	if not data.avatar and Theme.PieceSheet ~= "" then
 		piece("P", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -366,8 +367,9 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 		Name = "Welcome",
 		Position = UDim2.fromOffset(nameX, if compact then 2 else 6),
 		Size = UDim2.fromOffset(nameW, 18),
-		Text = "Welcome back,",
-		TextColor3 = Theme.TextMuted,
+		Text = if data.vip then "👑 ROYAL VIP" else "Welcome back,",
+		TextColor3 = if data.vip then Theme.Gold else Theme.TextMuted,
+		FontFace = if data.vip then Theme.FontHeavy else Theme.Font,
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = page,

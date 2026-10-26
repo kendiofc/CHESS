@@ -24,6 +24,7 @@ SERVER_PURE = [
     ROOT / "src" / "server" / "Services" / "ProfileStore.luau",
     ROOT / "src" / "server" / "Services" / "DuelManager.luau",
     ROOT / "src" / "server" / "Services" / "DuelMatchmaker.luau",
+    ROOT / "src" / "server" / "Services" / "Entitlements.luau",
 ]
 TESTS = ROOT / "tests" / "run.luau"
 

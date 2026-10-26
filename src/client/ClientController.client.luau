@@ -73,6 +73,13 @@ local hud = PuzzleHUD.new(playerGui, {
 	duelExit = function()
 		actionRemote:FireServer(ACTIONS.DuelExit)
 	end,
+	-- The server checks the item, its price and the player's coins or passes.
+	shopBuy = function(slot: string, item: string)
+		actionRemote:FireServer(ACTIONS.ShopBuy, { slot = slot, item = item })
+	end,
+	shopEquip = function(slot: string, item: string)
+		actionRemote:FireServer(ACTIONS.ShopEquip, { slot = slot, item = item })
+	end,
 })
 
 stateRemote.OnClientEvent:Connect(function(snapshot)

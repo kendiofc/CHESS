@@ -19,12 +19,15 @@
 --   * Weekly Challenge milestones pay under "weekly:<week>:<n>", once ever;
 --   * a duel is counted once per match id (profile.duel.recent remembers the
 --     last ones, on top of the op id), whichever server applies it;
+--   * a Shop purchase is checked again against the stored coins and owned
+--     items, so a retried or doubled op never charges twice or goes negative;
 --   * an Endless board is one op per run and board ("endless:<run>:<n>"), so a
 --     retried save counts it once; the best run only ever goes up.
 
 local Achievements = require(script.Parent.Achievements)
 local GameConfig = require(script.Parent.GameConfig)
 local PuzzleDefinitions = require(script.Parent.PuzzleDefinitions)
+local ShopCatalog = require(script.Parent.ShopCatalog)
 local WeeklyChallenge = require(script.Parent.WeeklyChallenge)
 
 local Progression = {}
@@ -93,6 +96,9 @@ export type Op = {
 	id: string,
 	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings" | "tutorial" | "duel" | "endless"
 	board: number?, -- endless ops: the board number cleared in the run
+	slot: string?, -- buy / equip ops: the cosmetic slot
+	item: string?, -- buy / equip ops: the item id in that slot
+	passVerified: boolean?, -- equip ops: the server checked the item's gamepass
 	puzzleId: string?,
 	mode: string?,
 	moves: number?,
@@ -283,8 +289,18 @@ function Progression.normalize(data: any): Profile
 		if type(data.cosmetics.equipped) == "table" then
 			for slot, default in pairs(GameConfig.COSMETIC_SLOTS) do
 				local id = data.cosmetics.equipped[slot]
-				-- Only defaults or owned items can be equipped.
-				if type(id) == "string" and (id == default or profile.cosmetics.owned[id]) then
+				-- Only defaults, owned items, or (kept as a choice) pass items can be
+				-- equipped. A pass item is only shown while the server sees the pass:
+				-- see Progression.effectiveCosmetics.
+				local item = ShopCatalog.get(slot, id)
+				if
+					type(id) == "string"
+					and (
+						id == default
+						or profile.cosmetics.owned[id]
+						or (item ~= nil and (item.pass ~= nil or profile.cosmetics.owned[ShopCatalog.ownKey(item)]))
+					)
+				then
 					profile.cosmetics.equipped[slot] = id
 				end
 			end
@@ -737,6 +753,69 @@ local function applyDuel(profile: Profile, op: Op): Reward?
 	return { xp = amount.xp, coins = amount.coins, reason = reason, items = { { xp = amount.xp, coins = amount.coins, reason = reason } } }
 end
 
+-- Shop -------------------------------------------------------------------------------
+
+-- Whether the player can buy this item with coins now: nil, or why not
+-- ("unknown_item", "not_for_coins", "owned", "not_enough_coins").
+function Progression.buyBlock(profile: Profile, slot: any, id: any): string?
+	local item = ShopCatalog.get(slot, id)
+	if not item then
+		return "unknown_item"
+	elseif not item.coins then
+		return "not_for_coins"
+	elseif profile.cosmetics.owned[ShopCatalog.ownKey(item)] then
+		return "owned"
+	elseif profile.coins < item.coins then
+		return "not_enough_coins"
+	end
+	return nil
+end
+
+-- Whether the player can equip this item now: nil, or why not. `passes` are
+-- the gamepasses the server has verified for them this session.
+function Progression.equipBlock(profile: Profile, slot: any, id: any, passes: { [string]: boolean }?): string?
+	local item = ShopCatalog.get(slot, id)
+	if not item then
+		return "unknown_item"
+	elseif not ShopCatalog.usable(item, profile.cosmetics.owned, passes) then
+		return if item.pass then "needs_pass" else "not_owned"
+	end
+	return nil
+end
+
+-- What each slot shows: the equipped item if the player may still use it,
+-- otherwise the free default (e.g. a pass item while the pass can't be checked).
+function Progression.effectiveCosmetics(profile: Profile, passes: { [string]: boolean }?): { [string]: string }
+	local out = {}
+	for slot, default in pairs(GameConfig.COSMETIC_SLOTS) do
+		local item = ShopCatalog.get(slot, profile.cosmetics.equipped[slot])
+		out[slot] = if item and ShopCatalog.usable(item, profile.cosmetics.owned, passes) then item.id else default
+	end
+	return out
+end
+
+local function applyBuy(profile: Profile, op: Op)
+	if Progression.buyBlock(profile, op.slot, op.item) then
+		return -- checked again here: a doubled or late op never charges twice
+	end
+	local item = ShopCatalog.get(op.slot, op.item) :: ShopCatalog.Item
+	profile.coins -= item.coins :: number
+	profile.cosmetics.owned[ShopCatalog.ownKey(item)] = true
+end
+
+local function applyEquip(profile: Profile, op: Op)
+	local item = ShopCatalog.get(op.slot, op.item)
+	if not item then
+		return
+	end
+	-- A pass item counts as usable only if the server verified the pass when it
+	-- made this op; the op never comes from a client.
+	local passes = if item.pass and op.passVerified == true then { [item.pass] = true } else nil
+	if ShopCatalog.usable(item, profile.cosmetics.owned, passes) then
+		profile.cosmetics.equipped[item.slot] = item.id
+	end
+end
+
 -- Applies one op. Returns whether it was new, and the reward it paid (if any).
 function Progression.apply(profile: Profile, op: Op): (boolean, Reward?)
 	if table.find(profile.applied, op.id) then
@@ -749,6 +828,10 @@ function Progression.apply(profile: Profile, op: Op): (boolean, Reward?)
 		return true, applyDuel(profile, op)
 	elseif op.kind == "endless" then
 		return true, applyEndless(profile, op)
+	elseif op.kind == "buy" then
+		applyBuy(profile, op)
+	elseif op.kind == "equip" then
+		applyEquip(profile, op)
 	elseif op.kind == "fail" then
 		profile.stats.fails += 1
 	elseif op.kind == "restart" then
@@ -817,6 +900,7 @@ function Progression.summary(profile: Profile, day: number): { [string]: any }
 		tutorialDone = profile.tutorial.done,
 		needsTutorial = Progression.needsTutorial(profile),
 		equipped = table.clone(profile.cosmetics.equipped),
+		owned = table.clone(profile.cosmetics.owned),
 		unlockedIndex = Progression.unlockedIndex(profile),
 		unlockRequirement = GameConfig.UNLOCK_REQUIREMENT,
 		completed = completed,

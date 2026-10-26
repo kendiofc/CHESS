@@ -80,9 +80,9 @@ GameConfig.STAR_SLACK = {
 -- streak) and pays nothing for the missed day. Days are UTC day numbers.
 GameConfig.STREAK_SHIELD_DAYS = 7
 
--- Cosmetics are earned with coins later (board themes, piece skins, effects).
--- Nothing is for sale yet; this lists the slots and the free defaults so saved
--- profiles already have a place for them. Cosmetics never change gameplay.
+-- Cosmetic slots and their free defaults. The Shop (ShopCatalog) sells items
+-- for them with coins or includes them in gamepasses (GamePassConfig).
+-- Cosmetics never change gameplay.
 GameConfig.COSMETIC_SLOTS = {
 	board = "classic",
 	pieces = "classic",
@@ -157,6 +157,8 @@ GameConfig.ACTIONS = {
 	DuelCancel = "duel_cancel", -- leave the queue before a match starts
 	DuelLeave = "duel_leave", -- forfeit the current match
 	DuelExit = "duel_exit", -- close the result screen and go back to puzzles
+	ShopBuy = "shop_buy", -- { slot, item }: buy a coin item (the server sets the price)
+	ShopEquip = "shop_equip", -- { slot, item }: equip an item the server says you may use
 }
 
 return GameConfig

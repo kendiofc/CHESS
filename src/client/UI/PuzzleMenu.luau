@@ -7,6 +7,7 @@
 --             unlocks the next difficulty
 --   Practice  every puzzle, any difficulty, free hints, no rewards
 --   Daily     today's puzzle, its one free hint, the streak and its shield
+--   Shop      cosmetics for coins or gamepasses (ShopPage)
 --   Stats     the server's numbers for this player, and achievements
 --   Settings  sound on/off, volume, haptics, drag-to-move, replay tutorial
 --
@@ -29,10 +30,11 @@ local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local Decor = require(script.Parent:WaitForChild("Decor"))
 local HomeDashboard = require(script.Parent:WaitForChild("HomeDashboard"))
 local MenuSidebar = require(script.Parent:WaitForChild("MenuSidebar"))
+local ShopPage = require(script.Parent:WaitForChild("ShopPage"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local PLAY_MODES = GameConfig.PLAY_MODES
-local VIEWS = { "Home", "Journey", "Practice", "Daily", "Weekly", "Endless", "Duel", "Stats", "Settings" }
+local VIEWS = { "Home", "Journey", "Practice", "Daily", "Weekly", "Endless", "Duel", "Shop", "Stats", "Settings" }
 
 -- Below this screen width the sidebar is a rail of icons, and opening it
 -- floats it over the page instead of pushing the page over.
@@ -47,6 +49,7 @@ local NAV_ITEMS: { MenuSidebar.Item } = {
 	{ id = "Endless", icon = "🌀", label = "Endless" },
 	{ id = "Practice", icon = "🧩", label = "Practice" },
 	{ id = "Duel", icon = "⚔️", label = "Puzzle Duel" },
+	{ id = "Shop", icon = "🛍️", label = "Shop" },
 	{ id = "Stats", icon = "📊", label = "Statistics" },
 	{ id = "Tutorial", icon = "🎓", label = "How to Play" },
 	{ id = "Settings", icon = "⚙️", label = "Settings", footer = true },
@@ -62,6 +65,8 @@ export type Handlers = {
 	tutorial: () -> (),
 	duelJoin: () -> (),
 	duelCancel: () -> (),
+	shopBuy: (slot: string, item: string) -> (),
+	shopEquip: (slot: string, item: string) -> (),
 }
 
 local function make(className: string, props: { [string]: any }?, children: { Instance }?): any
@@ -205,8 +210,9 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 	}, {
 		corner(16),
 		make("UIStroke", { Color = Theme.Stroke, Thickness = 1.5 }),
-		make("UISizeConstraint", { MaxSize = Vector2.new(600, 780) }),
 	})
+	-- The Shop's grid gets a wider panel than the lists.
+	self.panelSize = make("UISizeConstraint", { MaxSize = Vector2.new(600, 780), Parent = panel })
 	Decor.sheen(panel, 0.3)
 	self.panel = panel
 
@@ -358,6 +364,7 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 			end
 		end)
 	end
+	ShopPage.init(self)
 	self:_layout()
 	return self
 end
@@ -467,6 +474,7 @@ function PuzzleMenu.updateDuel(self: any, snap: any)
 		self.queuedAt = nil
 	end
 	if snap then
+		ShopPage.onSnapshot(self, snap)
 		self.progress = snap.progress or self.progress
 		self.duelsAllServers = snap.duelsAllServers == true
 		self.saveStatus = snap.saveStatus or self.saveStatus
@@ -477,7 +485,9 @@ function PuzzleMenu.updateDuel(self: any, snap: any)
 end
 
 function PuzzleMenu.open(self: any, view: string?)
-	self.view = if view and table.find(VIEWS, view) then view else "Home"
+	local target = if view and table.find(VIEWS, view) then view else "Home"
+	self.shopAnimate = target == "Shop" and (self.view ~= "Shop" or not self.gui.Enabled)
+	self.view = target
 	local wasOpen = self.gui.Enabled
 	self.gui.Enabled = true
 	self.list.CanvasPosition = Vector2.zero
@@ -491,6 +501,7 @@ function PuzzleMenu.open(self: any, view: string?)
 end
 
 function PuzzleMenu.show(self: any, view: string)
+	self.shopAnimate = view == "Shop" and self.view ~= "Shop"
 	self.view = view
 	self.list.CanvasPosition = Vector2.zero
 	self:_render()
@@ -519,6 +530,7 @@ function PuzzleMenu.update(self: any, snap: any)
 	self.progress = snap.progress
 	self.duelsAllServers = snap.duelsAllServers == true
 	self.saveStatus = snap.saveStatus
+	ShopPage.onSnapshot(self, snap)
 	-- The Settings view already shows the player's own changes; redrawing it
 	-- when the server confirms them would rebuild buttons mid-click.
 	local echo = snap.event == "settings" and self.view == "Settings"
@@ -979,6 +991,7 @@ function PuzzleMenu._renderHome(self: any)
 		saveStatus = self.saveStatus,
 		playerName = self.playerName or "Player",
 		avatar = self.avatar,
+		vip = self.shopState ~= nil and self.shopState.passes ~= nil and self.shopState.passes.RoyalVIP == true,
 		queued = self:isQueued(),
 		serverPlayers = #Players:GetPlayers(),
 		allServers = self.duelsAllServers == true,
@@ -1523,7 +1536,7 @@ function PuzzleMenu._renderStats(self: any)
 	end
 	text({
 		LayoutOrder = 100,
-		Text = "Coins will unlock board themes, piece skins and effects in a later update. They are cosmetic only and can't be bought.",
+		Text = "Spend coins in the Shop on board themes, chess skins and capture effects. They are cosmetic only and coins can't be bought.",
 		TextSize = 13,
 		TextColor3 = Theme.TextMuted,
 		TextWrapped = true,
@@ -1677,6 +1690,7 @@ local NOTES = {
 	Weekly = "Four puzzles, the same for everyone, new every Monday 00:00 UTC. One hint per attempt. Each reward is paid once.",
 	Endless = "Generated boards, one after another, getting harder as you go. No undo or hints. A dead end or a restart costs a life.",
 	Duel = "Opponents come from this server first, then from any server. Leaving a duel counts as a loss.",
+	Shop = "Cosmetics only. Nothing here changes puzzles, hints, timers, rewards or duels.",
 	Stats = "Your numbers, as the server has them.",
 	Settings = "",
 }
@@ -1689,6 +1703,7 @@ local TITLES = {
 	Weekly = "WEEKLY CHALLENGE",
 	Endless = "ENDLESS",
 	Duel = "PUZZLE DUEL",
+	Shop = "SHOP",
 	Stats = "STATISTICS",
 	Settings = "SETTINGS",
 }
@@ -1729,6 +1744,7 @@ function PuzzleMenu._render(self: any)
 	self:_layout(true)
 	self.home.Visible = home
 	self.panel.Visible = not home
+	self.panelSize.MaxSize = Vector2.new(if self.view == "Shop" then 760 else 600, 780)
 	if home then
 		self.countdown = nil
 		self.weeklyCountdown = nil
@@ -1781,6 +1797,8 @@ function PuzzleMenu._render(self: any)
 		self:_renderEndless()
 	elseif self.view == "Duel" then
 		self:_renderDuel()
+	elseif self.view == "Shop" then
+		ShopPage.render(self)
 	elseif self.view == "Stats" then
 		self:_renderStats()
 	elseif self.view == "Settings" then

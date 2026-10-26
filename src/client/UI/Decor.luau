@@ -201,13 +201,14 @@ end
 
 -- The player's piece: a steady golden glow with an echo ring that keeps
 -- spreading out from it. Both sit under the art (ZIndex 3) and its shadow (2).
-function Decor.aura(holder: GuiObject)
+function Decor.aura(holder: GuiObject, color: Color3?)
+	local tone = color or Theme.Gold
 	local glow = make("Frame", {
 		Name = "Aura",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromScale(0.8, 0.8),
-		BackgroundColor3 = Theme.Gold,
+		BackgroundColor3 = tone,
 		BackgroundTransparency = 0.72,
 		BorderSizePixel = 0,
 		ZIndex = 1,
@@ -233,7 +234,7 @@ function Decor.aura(holder: GuiObject)
 		Parent = holder,
 	})
 	make("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = echo })
-	local ring = make("UIStroke", { Color = Theme.Gold, Thickness = 2.5, Transparency = 0.2, Parent = echo })
+	local ring = make("UIStroke", { Color = tone, Thickness = 2.5, Transparency = 0.2, Parent = echo })
 	local info = TweenInfo.new(1.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1, false, 0.5)
 	TweenService:Create(echo, info, { Size = UDim2.fromScale(1.05, 1.05) }):Play()
 	TweenService:Create(ring, info, { Transparency = 1 }):Play()

@@ -223,6 +223,45 @@ A run of generated boards, one after another.
 - **Leaving.** A run lives on the server only: starting another puzzle, or
   leaving the game, ends it. Its cleared boards are already saved.
 
+## Shop and gamepasses
+
+A Shop page in the menu and the sidebar: Featured, Gamepasses, Chess Skins,
+Board Themes and Effects. Everything in it is cosmetic. Nothing changes puzzles,
+moves, hints, timers, rewards, matchmaking or duels, and cosmetics are drawn
+only on the owner's own screen.
+
+- **Catalogue.** `src/shared/ShopCatalog.luau` lists every item. Each item fills
+  one slot (`board`, `pieces`, `effect`) and is either free (the slot's default),
+  bought once with earned coins, or included in a gamepass. Chess skins tint only
+  the player's own piece, so the black targets always look the same.
+- **Gamepasses.** `src/shared/GamePassConfig.luau` is the only place pass IDs
+  live. All three passes (Royal VIP, Legendary Chess Skins, Royal Board
+  Collection) are **unconfigured** (`id = nil`). An unconfigured pass shows a
+  disabled "Not available yet" button and its suggested price labelled as a
+  suggestion. The server never checks or grants it. To turn one on, create the
+  pass on the Creator Dashboard and paste its numeric ID into `id`.
+- **Coin purchases.** The client sends only `shop_buy {slot, item}`. The server
+  looks the item up in its own catalogue, checks the price against the stored
+  coins, and records a `buy` op. The op is checked again in the DataStore
+  transform, so a doubled or retried save charges once. A new item is equipped
+  straight away. The player's coins can't be bought with Robux.
+- **Ownership of passes.** The server asks Roblox (`UserOwnsGamePassAsync`) on
+  join and after `PromptGamePassPurchaseFinished`, retrying for a few seconds,
+  and grants only what Roblox confirms. A cancelled prompt, a failed check or
+  anything the client says grants nothing. Pass items are never stored as
+  owned. The equipped choice is kept, but it's shown only while the pass is
+  verified this session.
+- **Equipping.** `shop_equip {slot, item}` is checked against owned coin items
+  and the passes the server has verified. A forged equip of a pass item is
+  refused (`needs_pass`).
+- **Saving.** Purchases and equips are Progression ops in the existing profile
+  (`cosmetics.owned`, `cosmetics.equipped`). There is no new DataStore or schema
+  and no migration. If saving is unavailable, the Shop says the change isn't
+  saved yet.
+- **Studio testing.** `ServerStorage.EchoChessShopTestHook` (Studio only)
+  `:Invoke("grant" | "revoke", passKey)` pretends the Studio player owns a pass,
+  so the owned states can be checked without Robux. It doesn't exist live.
+
 ## Puzzle Duel
 
 Two players race on the same puzzle, each on their own board.
@@ -319,13 +358,14 @@ How saving works:
 
 ## Security model
 
-The client sends only intents (`start`, `move`, `undo`, `restart`, `hint`, `settings`, `tutorial`, `sync`, and `duel_join`, `duel_cancel`, `duel_leave`, `duel_exit`). The server owns everything else:
+The client sends only intents (`start`, `move`, `undo`, `restart`, `hint`, `settings`, `tutorial`, `sync`, `duel_join`, `duel_cancel`, `duel_leave`, `duel_exit`, and `shop_buy`, `shop_equip`). The server owns everything else:
 
 - The server validates every move against the shared rules. It rejects the move if the player has no piece there, the move is illegal or the input is malformed.
 - The server decides win and fail and keeps its own timer. Before recording a win, it replays its own move log through the rules.
 - Unlocks, the Daily Puzzle choice, hint allowances, stars, achievements, the streak and rewards are decided on the server from the stored profile. The client's menu only displays them.
 - Duels: the server owns the queue, the match, both boards, the timer and the result. Moves go to the board of the player who sent them, so no one can move for another player. A player who isn't in the match can't act on it.
 - If saving is unavailable, the win card and menu say so ("not saving", "isn't saved yet") rather than showing a reward as saved.
+- Shop: prices, coins, ownership and gamepasses are the server's. A gamepass counts only after the server confirms it with Roblox.
 - After every action the server sends a full snapshot.
 - Each player is limited to a burst of 8 actions, refilled at 6 per second. A throttled burst gets a single "rate limited" notice.
 
@@ -402,6 +442,14 @@ The suite checks:
 - a generated board plays to a win that passes the server's replay check
 - scoring once per board, no skipping, lives for dead ends and restarts, free replays after a dead end, and the end of a run
 - best run, run count, the daily XP cap, late ops, the two achievements, bad board numbers, and a save round trip
+
+**Shop**
+- the catalogue is well formed and every gamepass is unconfigured
+- a coin purchase charges once (also when the op is applied twice), and is refused without enough coins or for pass items
+- equips need an owned item or a verified pass; forged ops and junk saved data are ignored
+- old profiles load unchanged
+- pass checks on join, failed checks, purchase confirmation, cancelled prompts, unknown pass IDs and a player who left
+- duels are unaffected by cosmetics
 
 **Duel and rate limits**
 - join, cancel, duplicate joins, self-match, and three or four players joining
