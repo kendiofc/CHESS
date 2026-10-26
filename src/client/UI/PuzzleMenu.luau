@@ -15,6 +15,7 @@
 -- reported (snapshot.progress) and sends requests; the server checks locks,
 -- rewards and settings again before acting on anything.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -145,6 +146,17 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
+	-- The backdrop runs under Roblox's top bar, but the menu itself starts
+	-- below it so the Roblox buttons never cover the logo or the coins.
+	local function fitBelowTopBar()
+		local top = GuiService:GetGuiInset().Y
+		self.root.Position = UDim2.fromOffset(0, top)
+		self.root.Size = UDim2.new(1, 0, 1, -top)
+	end
+	fitBelowTopBar()
+	pcall(function()
+		GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(fitBelowTopBar)
+	end)
 	self.sidebarPrefs = { narrow = false, wide = true } -- true = expanded
 	self.sidebar = MenuSidebar.new(self.root, NAV_ITEMS, function(id: string)
 		self:_navigate(id)
