@@ -58,6 +58,21 @@ local hud = PuzzleHUD.new(playerGui, {
 	tutorial = function(outcome: string)
 		actionRemote:FireServer(ACTIONS.Tutorial, { outcome = outcome })
 	end,
+	sync = function()
+		actionRemote:FireServer(ACTIONS.Sync)
+	end,
+	duelJoin = function()
+		actionRemote:FireServer(ACTIONS.DuelJoin)
+	end,
+	duelCancel = function()
+		actionRemote:FireServer(ACTIONS.DuelCancel)
+	end,
+	duelLeave = function()
+		actionRemote:FireServer(ACTIONS.DuelLeave)
+	end,
+	duelExit = function()
+		actionRemote:FireServer(ACTIONS.DuelExit)
+	end,
 })
 
 stateRemote.OnClientEvent:Connect(function(snapshot)

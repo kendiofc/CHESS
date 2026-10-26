@@ -27,7 +27,7 @@ local Decor = require(script.Parent:WaitForChild("Decor"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local PLAY_MODES = GameConfig.PLAY_MODES
-local VIEWS = { "Home", "Journey", "Practice", "Daily", "Stats", "Settings" }
+local VIEWS = { "Home", "Journey", "Practice", "Daily", "Weekly", "Duel", "Stats", "Settings" }
 
 local PuzzleMenu = {}
 PuzzleMenu.__index = PuzzleMenu
@@ -36,6 +36,8 @@ export type Handlers = {
 	start: (puzzleId: string, mode: string) -> (),
 	settings: (values: { [string]: any }) -> (),
 	tutorial: () -> (),
+	duelJoin: () -> (),
+	duelCancel: () -> (),
 }
 
 local function make(className: string, props: { [string]: any }?, children: { Instance }?): any
@@ -85,7 +87,9 @@ end
 local function duration(seconds: number): string
 	seconds = math.max(0, math.floor(seconds))
 	local hours, minutes = seconds // 3600, (seconds % 3600) // 60
-	if hours > 0 then
+	if hours >= 24 then
+		return string.format("%dd %02dh", hours // 24, hours % 24)
+	elseif hours > 0 then
 		return string.format("%dh %02dm", hours, minutes)
 	end
 	return string.format("%dm %02ds", minutes, seconds % 60)
@@ -232,14 +236,49 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 					then "A new puzzle is ready. Reopen the menu to load it."
 					else "Next puzzle in " .. duration(left)
 			end
+			local weekly = self.weeklyCountdown
+			if self.gui.Enabled and weekly and weekly.Parent and self.snapshot and self.snapshot.nextWeeklyIn then
+				local left = self.snapshot.nextWeeklyIn - (os.clock() - self.receivedAt)
+				weekly.Text = if left <= 0
+					then "A new challenge is ready. Reopen the menu to load it."
+					else "New challenge in " .. duration(left)
+			end
+			local queue = self.queueLabel
+			if self.gui.Enabled and queue and queue.Parent and self.queuedAt then
+				queue.Text = "Waiting " .. duration(os.clock() - self.queuedAt)
+			end
 		end
 	end)
 	return self
 end
 
--- Close only when there is a puzzle behind the menu to return to.
+-- Close only when there is a puzzle behind the menu to return to, and not
+-- while searching for a duel (Cancel leaves the queue).
 function PuzzleMenu._canClose(self: any): boolean
-	return self.snapshot ~= nil
+	return self.snapshot ~= nil and not self:isQueued()
+end
+
+function PuzzleMenu.isQueued(self: any): boolean
+	return self.duelState ~= nil and self.duelState.phase == "queued"
+end
+
+-- Duel queue snapshots (no board), or nil once a board snapshot arrives.
+function PuzzleMenu.updateDuel(self: any, snap: any)
+	local wasQueued = self:isQueued()
+	self.duelState = snap and snap.duel
+	self.duelError = snap and snap.error
+	if self:isQueued() and not wasQueued then
+		self.queuedAt = os.clock()
+	elseif not self:isQueued() then
+		self.queuedAt = nil
+	end
+	if snap then
+		self.progress = snap.progress or self.progress
+		self.saveStatus = snap.saveStatus or self.saveStatus
+		if self.gui.Enabled and not self.closing then
+			self:_render()
+		end
+	end
 end
 
 function PuzzleMenu.open(self: any, view: string?)
@@ -425,6 +464,230 @@ local function progressBar(parent: Instance, position: UDim2, size: UDim2, fract
 	}, { make("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
 end
 
+-- Weekly Challenge ----------------------------------------------------------------------
+
+function PuzzleMenu._renderWeekly(self: any)
+	local progress = self.progress
+	local weekly = progress and progress.weekly
+	if not weekly then
+		text({ Text = "Loading this week's challenge...", Size = UDim2.new(1, 0, 0, 40), Parent = self.list })
+		return
+	end
+	local top = card(self, 1, 132, "WeeklyCard")
+	text({
+		Text = string.format("THIS WEEK  ·  %s – %s", dateOf(weekly.firstDay), dateOf(weekly.firstDay + 6)),
+		FontFace = Theme.FontBold,
+		TextSize = 13,
+		TextColor3 = Theme.Gold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 12),
+		Size = UDim2.new(1, -28, 0, 18),
+		Parent = top,
+	})
+	text({
+		Name = "Progress",
+		Text = if weekly.completed
+			then "Challenge complete ✓"
+			else string.format("%d / %d cleared", weekly.clearedCount, weekly.size),
+		FontFace = Theme.FontBold,
+		TextSize = 24,
+		TextColor3 = if weekly.completed then Theme.Legal else Theme.Text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 34),
+		Size = UDim2.new(1, -28, 0, 30),
+		Parent = top,
+	})
+	progressBar(top, UDim2.fromOffset(14, 72), UDim2.new(1, -28, 0, 8), weekly.clearedCount / math.max(1, weekly.size), Theme.Gold)
+	local countdown = text({
+		Name = "Countdown",
+		TextSize = 14,
+		TextColor3 = Theme.TextMuted,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 94),
+		Size = UDim2.new(1, -28, 0, 20),
+		Parent = top,
+	})
+	if self.snapshot and self.snapshot.nextWeeklyIn then
+		countdown.Text = "New challenge in " .. duration(self.snapshot.nextWeeklyIn - (os.clock() - self.receivedAt))
+	end
+	self.weeklyCountdown = countdown
+
+	-- Rewards.
+	for index, milestone in ipairs(weekly.milestones) do
+		local row = card(self, 1 + index, 50, "Milestone" .. index)
+		local final = milestone.cleared >= weekly.size
+		text({
+			Text = if final then string.format("Clear all %d", milestone.cleared) else string.format("Clear %d puzzles", milestone.cleared),
+			FontFace = Theme.FontBold,
+			TextSize = 15,
+			TextColor3 = if milestone.claimed then Theme.Gold else Theme.Text,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Position = UDim2.fromOffset(14, 0),
+			Size = UDim2.new(1, -150, 1, 0),
+			Parent = row,
+		})
+		text({
+			Text = if milestone.claimed
+				then "✓ Collected"
+				else string.format("+%d XP  +%d coins", milestone.xp, milestone.coins),
+			TextSize = 14,
+			TextColor3 = if milestone.claimed then Theme.Legal else Theme.TextMuted,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -14, 0, 0),
+			Size = UDim2.new(0, 140, 1, 0),
+			Parent = row,
+		})
+	end
+
+	-- The puzzles, easiest first.
+	local order = 10
+	for index, id in ipairs(weekly.puzzleIds) do
+		local puzzle = PuzzleDefinitions.get(id)
+		if puzzle then
+			local cleared = weekly.cleared[id] == true
+			local record = progress.completed[id]
+			local sub = string.format(
+				"%s  ·  par %d  ·  %s",
+				puzzle.difficulty,
+				puzzle.par,
+				if cleared then "cleared this week ✓" else "not cleared yet"
+			)
+			if record and record.stars and record.stars > 0 then
+				sub ..= "  ·  " .. starText(record.stars)
+			end
+			local button = rowButton(self, order + index, "WeeklyPuzzle" .. index, string.format("%d.  %s", index, puzzle.name), sub)
+			local title = button:FindFirstChild("Title") :: TextLabel?
+			if title then
+				title.TextColor3 = if cleared then Theme.Legal else Theme.DifficultyColors[puzzle.difficulty] or Theme.Text
+			end
+			button.Activated:Connect(function()
+				self:_start(id, PLAY_MODES.Weekly)
+			end)
+		end
+	end
+end
+
+-- Puzzle Duel ----------------------------------------------------------------------------
+
+function PuzzleMenu._renderDuel(self: any)
+	local progress = self.progress
+	local queued = self:isQueued()
+	local top = card(self, 1, 176, "DuelCard")
+	text({
+		Text = if queued then "SEARCHING FOR AN OPPONENT..." else "RACE ANOTHER PLAYER",
+		FontFace = Theme.FontBold,
+		TextSize = 13,
+		TextColor3 = Theme.Gold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 12),
+		Size = UDim2.new(1, -28, 0, 18),
+		Parent = top,
+	})
+	local body
+	if queued then
+		local waiting = self.duelState.waiting or 1
+		body = string.format(
+			"You're in the queue%s. When someone else in this server joins, you'll both get the same puzzle after a short countdown.",
+			if waiting > 1 then string.format(" (%d waiting)", waiting) else ""
+		)
+	else
+		body = "Same puzzle, separate boards. The first player to clear their board wins. If nobody clears it in 3 minutes, it's a draw."
+	end
+	text({
+		Name = "Body",
+		Text = body,
+		TextSize = 14,
+		TextColor3 = Theme.Text,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(14, 36),
+		Size = UDim2.new(1, -28, 0, 54),
+		Parent = top,
+	})
+	local status = text({
+		Name = "Status",
+		Text = "",
+		TextSize = 13,
+		TextColor3 = Theme.TextMuted,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 92),
+		Size = UDim2.new(1, -28, 0, 18),
+		Parent = top,
+	})
+	self.queueLabel = if queued then status else nil
+	if queued and self.queuedAt then
+		status.Text = "Waiting " .. duration(os.clock() - self.queuedAt)
+	elseif self.duelError then
+		status.Text = self.duelError == "already_queued" and "You're already in the queue." or "That didn't go through. Try again."
+		status.TextColor3 = Theme.Danger
+	end
+	local action = make("TextButton", {
+		Name = if queued then "CancelDuel" else "FindDuel",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 14, 1, -12),
+		Size = UDim2.new(1, -28, 0, 48),
+		BackgroundColor3 = if queued then Theme.PanelRaised else Theme.Accent,
+		FontFace = Theme.FontBold,
+		Text = if queued then "Cancel" else "Find opponent",
+		TextColor3 = Theme.Text,
+		TextSize = 18,
+		Parent = top,
+	}, { corner(12) })
+	Decor.sheen(action, 0.2)
+	action.Activated:Connect(function()
+		if queued then
+			self.handlers.duelCancel()
+		else
+			self.handlers.duelJoin()
+		end
+	end)
+
+	local stats = progress and progress.duel
+	local info = card(self, 2, 108, "DuelStats")
+	text({
+		Text = "YOUR DUELS",
+		FontFace = Theme.FontBold,
+		TextSize = 12,
+		TextColor3 = Theme.TextMuted,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 10),
+		Size = UDim2.new(1, -28, 0, 16),
+		Parent = info,
+	})
+	text({
+		Name = "Record",
+		Text = if stats
+			then string.format("%d W  ·  %d L  ·  %d D   (%d played)", stats.wins, stats.losses, stats.draws, stats.played)
+			else "Loading...",
+		FontFace = Theme.FontBold,
+		TextSize = 20,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(14, 28),
+		Size = UDim2.new(1, -28, 0, 26),
+		Parent = info,
+	})
+	text({
+		Name = "Rewards",
+		Text = string.format(
+			"Win +%d coins, draw +%d. Rewarded duels left today: %d of %d, one per opponent.",
+			GameConfig.DUEL.REWARD_WIN.coins,
+			GameConfig.DUEL.REWARD_DRAW.coins,
+			if stats then stats.rewardsLeftToday else GameConfig.DUEL.DAILY_REWARDED,
+			GameConfig.DUEL.DAILY_REWARDED
+		),
+		TextSize = 13,
+		TextColor3 = Theme.TextMuted,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(14, 60),
+		Size = UDim2.new(1, -28, 0, 40),
+		Parent = info,
+	})
+end
+
 -- Home ---------------------------------------------------------------------------------
 
 function PuzzleMenu._renderHome(self: any)
@@ -497,10 +760,24 @@ function PuzzleMenu._renderHome(self: any)
 			#Achievements.list
 		)
 	end
+	local weeklySub = "Four puzzles a week, rewards for clearing them"
+	local duelSub = "Race another player to clear the same puzzle"
+	if progress and progress.weekly then
+		local weekly = progress.weekly
+		weeklySub = if weekly.completed
+			then "Complete this week ✓"
+			else string.format("%d / %d cleared this week", weekly.clearedCount, weekly.size)
+	end
+	if progress and progress.duel and progress.duel.played > 0 then
+		local duel = progress.duel
+		duelSub = string.format("%d W  ·  %d L  ·  %d D", duel.wins, duel.losses, duel.draws)
+	end
 	local settings = Sound.getSettings()
 	local rows = {
 		{ "Journey", "Journey", journeySub, "K" },
 		{ "Daily", "Daily Puzzle", dailySub, "Q" },
+		{ "Weekly", "Weekly Challenge", weeklySub, "R", true },
+		{ "Duel", "Puzzle Duel", duelSub, "K", true },
 		{ "Practice", "Practice", "Any puzzle, any difficulty, free hints, no rewards", "B" },
 		{ "Stats", "Statistics", statsSub, "R" },
 		{
@@ -806,6 +1083,13 @@ function PuzzleMenu._renderStats(self: any)
 		{ "3-star clears", tostring(totals.perfect) },
 		{ "Daily streak", string.format("%d  (best %d)", streak.current, streak.longest) },
 		{ "Dailies cleared", tostring(stats.dailies or 0) },
+		{ "Weekly challenges", tostring(stats.weeklies or 0) },
+		{
+			"Duels W / L / D",
+			if progress.duel
+				then string.format("%d / %d / %d", progress.duel.wins, progress.duel.losses, progress.duel.draws)
+				else "0 / 0 / 0",
+		},
 		{ "Solves", tostring(stats.solves) },
 		{ "Dead ends", tostring(stats.fails) },
 		{ "Restarts", tostring(stats.restarts) },
@@ -1057,6 +1341,8 @@ local NOTES = {
 	Journey = "Clear %d puzzles of a difficulty to unlock the next. First clears earn XP and coins. Clear within par for 3 stars.",
 	Practice = "Play any puzzle at any difficulty. Hints are free. Practice earns no rewards or stars and doesn't unlock difficulties.",
 	Daily = "A new puzzle every day at 00:00 UTC. One free hint and one reward per day.",
+	Weekly = "Four puzzles, the same for everyone, new every Monday 00:00 UTC. One hint per attempt. Each reward is paid once.",
+	Duel = "Opponents come from this server. Leaving a duel counts as a loss.",
 	Stats = "Your numbers, as saved on the server.",
 	Settings = "",
 }
@@ -1066,13 +1352,20 @@ local TITLES = {
 	Journey = "JOURNEY",
 	Practice = "PRACTICE",
 	Daily = "DAILY PUZZLE",
+	Weekly = "WEEKLY CHALLENGE",
+	Duel = "PUZZLE DUEL",
 	Stats = "STATISTICS",
 	Settings = "SETTINGS",
 }
 
 function PuzzleMenu._render(self: any)
 	local home = self.view == "Home"
-	self.backButton.Visible = not home
+	if self:isQueued() and self.view ~= "Duel" then
+		-- While searching, the menu stays on the Duel page (Cancel leaves the queue).
+		self.view = "Duel"
+		home = false
+	end
+	self.backButton.Visible = not home and not self:isQueued()
 	self.title.Text = TITLES[self.view]
 	self.title.Position = UDim2.fromOffset(if home then 18 else 66, 12)
 	self.wallet.Position = UDim2.fromOffset(if home then 18 else 66, 40)
@@ -1099,6 +1392,8 @@ function PuzzleMenu._render(self: any)
 	self.list.Size = UDim2.new(1, -24, 1, -(top + 12))
 
 	self.countdown = nil
+	self.weeklyCountdown = nil
+	self.queueLabel = nil
 	for _, child in ipairs(self.list:GetChildren()) do
 		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
 			child:Destroy()
@@ -1108,6 +1403,10 @@ function PuzzleMenu._render(self: any)
 		self:_renderHome()
 	elseif self.view == "Daily" then
 		self:_renderDaily()
+	elseif self.view == "Weekly" then
+		self:_renderWeekly()
+	elseif self.view == "Duel" then
+		self:_renderDuel()
 	elseif self.view == "Stats" then
 		self:_renderStats()
 	elseif self.view == "Settings" then

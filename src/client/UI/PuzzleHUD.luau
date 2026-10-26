@@ -39,9 +39,15 @@ export type Handlers = {
 	start: (puzzleId: string, mode: string) -> (),
 	settings: (values: { [string]: any }) -> (),
 	tutorial: (outcome: string) -> (),
+	sync: () -> (),
+	duelJoin: () -> (),
+	duelCancel: () -> (),
+	duelLeave: () -> (),
+	duelExit: () -> (),
 }
 
 local PLAY_MODES = GameConfig.PLAY_MODES
+local DUEL_MODE = GameConfig.DUEL_MODE
 
 local PIECE_NAMES = ChessRules.PIECE_NAMES
 
@@ -58,7 +64,34 @@ local ERROR_MESSAGES = {
 	bad_mode = "That mode isn't available.",
 	no_hints = "No hints left for this puzzle.",
 	bad_tutorial = "That wasn't accepted.",
+	not_weekly = "That puzzle isn't in this week's challenge.",
+	in_duel = "Finish or leave your duel first.",
+	not_started = "Wait for the countdown.",
+	match_over = "The duel is over.",
+	not_in_duel = "You're not in a duel.",
+	already_queued = "You're already looking for an opponent.",
+	not_queued = "You're not in the duel queue.",
+	bad_action = "That action isn't available in a duel.",
 }
+
+-- Duel result lines, by the server's reason.
+local DUEL_REASONS = {
+	solved = "You cleared the board first.",
+	opponent_solved = "%s cleared the board first.",
+	timeout = "Time's up. Nobody cleared the board.",
+	opponent_left = "%s left the match.",
+	left = "You left the match.",
+}
+
+local DUEL_REWARD_NOTES = {
+	same_opponent = "No reward: you already earned one against this player today.",
+	daily_cap = "No reward: today's rewarded duels are used up.",
+}
+
+-- True while a duel snapshot is on screen but its board isn't live yet (or anymore).
+local function duelLocked(snap: any): boolean
+	return snap ~= nil and snap.duel ~= nil and snap.duel.phase ~= "playing"
+end
 
 local MARGIN = 12
 local GAP = 10
@@ -192,6 +225,14 @@ function PuzzleHUD.new(playerGui: Instance, handlers: Handlers)
 				self:startTutorial()
 			end)
 		end,
+		-- The puzzle behind the menu is kept on the server and comes back
+		-- after the duel, so joining needs no confirmation.
+		duelJoin = function()
+			self.handlers.duelJoin()
+		end,
+		duelCancel = function()
+			self.handlers.duelCancel()
+		end,
 	})
 	self.menu.dragEnabled = self.dragEnabled
 	UserInputService.InputChanged:Connect(function(input)
@@ -307,8 +348,14 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	menuButton.TextSize = 14
 	menuButton.Parent = switcher
 	menuButton.Activated:Connect(function()
+		local snap = self.snapshot
+		if snap and snap.duel and snap.duel.phase ~= "finished" then
+			self:_confirmForfeit()
+			return
+		end
 		self.menu:open("Home")
 	end)
+	self.menuButton = menuButton
 	self.prevButton, self.nextButton = prev, nextButton
 	prev.Activated:Connect(function()
 		self:_confirmLeave(function()
@@ -334,7 +381,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			Padding = UDim.new(0, 10),
 		}),
 	})
-	local function statCard(order: number, title: string): (Frame, TextLabel, TextLabel)
+	local function statCard(order: number, title: string): (Frame, TextLabel, TextLabel, TextLabel)
 		local card = make("Frame", {
 			LayoutOrder = order,
 			Size = UDim2.new(1 / 3, -7, 1, 0),
@@ -342,7 +389,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			Parent = stats,
 		}, { corner(12), stroke(Theme.Stroke, 1, 0.35) })
 		Decor.sheen(card, 0.22)
-		label({
+		local heading = label({
 			Text = title,
 			TextSize = 12,
 			FontFace = Theme.FontBold,
@@ -369,11 +416,12 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 			TextXAlignment = Enum.TextXAlignment.Right,
 			Parent = card,
 		})
-		return card, value, sub
+		return card, value, sub, heading
 	end
 	local _, movesValue, parLabel = statCard(1, "MOVES")
 	local capturedCard, capturedValue, _ = statCard(2, "CAPTURED")
-	local _, timeValue, _ = statCard(3, "TIME")
+	local _, timeValue, _, timeTitle = statCard(3, "TIME")
+	self.timeTitle = timeTitle
 	self.movesValue, self.parLabel = movesValue, parLabel
 	self.capturedValue, self.timeValue = capturedValue, timeValue
 	local track = make("Frame", {
@@ -427,6 +475,23 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 		Parent = self.boardFrame,
 	})
 
+	-- Duel countdown: a big number over the board.
+	self.countdownLabel = label({
+		Name = "Countdown",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 0.5),
+		FontFace = Theme.FontHeavy,
+		TextScaled = true,
+		TextColor3 = Color3.new(1, 1, 1),
+		TextStrokeTransparency = 0.4,
+		Visible = false,
+		ZIndex = 20,
+		Parent = boardArea,
+	})
+	make("UITextSizeConstraint", { MaxTextSize = 140, Parent = self.countdownLabel })
+	Decor.goldText(self.countdownLabel)
+
 	self.messageLabel = label({
 		Name = "Message",
 		TextSize = 16,
@@ -462,7 +527,7 @@ function PuzzleHUD._build(self: any, playerGui: Instance)
 	self.hintButton.Parent = controls
 	self.hintButton.Activated:Connect(function()
 		local snap = self.snapshot
-		if snap and snap.status ~= "won" and not self.pending then
+		if snap and snap.status ~= "won" and not snap.duel and not self.pending then
 			self.handlers.hint()
 		end
 	end)
@@ -619,7 +684,9 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 		if not snap then
 			return
 		end
-		if snap.status == "won" then
+		if snap.duel and snap.duel.phase == "finished" then
+			self.handlers.duelJoin()
+		elseif snap.status == "won" then
 			local _, action = self:_nextAfterWin()
 			action()
 		elseif snap.status == "failed" then
@@ -628,6 +695,11 @@ function PuzzleHUD._buildResultCard(self: any, gui: ScreenGui)
 		end
 	end)
 	secondary.Activated:Connect(function()
+		local snap = self.snapshot
+		if snap and snap.duel and snap.duel.phase == "finished" then
+			self.handlers.duelExit()
+			return
+		end
 		self.handlers.restart()
 	end)
 
@@ -879,6 +951,46 @@ end
 
 function PuzzleHUD.render(self: any, snap: any)
 	local previous = self.snapshot
+	if snap.mode == DUEL_MODE then
+		if not snap.layout then
+			-- Queue states have no board: they live in the menu's Duel page.
+			self.menu:updateDuel(snap)
+			if snap.duel.phase == "queued" then
+				self.result.dim.Visible = false
+				self.countdownLabel.Visible = false
+				if not self.menu:isOpen() or self.menu.view ~= "Duel" then
+					self.menu:open("Duel")
+				end
+			elseif previous and previous.mode == DUEL_MODE then
+				-- Back from the queue: fetch the puzzle that was left behind.
+				self.handlers.sync()
+			end
+			if snap.error then
+				Sound.play("invalid")
+			end
+			return
+		end
+		if
+			snap.event == "duel_opponent"
+			and previous
+			and previous.duel
+			and previous.duel.matchId == snap.duel.matchId
+		then
+			-- Only the opponent's progress changed; don't redraw (or interrupt a drag).
+			previous.duel.opponent = snap.duel.opponent
+			self:_renderDuelMessage(previous)
+			return
+		end
+		if snap.event == "duel_found" then
+			self.menu:close()
+			Sound.play("unlock")
+			Sound.haptic("medium")
+		elseif snap.event == "duel_start" then
+			Sound.play("hint")
+			Sound.haptic("light")
+		end
+	end
+	self.menu:updateDuel(nil)
 	local newPuzzle = not previous or previous.puzzleId ~= snap.puzzleId or snap.event == "start"
 	-- Only the winning move's snapshot carries the rating and reward. A later
 	-- snapshot for the same finished attempt (tutorial saved, settings, a
@@ -909,6 +1021,10 @@ function PuzzleHUD.render(self: any, snap: any)
 		self.selected = self.playerSquare
 	elseif snap.event == "start" or snap.status ~= "playing" then
 		self.selected = nil
+	end
+	if duelLocked(snap) then
+		self.selected = nil
+		self:_cancelDrag()
 	end
 
 	if snap.progress and snap.progress.settings and not self.settingsTouched then
@@ -968,11 +1084,15 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	local group = PuzzleDefinitions.byDifficulty[snap.difficulty]
 	self.difficultyPill.Text = string.format("%s  %d/%d", string.upper(snap.difficulty), snap.number or 1, if group then #group else 1)
 	-- Narrow headers (phones) only have room for the mode name.
-	local mode = string.upper(snap.mode or PLAY_MODES.Journey)
+	local mode = if snap.mode == DUEL_MODE then "PUZZLE DUEL" else string.upper(snap.mode or PLAY_MODES.Journey)
 	self.brandLabel.Text = if self.parts.header.AbsoluteSize.X < 340 then mode else "ECHO CHESS  ·  " .. mode
-	local daily = snap.mode == PLAY_MODES.Daily
-	self.prevButton.Visible = not daily
-	self.nextButton.Visible = not daily
+	-- Daily, Weekly and Duel puzzles have no neighbours to step to.
+	local fixed = snap.mode == PLAY_MODES.Daily or snap.mode == PLAY_MODES.Weekly or snap.mode == DUEL_MODE
+	self.prevButton.Visible = not fixed
+	self.nextButton.Visible = not fixed
+	local dueling = snap.duel ~= nil and snap.duel.phase ~= "finished"
+	self.menuButton.Text = if dueling then "Leave" else "Menu"
+	self.timeTitle.Text = if snap.duel then "TIME LEFT" else "TIME"
 	local hintsLeft = snap.hintsLeft or 0
 	local hintsOn = hintsLeft ~= 0 and snap.status ~= "won"
 	self.hintButton.Text = if hintsLeft > 0 then string.format("Hint (%d)", hintsLeft) else "Hint"
@@ -993,9 +1113,33 @@ function PuzzleHUD._updateTimer(self: any)
 	if not snap then
 		return
 	end
+	local since = os.clock() - self.receivedAt
+	local duel = snap.duel
+	if duel then
+		local left = duel.timeLeft
+		if duel.phase == "playing" then
+			left -= since
+		end
+		self.timeValue.Text = formatTime(math.ceil(math.max(0, left)))
+		self.timeValue.TextColor3 = if duel.phase == "playing" and left < 30 then Theme.Danger else Theme.Text
+		local count = self.countdownLabel
+		if duel.phase == "countdown" then
+			local startsIn = duel.startsIn - since
+			count.Visible = true
+			count.Text = if startsIn > 0 then tostring(math.ceil(startsIn)) else "GO!"
+		elseif duel.phase == "playing" and since < 0.8 and snap.event == "duel_start" then
+			count.Visible = true
+			count.Text = "GO!"
+		else
+			count.Visible = false
+		end
+		return
+	end
+	self.countdownLabel.Visible = false
+	self.timeValue.TextColor3 = Theme.Text
 	local seconds = snap.elapsed
 	if snap.status == "playing" then
-		seconds += os.clock() - self.receivedAt
+		seconds += since
 	end
 	self.timeValue.Text = formatTime(seconds)
 end
@@ -1077,7 +1221,34 @@ function PuzzleHUD._renderHighlights(self: any)
 	end
 end
 
+-- The duel's message line: what the opponent is up to (never their board).
+function PuzzleHUD._renderDuelMessage(self: any, snap: any)
+	local duel = snap.duel
+	local opponent = duel.opponent
+	local text
+	if duel.phase == "countdown" then
+		text = string.format("Opponent found: %s. Same puzzle, separate boards. Get ready!", opponent.name)
+	elseif not opponent.connected then
+		text = string.format("%s left the match.", opponent.name)
+	else
+		text = string.format(
+			"vs %s  ·  %d / %d captured  ·  %d %s",
+			opponent.name,
+			opponent.captured,
+			opponent.total,
+			opponent.moves,
+			if opponent.moves == 1 then "move" else "moves"
+		)
+	end
+	self.messageLabel.Text = text
+	self.messageLabel.TextColor3 = if opponent.connected then Theme.TextMuted else Theme.Gold
+end
+
 function PuzzleHUD._renderMessage(self: any, snap: any)
+	if snap.duel and not snap.error and snap.event ~= "move" and snap.status ~= "failed" then
+		self:_renderDuelMessage(snap)
+		return
+	end
 	local text
 	local color = Theme.TextMuted
 	local playerPiece = self.playerSquare and self.board.pieces[self.playerSquare]
@@ -1157,8 +1328,19 @@ local function rewardText(snap: any): string
 		return "Practice: no rewards"
 	elseif snap.mode == PLAY_MODES.Daily then
 		return "Today's reward was already collected."
+	elseif snap.mode == PLAY_MODES.Weekly then
+		return "No new weekly reward for this clear."
 	end
 	return "Reward already collected. Replays can still earn stars."
+end
+
+-- Rewards are applied at once but saved a little later. When saving isn't
+-- working, say so instead of implying they're safe.
+local function saveNote(snap: any): string
+	if snap.saveStatus == "offline" then
+		return "\nSaving is unavailable right now, so this isn't saved yet."
+	end
+	return ""
 end
 
 -- Where the player stands after a win: unlock progress in Journey, the
@@ -1173,6 +1355,23 @@ local function progressText(snap: any, result: any): string
 		local text = string.format("🔥 %d-day Daily streak", streak.current)
 		if result.shieldUsed then
 			text ..= "\n🛡 Your streak shield covered the day you missed."
+		end
+		return text
+	elseif snap.mode == PLAY_MODES.Weekly and progress.weekly then
+		local weekly = progress.weekly
+		if weekly.completed then
+			return string.format("Weekly Challenge complete: %d / %d ✓", weekly.clearedCount, weekly.size)
+		end
+		local nextMilestone = nil
+		for _, milestone in ipairs(weekly.milestones) do
+			if not milestone.claimed then
+				nextMilestone = milestone
+				break
+			end
+		end
+		local text = string.format("Weekly Challenge: %d / %d cleared", weekly.clearedCount, weekly.size)
+		if nextMilestone then
+			text ..= string.format("\nClear %d for +%d coins.", nextMilestone.cleared, nextMilestone.coins)
 		end
 		return text
 	elseif snap.mode == PLAY_MODES.Journey and progress.unlocks then
@@ -1196,8 +1395,90 @@ local function progressText(snap: any, result: any): string
 	return ""
 end
 
+function PuzzleHUD._renderDuelResult(self: any, snap: any, previous: any)
+	local r = self.result
+	local duel = snap.duel
+	local wasShowing = r.dim.Visible and previous and previous.duel and previous.duel.matchId == duel.matchId
+	r.dim.Visible = true
+	local outcome = duel.outcome
+	local color = if outcome == "win" then Theme.Gold elseif outcome == "loss" then Theme.Danger else Theme.Text
+	r.title.Text = if outcome == "win" then "VICTORY!" elseif outcome == "loss" then "DEFEAT" else "DRAW"
+	r.title.TextColor3 = if outcome == "win" then Color3.new(1, 1, 1) else color
+	r.gradient.Enabled = outcome == "win"
+	r.gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Theme.GoldDeep),
+		ColorSequenceKeypoint.new(0.5, Theme.Gold),
+		ColorSequenceKeypoint.new(1, Theme.GoldDeep),
+	})
+	r.stroke.Color = color
+	r.stars.Visible = false
+	r.banner.Visible = false
+	r.subtitle.Text = string.format(DUEL_REASONS[duel.reason or ""] or "The duel is over.", duel.opponent.name)
+	r.stats.Text = string.format(
+		"You: %d / %d captured in %d %s",
+		snap.targetsTotal - snap.targetsLeft,
+		snap.targetsTotal,
+		snap.moveCount,
+		if snap.moveCount == 1 then "move" else "moves"
+	)
+	r.detail.Visible = true
+	r.detail.Text = string.format(
+		"%s: %d / %d captured in %d %s",
+		duel.opponent.name,
+		duel.opponent.captured,
+		duel.opponent.total,
+		duel.opponent.moves,
+		if duel.opponent.moves == 1 then "move" else "moves"
+	)
+	r.reward.Visible = true
+	local rewardLine
+	if duel.reward then
+		rewardLine = string.format("+%d XP   +%d coins", duel.reward.xp, duel.reward.coins) .. saveNote(snap)
+	elseif outcome == "loss" then
+		rewardLine = "No reward for a loss. The result is in your Duel stats."
+	else
+		rewardLine = DUEL_REWARD_NOTES[duel.rewardNote or ""] or "No reward this time."
+	end
+	r.reward.Text = rewardLine
+	r.reward.TextColor3 = if duel.reward then Theme.Legal else Theme.TextMuted
+	local stats = snap.progress and snap.progress.duel
+	r.progress.Visible = stats ~= nil
+	if stats then
+		r.progress.Text = string.format("Duels: %d W  ·  %d L  ·  %d D", stats.wins, stats.losses, stats.draws)
+	end
+	r.primary.Text = "Duel again"
+	r.secondary.Text = "Back to puzzles"
+	if not wasShowing then
+		r.dim.BackgroundTransparency = 1
+		Anim.tween(r.dim, 0.25, { BackgroundTransparency = 0.4 })
+		r.scale.Scale = 0.85
+		task.defer(function()
+			self:_fitResultCard()
+			r.scale.Scale = r.fit * 0.85
+			Anim.tween(r.scale, 0.35, { Scale = r.fit }, Enum.EasingStyle.Back)
+		end)
+		if outcome == "win" then
+			Anim.burst(r.dim, Theme.Gold, 18)
+			Sound.play("win")
+			Sound.haptic("heavy")
+		else
+			Sound.play(if outcome == "loss" then "fail" else "open")
+			Sound.haptic("medium")
+		end
+	end
+end
+
 function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 	local r = self.result
+	if snap.duel then
+		if snap.duel.phase == "finished" then
+			self:_renderDuelResult(snap, previous)
+			return
+		elseif snap.status ~= "failed" then
+			r.dim.Visible = false
+			return
+		end
+	end
 	if snap.status == "playing" then
 		r.dim.Visible = false
 		return
@@ -1226,7 +1507,7 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 			unlocked = result.unlocked
 		end
 		r.reward.Visible = true
-		r.reward.Text = rewardText(snap)
+		r.reward.Text = rewardText(snap) .. (if snap.reward then saveNote(snap) else "")
 		r.reward.TextColor3 = if snap.reward then Theme.Legal else Theme.TextMuted
 		local progressLine = if result then progressText(snap, result) else ""
 		r.progress.Text = progressLine
@@ -1242,7 +1523,9 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 		r.subtitle.Text = "The pieces left can't all be captured from here."
 		r.stats.Text = string.format("Moves %d    Captured %d / %d", snap.moveCount, snap.targetsTotal - snap.targetsLeft, snap.targetsTotal)
 		r.detail.Visible = true
-		r.detail.Text = "Undo your last capture and try another, or tap Hint for a free explanation."
+		r.detail.Text = if snap.duel
+			then "Undo your last capture and try another. The clock is still running!"
+			else "Undo your last capture and try another, or tap Hint for a free explanation."
 		r.reward.Visible = false
 		r.progress.Visible = false
 		r.primary.Text = "Undo move"
@@ -1284,7 +1567,7 @@ end
 
 function PuzzleHUD._onSquare(self: any, index: number)
 	local snap = self.snapshot
-	if not snap or self.pending or snap.status ~= "playing" or self.dialog:isOpen() then
+	if not snap or self.pending or snap.status ~= "playing" or self.dialog:isOpen() or duelLocked(snap) then
 		return
 	end
 	-- The release of a drag, not a tap. A button's Activated can fire before
@@ -1373,6 +1656,7 @@ function PuzzleHUD._pressBegan(self: any, index: number, input: InputObject)
 		or self.press
 		or not snap
 		or snap.status ~= "playing"
+		or duelLocked(snap)
 		or self.pending
 		or self.dialog:isOpen()
 		or index ~= self.playerSquare
@@ -1476,6 +1760,18 @@ function PuzzleHUD._confirmLeave(self: any, action: () -> ())
 		body = string.format("Your %d %s on %s will be lost.", snap.moveCount, if snap.moveCount == 1 then "move" else "moves", snap.name),
 		confirm = "Leave",
 		onConfirm = action,
+	})
+end
+
+function PuzzleHUD._confirmForfeit(self: any)
+	self:_cancelDrag()
+	self.dialog:ask({
+		title = "Leave this duel?",
+		body = "Leaving counts as a loss, and your opponent wins.",
+		confirm = "Leave",
+		onConfirm = function()
+			self.handlers.duelLeave()
+		end,
 	})
 end
 
@@ -1585,7 +1881,7 @@ end
 -- end, the current mode has no neighbours (Daily), or Journey has it locked.
 function PuzzleHUD._neighbour(self: any, offset: number): any
 	local snap = self.snapshot
-	if not snap or snap.mode == PLAY_MODES.Daily then
+	if not snap or snap.mode ~= PLAY_MODES.Journey and snap.mode ~= PLAY_MODES.Practice then
 		return nil
 	end
 	local list = PuzzleDefinitions.list
@@ -1620,7 +1916,7 @@ end
 
 -- What the win card's main button does: Journey goes to the next unsolved
 -- puzzle (the server's resume pick), Practice to the next in the catalogue,
--- Daily back to the Daily page.
+-- Weekly to the next uncleared challenge puzzle, Daily back to the Daily page.
 function PuzzleHUD._nextAfterWin(self: any): (string, () -> ())
 	local snap = self.snapshot
 	if snap.mode == PLAY_MODES.Journey then
@@ -1642,6 +1938,20 @@ function PuzzleHUD._nextAfterWin(self: any): (string, () -> ())
 		end
 		return "Menu", function()
 			self.menu:open("Practice")
+		end
+	elseif snap.mode == PLAY_MODES.Weekly then
+		local weekly = snap.progress and snap.progress.weekly
+		if weekly then
+			for _, id in ipairs(weekly.puzzleIds) do
+				if not weekly.cleared[id] then
+					return "Next challenge", function()
+						self.handlers.start(id, PLAY_MODES.Weekly)
+					end
+				end
+			end
+		end
+		return "Menu", function()
+			self.menu:open("Weekly")
 		end
 	end
 	return "Menu", function()
