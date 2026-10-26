@@ -580,7 +580,9 @@ end
 function PuzzleMenu._renderDuel(self: any)
 	local progress = self.progress
 	local queued = self:isQueued()
-	local top = card(self, 1, 176, "DuelCard")
+	-- On a phone-width panel the body wraps to four lines, so give it room.
+	local bodyHeight = if self.list.AbsoluteSize.X < 340 then 72 else 54
+	local top = card(self, 1, 122 + bodyHeight, "DuelCard")
 	text({
 		Text = if queued then "SEARCHING FOR AN OPPONENT..." else "RACE ANOTHER PLAYER",
 		FontFace = Theme.FontBold,
@@ -610,7 +612,7 @@ function PuzzleMenu._renderDuel(self: any)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Position = UDim2.fromOffset(14, 36),
-		Size = UDim2.new(1, -28, 0, 54),
+		Size = UDim2.new(1, -28, 0, bodyHeight),
 		Parent = top,
 	})
 	local status = text({
@@ -619,7 +621,7 @@ function PuzzleMenu._renderDuel(self: any)
 		TextSize = 13,
 		TextColor3 = Theme.TextMuted,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.fromOffset(14, 92),
+		Position = UDim2.fromOffset(14, 38 + bodyHeight),
 		Size = UDim2.new(1, -28, 0, 18),
 		Parent = top,
 	})
@@ -663,18 +665,19 @@ function PuzzleMenu._renderDuel(self: any)
 		Size = UDim2.new(1, -28, 0, 16),
 		Parent = info,
 	})
-	text({
+	local record = text({
 		Name = "Record",
 		Text = if stats
 			then string.format("%d W  ·  %d L  ·  %d D   (%d played)", stats.wins, stats.losses, stats.draws, stats.played)
 			else "Loading...",
 		FontFace = Theme.FontBold,
-		TextSize = 20,
+		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Position = UDim2.fromOffset(14, 28),
 		Size = UDim2.new(1, -28, 0, 26),
 		Parent = info,
 	})
+	make("UITextSizeConstraint", { MaxTextSize = 20, MinTextSize = 12, Parent = record })
 	text({
 		Name = "Rewards",
 		Text = string.format(
@@ -768,7 +771,7 @@ function PuzzleMenu._renderHome(self: any)
 		)
 	end
 	local weeklySub = "Four puzzles a week, rewards for clearing them"
-	local duelSub = "Race another player to clear the same puzzle"
+	local duelSub = "Race a player on the same puzzle"
 	if progress and progress.weekly then
 		local weekly = progress.weekly
 		weeklySub = if weekly.completed

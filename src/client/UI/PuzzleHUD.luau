@@ -1310,7 +1310,8 @@ local function starDetail(snap: any, result: any): string
 	if not result.starsSaved then
 		table.insert(parts, "Practice stars aren't saved.")
 	elseif result.newStars and result.bestStars and result.bestStars > 0 then
-		table.insert(parts, "New star record saved.")
+		-- Only say "saved" when saving works; offline it's kept for this session.
+		table.insert(parts, if snap.saveStatus == "offline" then "New star record." else "New star record saved.")
 	end
 	return table.concat(parts, " ")
 end
