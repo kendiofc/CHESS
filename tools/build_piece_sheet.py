@@ -9,63 +9,56 @@ Output: assets/pieces.png, a 6 x 2 grid of CELL-pixel cells in the same order,
         publishes it with AssetService:CreateAssetAsync. 1020x340 keeps it
         under the 1024px EditableImage limit.
 
+The source is a small JPEG, so it is first enlarged UP times; working at that
+size keeps the cut smooth instead of following the JPEG's blocky pixels.
 The white background is removed by flood-filling light pixels from the image
 border, so the white fill inside each white piece (and the white detail lines
 inside the black pieces) stays opaque. The dark strokes are thickened by SEAL
 pixels before the fill so it can't leak through hairline gaps in an outline,
-and then the background is grown back over the light halo that leaves.
+and then the background is grown back over the light halo that leaves. The
+outer edge gets a soft alpha from the stroke's darkness, and stray specks
+(JPEG noise) are dropped.
+
+Needs numpy, Pillow and scipy.
 """
 import pathlib
-from collections import deque
 
 import numpy as np
 from PIL import Image
+from scipy import ndimage
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "source" / "pieces-reference.jpg"
 OUTPUT = ROOT / "assets" / "pieces.png"
 RAW = ROOT / "assets" / "pieces.rgba"
 CELL = 170
+UP = 4  # work at 4x the source size
 LIGHT = 200  # pixels at least this bright can be background
-SEAL = 2  # pixels of stroke thickening used to seal outline gaps
-
-
-def grow(mask: np.ndarray, steps: int) -> np.ndarray:
-    out = mask.copy()
-    for _ in range(steps):
-        step = out.copy()
-        step[1:, :] |= out[:-1, :]
-        step[:-1, :] |= out[1:, :]
-        step[:, 1:] |= out[:, :-1]
-        step[:, :-1] |= out[:, 1:]
-        out = step
-    return out
+SEAL = 4  # pixels (at UP size) of stroke thickening used to seal outline gaps
+EDGE = 3  # width (at UP size) of the soft outer edge
+NOTCH = 400  # light pockets smaller than this (at UP size) can be cut-off background
+SPECK = 60  # opaque bits smaller than this (at UP size) are JPEG noise
 
 
 def background_mask(gray: np.ndarray) -> np.ndarray:
-    h, w = gray.shape
-    light = (gray >= LIGHT) & ~grow(gray < LIGHT, SEAL)
-    bg = np.zeros_like(light)
-    queue = deque()
-    for x in range(w):
-        for y in (0, h - 1):
-            if light[y, x] and not bg[y, x]:
-                bg[y, x] = True
-                queue.append((y, x))
-    for y in range(h):
-        for x in (0, w - 1):
-            if light[y, x] and not bg[y, x]:
-                bg[y, x] = True
-                queue.append((y, x))
-    while queue:
-        y, x = queue.popleft()
-        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            ny, nx = y + dy, x + dx
-            if 0 <= ny < h and 0 <= nx < w and light[ny, nx] and not bg[ny, nx]:
-                bg[ny, nx] = True
-                queue.append((ny, nx))
+    light = ~ndimage.binary_dilation(gray < LIGHT, iterations=SEAL)
+    labels, _ = ndimage.label(light)
+    border = np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]]))
+    bg = np.isin(labels, border[border != 0])
+    holes = light & ~bg  # the white fill inside pieces
     # Reclaim the halo the sealing left around each outline.
-    return bg | (grow(bg, SEAL) & (gray >= LIGHT))
+    bg |= ndimage.binary_dilation(bg, iterations=SEAL) & (gray >= LIGHT)
+    # Light notches the sealing cut off (between a queen's points, say) are
+    # small, touch the background and hold no white fill: background too.
+    notches, count = ndimage.label((gray >= LIGHT) & ~bg)
+    if count:
+        index = range(1, count + 1)
+        sizes = ndimage.sum(np.ones_like(gray), notches, index)
+        filled = ndimage.maximum(holes, notches, index)
+        touching = ndimage.maximum(ndimage.binary_dilation(bg), notches, index)
+        drop = np.flatnonzero((sizes < NOTCH) & (filled == 0) & (touching > 0)) + 1
+        bg |= np.isin(notches, drop)
+    return bg
 
 
 def runs(flags: np.ndarray, min_len: int):
@@ -81,38 +74,44 @@ def runs(flags: np.ndarray, min_len: int):
 
 
 def main() -> None:
-    rgb = np.asarray(Image.open(SOURCE).convert("RGB")).astype(np.float32)
+    source = Image.open(SOURCE).convert("RGB")
+    big = source.resize((source.width * UP, source.height * UP), Image.BICUBIC)
+    rgb = np.asarray(big).astype(np.float32)
     gray = rgb.mean(axis=2)
     bg = background_mask(gray)
 
-    # Opaque everywhere except the flood-filled background; soften the outer
-    # anti-aliased edge by turning grey border pixels into partly transparent black.
-    rgba = np.zeros(gray.shape + (4,), dtype=np.uint8)
-    rgba[..., :3] = rgb.astype(np.uint8)
-    rgba[..., 3] = np.where(bg, 0, 255)
-    near_bg = np.zeros_like(bg)
-    near_bg[1:, :] |= bg[:-1, :]
-    near_bg[:-1, :] |= bg[1:, :]
-    near_bg[:, 1:] |= bg[:, :-1]
-    near_bg[:, :-1] |= bg[:, 1:]
-    edge = near_bg & ~bg & (gray > 90)
-    rgba[edge, :3] = 0
-    rgba[edge, 3] = np.clip((255 - gray[edge]) * 1.6, 0, 255).astype(np.uint8)
+    # Drop specks: opaque islands too small to be part of a piece.
+    labels, count = ndimage.label(~bg)
+    sizes = ndimage.sum(np.ones_like(gray), labels, range(1, count + 1))
+    bg |= np.isin(labels, np.flatnonzero(sizes < SPECK) + 1)
+
+    # Opaque everywhere except the background. The outer band is the outline,
+    # so it is drawn black with an alpha from how dark the source is there,
+    # which turns the grey anti-aliasing into a soft edge instead of a halo.
+    alpha = np.where(bg, 0.0, 1.0)
+    color = np.clip(rgb, 0, 255)
+    band = ndimage.binary_dilation(bg, iterations=EDGE) & ~bg
+    color[band] = 0
+    alpha[band] = np.clip((255 - gray[band]) / (255 - 110), 0, 1)
+    rgba = np.dstack([color, alpha * 255]).astype(np.uint8)
 
     solid = ~bg
-    row_bands = runs(solid.any(axis=1), 20)
+    row_bands = runs(solid.any(axis=1), 20 * UP)
     assert len(row_bands) == 2, f"expected 2 rows of pieces, found {row_bands}"
 
     sheet = Image.new("RGBA", (CELL * 6, CELL * 2), (0, 0, 0, 0))
-    source = Image.fromarray(rgba, "RGBA")
+    image = Image.fromarray(rgba, "RGBA")
     for r, (y0, y1) in enumerate(row_bands):
-        cols = runs(solid[y0:y1].any(axis=0), 20)
+        cols = runs(solid[y0:y1].any(axis=0), 20 * UP)
         assert len(cols) == 6, f"expected 6 pieces in row {r}, found {cols}"
         for c, (x0, x1) in enumerate(cols):
             ys = np.where(solid[y0:y1, x0:x1].any(axis=1))[0]
-            piece = source.crop((x0, y0 + ys[0], x1, y0 + ys[-1] + 1))
+            piece = image.crop((x0, y0 + ys[0], x1, y0 + ys[-1] + 1))
             scale = (CELL * 0.86) / max(piece.width, piece.height)
-            piece = piece.resize((round(piece.width * scale), round(piece.height * scale)), Image.LANCZOS)
+            # Resize premultiplied so transparent pixels don't bleed colour into the edge.
+            piece = piece.convert("RGBa").resize(
+                (round(piece.width * scale), round(piece.height * scale)), Image.LANCZOS
+            ).convert("RGBA")
             px = c * CELL + (CELL - piece.width) // 2
             py = r * CELL + round(CELL * 0.93) - piece.height
             sheet.alpha_composite(piece, (px, py))
