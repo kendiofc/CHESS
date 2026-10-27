@@ -1058,7 +1058,7 @@ function PuzzleHUD._pieceFrame(self: any, index: number, kind: string, color: "w
 	art.Size = UDim2.fromScale(0.84, 0.84)
 	art.ZIndex = 3
 	art.Parent = holder
-	Decor.pieceShadow(art)
+	Decor.pieceOutline(art)
 	make("UIScale", { Parent = holder })
 	return holder
 end

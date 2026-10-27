@@ -185,23 +185,26 @@ function Decor.boardFrame(board: GuiObject)
 	make("UICorner", { CornerRadius = UDim.new(0, 3), Parent = inlay })
 end
 
--- A dark copy of a piece image, offset down-right, as its shadow.
-function Decor.pieceShadow(art: GuiObject)
+-- A very light black outline around a piece image: faint black copies a hair
+-- out in eight directions, behind the art.
+function Decor.pieceOutline(art: GuiObject)
 	if not art:IsA("ImageLabel") then
 		return
 	end
-	local shadow = art:Clone()
-	shadow.Name = "Shadow"
-	shadow.ImageColor3 = Color3.new(0, 0, 0)
-	-- Faint and close: further out it read as a grey copy of the outline.
-	shadow.ImageTransparency = 0.8
-	shadow.Position = art.Position + UDim2.fromScale(0.015, 0.025)
-	shadow.ZIndex = art.ZIndex - 1
-	shadow.Parent = art.Parent
+	local step = 0.012
+	for _, dir in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }) do
+		local copy = art:Clone()
+		copy.Name = "Outline"
+		copy.ImageColor3 = Color3.new(0, 0, 0)
+		copy.ImageTransparency = 0.82
+		copy.Position = art.Position + UDim2.fromScale(dir[1] * step, dir[2] * step)
+		copy.ZIndex = art.ZIndex - 1
+		copy.Parent = art.Parent
+	end
 end
 
 -- The player's piece: a steady golden glow with an echo ring that keeps
--- spreading out from it. Both sit under the art (ZIndex 3) and its shadow (2).
+-- spreading out from it. Both sit under the art (ZIndex 3) and its outline (2).
 function Decor.aura(holder: GuiObject, color: Color3?)
 	local tone = color or Theme.Gold
 	local glow = make("Frame", {
