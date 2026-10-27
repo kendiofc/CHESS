@@ -193,8 +193,9 @@ function Decor.pieceShadow(art: GuiObject)
 	local shadow = art:Clone()
 	shadow.Name = "Shadow"
 	shadow.ImageColor3 = Color3.new(0, 0, 0)
-	shadow.ImageTransparency = 0.62
-	shadow.Position = art.Position + UDim2.fromScale(0.035, 0.045)
+	-- Faint and close: further out it read as a grey copy of the outline.
+	shadow.ImageTransparency = 0.8
+	shadow.Position = art.Position + UDim2.fromScale(0.015, 0.025)
 	shadow.ZIndex = art.ZIndex - 1
 	shadow.Parent = art.Parent
 end
