@@ -516,7 +516,7 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 		local kingSize = math.min(230, math.floor(W * 0.17))
 		local center = Vector2.new(W - kingSize * 0.6, y + heroH - kingSize * 0.5)
 		glow(page, center, kingSize * 1.6, Theme.Accent)
-		piece("K", {
+		local king = piece("K", {
 			Name = "HeroKing",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromOffset(center.X, center.Y),
@@ -524,6 +524,12 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 			ImageColor3 = Color3.fromRGB(236, 226, 255),
 			Parent = page,
 		})
+		-- The dedicated large king has smooth edges at this size; the sheet's doesn't.
+		if king and Theme.HeroKing ~= "" then
+			king.Image = Theme.HeroKing
+			king.ImageRectSize = Vector2.zero
+			king.ImageRectOffset = Vector2.zero
+		end
 	end
 	text({
 		Name = "Crown",
