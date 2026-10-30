@@ -9,6 +9,7 @@
 --   Daily     today's puzzle, its one free hint, the streak and its shield
 --   Shop      cosmetics for coins or gamepasses (ShopPage)
 --   Stats     the server's numbers for this player, and achievements
+--   Leaderboards  the global top players per board (LeaderboardPage)
 --   Settings  sound on/off, volume, haptics, drag-to-move, replay tutorial
 --
 -- It opens on join (showing a loading state until the server's first
@@ -22,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Achievements = require(Shared:WaitForChild("Achievements"))
+local Leaderboards = require(Shared:WaitForChild("Leaderboards"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
 
@@ -29,12 +31,13 @@ local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
 local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local Decor = require(script.Parent:WaitForChild("Decor"))
 local HomeDashboard = require(script.Parent:WaitForChild("HomeDashboard"))
+local LeaderboardPage = require(script.Parent:WaitForChild("LeaderboardPage"))
 local MenuSidebar = require(script.Parent:WaitForChild("MenuSidebar"))
 local ShopPage = require(script.Parent:WaitForChild("ShopPage"))
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local PLAY_MODES = GameConfig.PLAY_MODES
-local VIEWS = { "Home", "Journey", "Practice", "Daily", "Weekly", "Endless", "Duel", "Shop", "Stats", "Settings" }
+local VIEWS = { "Home", "Journey", "Practice", "Daily", "Weekly", "Endless", "Duel", "Shop", "Stats", "Leaderboards", "Settings" }
 
 -- Below this screen width the sidebar is a rail of icons, and opening it
 -- floats it over the page instead of pushing the page over.
@@ -51,6 +54,7 @@ local NAV_ITEMS: { MenuSidebar.Item } = {
 	{ id = "Duel", icon = "⚔️", label = "Puzzle Duel" },
 	{ id = "Shop", icon = "🛍️", label = "Shop" },
 	{ id = "Stats", icon = "📊", label = "Statistics" },
+	{ id = "Leaderboards", icon = "🥇", label = "Leaderboards" },
 	{ id = "Tutorial", icon = "🎓", label = "How to Play" },
 	{ id = "Settings", icon = "⚙️", label = "Settings", footer = true },
 	{ id = "Collapse", icon = "<", label = "Collapse", footer = true },
@@ -67,6 +71,7 @@ export type Handlers = {
 	duelCancel: () -> (),
 	shopBuy: (slot: string, item: string) -> (),
 	shopEquip: (slot: string, item: string) -> (),
+	leaderboard: (board: string) -> (),
 }
 
 local function make(className: string, props: { [string]: any }?, children: { Instance }?): any
@@ -365,6 +370,7 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 		end)
 	end
 	ShopPage.init(self)
+	LeaderboardPage.init(self)
 	self:_layout()
 	return self
 end
@@ -490,6 +496,7 @@ function PuzzleMenu.open(self: any, view: string?)
 	if self.shopAnimate then
 		self.shopNotice = nil
 	end
+	self.lbAnimate = target == "Leaderboards"
 	self.view = target
 	local wasOpen = self.gui.Enabled
 	self.gui.Enabled = true
@@ -508,9 +515,15 @@ function PuzzleMenu.show(self: any, view: string)
 	if self.shopAnimate then
 		self.shopNotice = nil -- an old notice would describe a state that may have changed
 	end
+	self.lbAnimate = view == "Leaderboards" and self.view ~= "Leaderboards"
 	self.view = view
 	self.list.CanvasPosition = Vector2.zero
 	self:_render()
+end
+
+-- A leaderboard the server sent (see LeaderboardPage).
+function PuzzleMenu.updateLeaderboard(self: any, view: any)
+	LeaderboardPage.onData(self, view)
 end
 
 function PuzzleMenu.close(self: any)
@@ -1445,6 +1458,7 @@ function PuzzleMenu._renderStats(self: any)
 		{ "Restarts", tostring(stats.restarts) },
 		{ "Hints used", tostring(stats.hints) },
 		{ "Moves played", tostring(stats.moves) },
+		{ "Play time", Leaderboards.durationText(stats.playSeconds or 0) },
 		{ "XP", tostring(progress.xp) },
 		{ "Coins", tostring(progress.coins) },
 	}
@@ -1698,6 +1712,7 @@ local NOTES = {
 	Duel = "Opponents come from this server first, then from any server. Leaving a duel counts as a loss.",
 	Shop = "Cosmetics only. Nothing here changes puzzles, hints, timers, rewards or duels.",
 	Stats = "Your numbers, as the server has them.",
+	Leaderboards = "",
 	Settings = "",
 }
 
@@ -1711,6 +1726,7 @@ local TITLES = {
 	Duel = "PUZZLE DUEL",
 	Shop = "SHOP",
 	Stats = "STATISTICS",
+	Leaderboards = "LEADERBOARDS",
 	Settings = "SETTINGS",
 }
 
@@ -1807,6 +1823,8 @@ function PuzzleMenu._render(self: any)
 		ShopPage.render(self)
 	elseif self.view == "Stats" then
 		self:_renderStats()
+	elseif self.view == "Leaderboards" then
+		LeaderboardPage.render(self)
 	elseif self.view == "Settings" then
 		self:_renderSettings()
 	else

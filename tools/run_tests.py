@@ -19,12 +19,13 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SHARED = ROOT / "src" / "shared"
 TEST_LIB = ROOT / "tests" / "lib"
-# Server modules that take their Roblox services as arguments (ProfileStore, DuelManager, DuelMatchmaker).
+# Server modules that take their Roblox services as arguments.
 SERVER_PURE = [
     ROOT / "src" / "server" / "Services" / "ProfileStore.luau",
     ROOT / "src" / "server" / "Services" / "DuelManager.luau",
     ROOT / "src" / "server" / "Services" / "DuelMatchmaker.luau",
     ROOT / "src" / "server" / "Services" / "Entitlements.luau",
+    ROOT / "src" / "server" / "Services" / "LeaderboardService.luau",
 ]
 TESTS = ROOT / "tests" / "run.luau"
 

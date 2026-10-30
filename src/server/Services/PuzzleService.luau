@@ -21,6 +21,9 @@
 -- single-player actions that would change what they see are refused.
 -- Players left waiting are also offered to other servers (DuelMatchmaker);
 -- a cross-server match is played on a reserved server both are teleported to.
+--
+-- Leaderboards (LeaderboardService) rank saved profiles. Play time is counted
+-- here with the server's clock and saved as ordinary ops.
 
 local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
@@ -31,6 +34,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 local TeleportService = game:GetService("TeleportService")
+local UserService = game:GetService("UserService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BoardState = require(Shared:WaitForChild("BoardState"))
@@ -38,6 +42,7 @@ local EndlessRun = require(Shared:WaitForChild("EndlessRun"))
 local GamePassConfig = require(Shared:WaitForChild("GamePassConfig"))
 local ShopCatalog = require(Shared:WaitForChild("ShopCatalog"))
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
+local Leaderboards = require(Shared:WaitForChild("Leaderboards"))
 local Progression = require(Shared:WaitForChild("Progression"))
 local PuzzleDefinitions = require(Shared:WaitForChild("PuzzleDefinitions"))
 local PuzzleHints = require(Shared:WaitForChild("PuzzleHints"))
@@ -48,11 +53,13 @@ local WeeklyChallenge = require(Shared:WaitForChild("WeeklyChallenge"))
 local DuelManager = require(script.Parent:WaitForChild("DuelManager"))
 local DuelMatchmaker = require(script.Parent:WaitForChild("DuelMatchmaker"))
 local Entitlements = require(script.Parent:WaitForChild("Entitlements"))
+local LeaderboardService = require(script.Parent:WaitForChild("LeaderboardService"))
 local ProfileStore = require(script.Parent:WaitForChild("ProfileStore"))
 
 local ACTIONS = GameConfig.ACTIONS
 local PLAY_MODES = GameConfig.PLAY_MODES
 local DATASTORE_NAME = "EchoChessProfiles_v1"
+local PLAYTIME_FLUSH = 300 -- seconds of play gathered before they are recorded
 
 type PlayerState = {
 	session: PuzzleSession.PuzzleSession,
@@ -78,9 +85,12 @@ local profiles: any
 local duels: any
 local matchmaker: any -- nil when cross-server matching is off
 local entitlements: any
+local leaderboards: any
+local playClock: { [number]: number } = {} -- os.clock() up to which play time is recorded
 local synced: { [number]: boolean } = {} -- players whose client has loaded
 local stateRemote: RemoteEvent
 local actionRemote: RemoteEvent
+local leaderboardRemote: RemoteEvent
 
 local function ensureRemote(folder: Instance, name: string): RemoteEvent
 	local existing = folder:FindFirstChild(name)
@@ -102,6 +112,7 @@ local function ensureRemotes()
 	end
 	actionRemote = ensureRemote(folder :: Instance, GameConfig.REMOTES.Action)
 	stateRemote = ensureRemote(folder :: Instance, GameConfig.REMOTES.State)
+	leaderboardRemote = ensureRemote(folder :: Instance, GameConfig.REMOTES.Leaderboard)
 end
 
 local function elapsed(state: PlayerState): number
@@ -161,6 +172,33 @@ end
 local function record(player: Player, op: any): any
 	local reward = profiles:record(player.UserId, op)
 	return reward
+end
+
+-- Records the play time gathered since the last call, once there is at least
+-- `minimum` seconds of it.
+local function flushPlaytime(userId: number, minimum: number)
+	local since = playClock[userId]
+	if not since or not profiles:get(userId) then
+		return
+	end
+	local seconds = math.floor(os.clock() - since)
+	if seconds < math.max(minimum, 1) then
+		return
+	end
+	playClock[userId] = since + seconds
+	while seconds > 0 do
+		local part = math.min(seconds, Progression.PLAYTIME_MAX_OP)
+		profiles:record(userId, { kind = "playtime", seconds = part })
+		seconds -= part
+	end
+end
+
+-- Puts a player's scores on the leaderboards. Only profiles that loaded from
+-- the DataStore count: an offline one starts from zero.
+local function submitScores(userId: number)
+	if profiles:status(userId) == "ok" then
+		leaderboards:submit(userId, profiles:get(userId))
+	end
 end
 
 local function requestSave(player: Player)
@@ -310,6 +348,41 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 	end
 	local data = if type(payload) == "table" then payload :: { [any]: any } else {}
 	local userId = player.UserId
+
+	-- Leaderboards ----------------------------------------------------------
+	-- Read-only, allowed on any screen. Answered on its own remote.
+	if action == ACTIONS.Leaderboard then
+		local board = Leaderboards.get(data.board)
+		if board then
+			task.spawn(function()
+				local live = {}
+				for _, other in ipairs(Players:GetPlayers()) do
+					local profile = profiles:get(other.UserId)
+					if profile then
+						table.insert(live, {
+							userId = other.UserId,
+							value = Leaderboards.score(board, profile),
+							name = other.DisplayName,
+						})
+					end
+				end
+				local view = leaderboards:view(board.id, live)
+				if not (view and player.Parent) then
+					return
+				end
+				local rank = nil
+				for _, entry in ipairs(view.entries) do
+					if entry.userId == userId then
+						rank = entry.rank
+						break
+					end
+				end
+				view.me = { value = Leaderboards.score(board, profileOf(player)), rank = rank }
+				leaderboardRemote:FireClient(player, view)
+			end)
+		end
+		return
+	end
 
 	-- Shop ------------------------------------------------------------------
 	-- Allowed on any screen (cosmetics never touch a puzzle or a duel). Only
@@ -790,6 +863,27 @@ local function createMatchmaker()
 	end
 end
 
+local function createLeaderboards()
+	leaderboards = LeaderboardService.new({
+		boards = Leaderboards,
+		orderedStore = function(name: string): any
+			return DataStoreService:GetOrderedDataStore(name)
+		end,
+		userNames = function(userIds: { number }): { [number]: string }
+			local names = {}
+			for _, info in ipairs(UserService:GetUserInfosByUserIdsAsync(userIds)) do
+				names[info.Id] = info.DisplayName
+			end
+			return names
+		end,
+		now = os.clock,
+		wait = function(seconds: number)
+			task.wait(seconds)
+		end,
+		log = warn,
+	})
+end
+
 local function createShop()
 	entitlements = Entitlements.new({
 		owns = function(userId: number, passId: number): boolean
@@ -895,12 +989,15 @@ function PuzzleService.Start()
 	createDuels()
 	createMatchmaker()
 	createShop()
+	createLeaderboards()
 	createStudioDuelHook()
 	createStudioShopHook()
 	actionRemote.OnServerEvent:Connect(onAction)
 
 	local function onPlayerAdded(player: Player)
 		entitlements:join(player.UserId)
+		playClock[player.UserId] = os.clock()
+		leaderboards:setName(player.UserId, player.DisplayName)
 		-- Passes they already own are checked on join, without holding anything up.
 		task.spawn(function()
 			if entitlements:refresh(player.UserId) then
@@ -936,7 +1033,16 @@ function PuzzleService.Start()
 		synced[player.UserId] = nil
 		entitlements:forget(player.UserId)
 		states[player] = nil
-		profiles:release(player.UserId)
+		local userId = player.UserId
+		flushPlaytime(userId, 1)
+		playClock[userId] = nil
+		local loaded = profiles:status(userId) == "ok"
+		local profile = profiles:get(userId)
+		-- Scores go up only once the profile they come from is saved.
+		if profiles:release(userId) and loaded and profile then
+			leaderboards:submit(userId, profile)
+		end
+		leaderboards:forget(userId)
 	end)
 
 	-- Duel clock: starts matches after the countdown and ends them on time.
@@ -947,13 +1053,17 @@ function PuzzleService.Start()
 		end
 	end)
 
-	-- Autosave: ops are also saved soon after every win.
+	-- Autosave: ops are also saved soon after every win. Play time is
+	-- recorded every few minutes, and saved scores go to the leaderboards.
 	task.spawn(function()
 		while true do
 			task.wait(ProfileStore.AUTOSAVE_INTERVAL)
 			for _, userId in ipairs(profiles:userIds()) do
+				flushPlaytime(userId, PLAYTIME_FLUSH)
 				task.spawn(function()
-					profiles:save(userId)
+					if profiles:save(userId) then
+						submitScores(userId)
+					end
 				end)
 			end
 		end
@@ -965,8 +1075,13 @@ function PuzzleService.Shutdown()
 	local userIds = profiles:userIds()
 	local remaining = #userIds
 	for _, userId in ipairs(userIds) do
+		flushPlaytime(userId, 1)
 		task.spawn(function()
-			profiles:release(userId)
+			local loaded = profiles:status(userId) == "ok"
+			local profile = profiles:get(userId)
+			if profiles:release(userId) and loaded and profile then
+				leaderboards:submit(userId, profile)
+			end
 			remaining -= 1
 		end)
 	end

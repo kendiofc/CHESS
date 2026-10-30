@@ -49,6 +49,7 @@ export type Handlers = {
 	duelExit: () -> (),
 	shopBuy: (slot: string, item: string) -> (),
 	shopEquip: (slot: string, item: string) -> (),
+	leaderboard: (board: string) -> (),
 }
 
 local PLAY_MODES = GameConfig.PLAY_MODES
@@ -270,6 +271,9 @@ function PuzzleHUD.new(playerGui: Instance, handlers: Handlers)
 		end,
 		shopEquip = function(slot: string, item: string)
 			self.handlers.shopEquip(slot, item)
+		end,
+		leaderboard = function(board: string)
+			self.handlers.leaderboard(board)
 		end,
 	})
 	self.menu.dragEnabled = self.dragEnabled

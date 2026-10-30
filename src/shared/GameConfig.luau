@@ -142,6 +142,7 @@ GameConfig.REMOTES = {
 	Folder = "Remotes",
 	Action = "PuzzleAction", -- client -> server: (action: string, payload: table?)
 	State = "PuzzleState", -- server -> client: (snapshot: table)
+	Leaderboard = "LeaderboardData", -- server -> client: (board view: table), answers ACTIONS.Leaderboard
 }
 
 GameConfig.ACTIONS = {
@@ -159,6 +160,7 @@ GameConfig.ACTIONS = {
 	DuelExit = "duel_exit", -- close the result screen and go back to puzzles
 	ShopBuy = "shop_buy", -- { slot, item }: buy a coin item (the server sets the price)
 	ShopEquip = "shop_equip", -- { slot, item }: equip an item the server says you may use
+	Leaderboard = "leaderboard", -- { board }: ask for a leaderboard (see Leaderboards)
 }
 
 return GameConfig

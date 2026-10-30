@@ -23,6 +23,9 @@
 --     items, so a retried or doubled op never charges twice or goes negative;
 --   * an Endless board is one op per run and board ("endless:<run>:<n>"), so a
 --     retried save counts it once; the best run only ever goes up.
+--   * play time is added in small ops (at most PLAYTIME_MAX_OP seconds each)
+--     that the server sends as the player plays; the op id keeps a retry from
+--     counting twice.
 
 local Achievements = require(script.Parent.Achievements)
 local GameConfig = require(script.Parent.GameConfig)
@@ -34,6 +37,7 @@ local Progression = {}
 
 Progression.VERSION = 1
 Progression.APPLIED_MEMORY = 200 -- op ids remembered for de-duplication
+Progression.PLAYTIME_MAX_OP = 900 -- seconds one playtime op can add
 local NONE = 1e9 -- "no best yet"; DataStores cannot store math.huge
 
 export type Completion = {
@@ -76,7 +80,16 @@ export type Settings = { sound: boolean, volume: number, haptics: boolean, drag:
 export type Profile = {
 	version: number,
 	completed: { [string]: Completion },
-	stats: { solves: number, fails: number, restarts: number, hints: number, moves: number, dailies: number, weeklies: number },
+	stats: {
+		solves: number,
+		fails: number,
+		restarts: number,
+		hints: number,
+		moves: number,
+		dailies: number,
+		weeklies: number,
+		playSeconds: number, -- time in the game, counted by the server
+	},
 	xp: number,
 	coins: number,
 	rewards: { [string]: boolean },
@@ -94,7 +107,7 @@ export type Profile = {
 
 export type Op = {
 	id: string,
-	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings" | "tutorial" | "duel" | "endless"
+	kind: string, -- "win" | "fail" | "restart" | "hint" | "settings" | "tutorial" | "duel" | "endless" | "playtime"
 	board: number?, -- endless ops: the board number cleared in the run
 	slot: string?, -- buy / equip ops: the cosmetic slot
 	item: string?, -- buy / equip ops: the item id in that slot
@@ -102,7 +115,7 @@ export type Op = {
 	puzzleId: string?,
 	mode: string?,
 	moves: number?,
-	seconds: number?,
+	seconds: number?, -- win ops: the clear time; playtime ops: seconds played since the last one
 	day: number?,
 	settings: { [string]: any }?,
 	outcome: string?, -- tutorial ops; duel ops: "win" | "loss" | "draw"
@@ -135,7 +148,7 @@ function Progression.newProfile(): Profile
 	return {
 		version = Progression.VERSION,
 		completed = {},
-		stats = { solves = 0, fails = 0, restarts = 0, hints = 0, moves = 0, dailies = 0, weeklies = 0 },
+		stats = { solves = 0, fails = 0, restarts = 0, hints = 0, moves = 0, dailies = 0, weeklies = 0, playSeconds = 0 },
 		xp = 0,
 		coins = 0,
 		rewards = {},
@@ -832,6 +845,8 @@ function Progression.apply(profile: Profile, op: Op): (boolean, Reward?)
 		applyBuy(profile, op)
 	elseif op.kind == "equip" then
 		applyEquip(profile, op)
+	elseif op.kind == "playtime" then
+		profile.stats.playSeconds += wholeNumber(op.seconds, 0, 0, Progression.PLAYTIME_MAX_OP)
 	elseif op.kind == "fail" then
 		profile.stats.fails += 1
 	elseif op.kind == "restart" then

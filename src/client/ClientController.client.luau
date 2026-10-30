@@ -13,6 +13,7 @@ local ACTIONS = GameConfig.ACTIONS
 local remotes = ReplicatedStorage:WaitForChild(GameConfig.REMOTES.Folder)
 local actionRemote = remotes:WaitForChild(GameConfig.REMOTES.Action) :: RemoteEvent
 local stateRemote = remotes:WaitForChild(GameConfig.REMOTES.State) :: RemoteEvent
+local leaderboardRemote = remotes:WaitForChild(GameConfig.REMOTES.Leaderboard) :: RemoteEvent
 
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
@@ -80,10 +81,17 @@ local hud = PuzzleHUD.new(playerGui, {
 	shopEquip = function(slot: string, item: string)
 		actionRemote:FireServer(ACTIONS.ShopEquip, { slot = slot, item = item })
 	end,
+	leaderboard = function(board: string)
+		actionRemote:FireServer(ACTIONS.Leaderboard, { board = board })
+	end,
 })
 
 stateRemote.OnClientEvent:Connect(function(snapshot)
 	hud:render(snapshot)
+end)
+
+leaderboardRemote.OnClientEvent:Connect(function(view)
+	hud.menu:updateLeaderboard(view)
 end)
 
 actionRemote:FireServer(ACTIONS.Sync)

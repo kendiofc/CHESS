@@ -2996,6 +2996,251 @@ test("shop: cosmetics never touch duel puzzles or rules", function()
 	end
 end)
 
+
+-- Leaderboards ---------------------------------------------------------------------------
+
+local Leaderboards = require(Shared.Leaderboards)
+local LeaderboardService = require(Shared.LeaderboardService)
+
+test("playtime: ops add server-counted seconds, capped per op and counted once", function()
+	local profile = Progression.newProfile()
+	eq(profile.stats.playSeconds, 0)
+	Progression.apply(profile, { id = "p1", kind = "playtime", seconds = 300 })
+	Progression.apply(profile, { id = "p1", kind = "playtime", seconds = 300 })
+	eq(profile.stats.playSeconds, 300, "a repeated op counts once")
+	Progression.apply(profile, { id = "p2", kind = "playtime", seconds = 1e9 })
+	eq(profile.stats.playSeconds, 300 + Progression.PLAYTIME_MAX_OP, "capped")
+	Progression.apply(profile, { id = "p3", kind = "playtime", seconds = -50 })
+	Progression.apply(profile, { id = "p4", kind = "playtime", seconds = "lots" })
+	Progression.apply(profile, { id = "p5", kind = "playtime", seconds = 0 / 0 })
+	eq(profile.stats.playSeconds, 300 + Progression.PLAYTIME_MAX_OP, "bad values add nothing")
+	-- Stored and loaded like any stat; old profiles start at zero.
+	eq(Progression.normalize(profile).stats.playSeconds, profile.stats.playSeconds)
+	eq(Progression.normalize({ stats = { solves = 3 } }).stats.playSeconds, 0)
+	eq(Progression.summary(profile, 20000).stats.playSeconds, profile.stats.playSeconds)
+end)
+
+test("playtime: survives the ProfileStore save merge", function()
+	local store = FakeStore.new()
+	local profiles = ProfileStore.new({
+		store = store,
+		progression = Progression,
+		now = function()
+			return 0
+		end,
+		wait = function() end,
+		newId = (function()
+			local n = 0
+			return function()
+				n += 1
+				return "id" .. n
+			end
+		end)(),
+	})
+	profiles:load(7)
+	profiles:record(7, { kind = "playtime", seconds = 120 })
+	profiles:record(7, { kind = "playtime", seconds = 60 })
+	assert(profiles:save(7))
+	profiles:release(7)
+	eq(profiles:load(7).stats.playSeconds, 180)
+end)
+
+test("leaderboards: every board scores a profile and formats its value", function()
+	local profile = Progression.newProfile()
+	profile.endless.best = 12
+	profile.stats.playSeconds = 3 * 3600 + 5 * 60 + 9
+	profile.stats.solves = 1234
+	profile.xp = 1234567
+	profile.streak.longest = 9
+	profile.duel.wins = 4
+	local expected = {
+		endless = { 12, "12 boards" },
+		playtime = { 11109, "3h 05m" },
+		solves = { 1234, "1,234 puzzles" },
+		xp = { 1234567, "1,234,567 XP" },
+		streak = { 9, "9 days" },
+		duels = { 4, "4 wins" },
+	}
+	local seen = 0
+	for _, board in ipairs(Leaderboards.list) do
+		local want = assert(expected[board.id], "unexpected board " .. board.id)
+		local score = Leaderboards.score(board, profile)
+		eq(score, want[1], board.id)
+		eq(Leaderboards.format(board, score), want[2], board.id)
+		eq(Leaderboards.get(board.id), board)
+		assert(#Leaderboards.storeName(board.id) <= 50, "store name too long")
+		seen += 1
+	end
+	eq(seen, 6)
+	eq(Leaderboards.get("nope"), nil)
+	eq(Leaderboards.get(5), nil)
+	eq(Leaderboards.score(Leaderboards.byId.endless, Progression.newProfile()), 0)
+	eq(Leaderboards.durationText(45), "45s")
+	eq(Leaderboards.durationText(12 * 60 + 30), "12m")
+	eq(Leaderboards.format(Leaderboards.byId.xp, 999), "999 XP")
+end)
+
+test("leaderboards: rank orders high to low, breaks ties by user id, drops zeros", function()
+	local ranked = Leaderboards.rank({
+		{ userId = 3, value = 5 },
+		{ userId = 1, value = 9, name = "A" },
+		{ userId = 2, value = 5 },
+		{ userId = 4, value = 0 },
+		{ userId = 1, value = 7 }, -- the same player twice: the higher score counts
+		{ userId = "x", value = 99 },
+	})
+	eq(#ranked, 3)
+	eq(ranked[1].userId, 1)
+	eq(ranked[1].value, 9)
+	eq(ranked[1].name, "A")
+	eq(ranked[2].userId, 2)
+	eq(ranked[3].userId, 3)
+	eq(ranked[3].rank, 3)
+	local many = {}
+	for i = 1, 80 do
+		table.insert(many, { userId = i, value = i })
+	end
+	local top = Leaderboards.rank(many)
+	eq(#top, Leaderboards.SIZE)
+	eq(top[1].userId, 80)
+end)
+
+-- An OrderedDataStore stand-in: UpdateAsync and GetSortedAsync, optionally failing.
+local function fakeOrdered()
+	local fake = { data = {}, reads = 0, writes = 0, broken = false }
+	function fake:UpdateAsync(key: string, transform: (any) -> any)
+		if fake.broken then
+			error("DataStores are not available")
+		end
+		local value = transform(fake.data[key])
+		if value ~= nil then
+			fake.writes += 1
+			fake.data[key] = value
+		end
+		return value
+	end
+	function fake:GetSortedAsync(ascending: boolean, size: number)
+		if fake.broken then
+			error("DataStores are not available")
+		end
+		fake.reads += 1
+		local items = {}
+		for key, value in pairs(fake.data) do
+			table.insert(items, { key = key, value = value })
+		end
+		table.sort(items, function(a, b)
+			return if ascending then a.value < b.value else a.value > b.value
+		end)
+		local page = {}
+		for i = 1, math.min(size, #items) do
+			page[i] = items[i]
+		end
+		return {
+			GetCurrentPage = function()
+				return page
+			end,
+		}
+	end
+	return fake
+end
+
+local function makeBoards()
+	local env = { clock = 0, stores = {}, nameCalls = 0 }
+	env.service = LeaderboardService.new({
+		boards = Leaderboards,
+		orderedStore = function(name: string)
+			env.stores[name] = env.stores[name] or fakeOrdered()
+			return env.stores[name]
+		end,
+		userNames = function(ids: { number })
+			env.nameCalls += 1
+			local names = {}
+			for _, id in ipairs(ids) do
+				names[id] = "user" .. id
+			end
+			return names
+		end,
+		now = function()
+			return env.clock
+		end,
+		wait = function(seconds: number)
+			env.clock += seconds
+		end,
+	})
+	env.store = function(id: string)
+		return env.stores[Leaderboards.storeName(id)]
+	end
+	return env
+end
+
+test("leaderboards: scores are written when they rise and never lowered", function()
+	local env = makeBoards()
+	local profile = Progression.newProfile()
+	profile.endless.best = 10
+	env.service:submit(1, profile)
+	eq(env.store("endless").data["1"], 10)
+	eq(env.store("xp"), nil, "zero scores aren't written")
+	local writes = env.store("endless").writes
+	env.service:submit(1, profile)
+	eq(env.store("endless").writes, writes, "an unchanged score isn't written again")
+	-- Another server already stored a higher score: it stays.
+	env.store("endless").data["1"] = 15
+	profile.endless.best = 12
+	env.service:submit(1, profile)
+	eq(env.store("endless").data["1"], 15)
+	profile.endless.best = 20
+	env.service:submit(1, profile)
+	eq(env.store("endless").data["1"], 20)
+end)
+
+test("leaderboards: a board is cached, named, and this server's scores laid over it", function()
+	local env = makeBoards()
+	local a, b = Progression.newProfile(), Progression.newProfile()
+	a.xp, b.xp = 500, 300
+	env.service:submit(101, a)
+	env.service:submit(102, b)
+	local view = env.service:view("xp", { { userId = 103, value = 400, name = "Here" } })
+	eq(view.scope, "global")
+	eq(#view.entries, 3)
+	eq(view.entries[1].name, "user101")
+	eq(view.entries[2].userId, 103)
+	eq(view.entries[2].name, "Here")
+	eq(view.entries[2].rank, 2)
+	eq(env.store("xp").reads, 1)
+	-- Within REFRESH the cached board is reused; a live player's new score shows at once.
+	env.clock += Leaderboards.REFRESH - 1
+	view = env.service:view("xp", { { userId = 102, value = 900, name = "Climber" } })
+	eq(env.store("xp").reads, 1)
+	eq(view.entries[1].userId, 102)
+	eq(view.entries[1].value, 900)
+	eq(env.nameCalls, 1, "names are looked up once")
+	env.clock += 2
+	env.service:view("xp", {})
+	eq(env.store("xp").reads, 2)
+	eq(env.service:view("nope", {}), nil)
+end)
+
+test("leaderboards: without DataStores a board shows this server's players", function()
+	local env = makeBoards()
+	local profile = Progression.newProfile()
+	profile.duel.wins = 3
+	env.service:submit(1, profile) -- creates the store
+	env.store("duels").broken = true
+	profile.duel.wins = 4
+	env.service:submit(1, profile)
+	eq(env.service:available(), false, "a failed write pauses the stores")
+	local view = env.service:view("duels", { { userId = 1, value = 4, name = "Me" }, { userId = 2, value = 0 } })
+	eq(view.scope, "server")
+	eq(#view.entries, 1)
+	eq(view.entries[1].name, "Me")
+	-- After RETRY_AFTER the stores are tried again.
+	env.store("duels").broken = false
+	env.clock += LeaderboardService.RETRY_AFTER + Leaderboards.REFRESH
+	env.service:submit(1, profile)
+	eq(env.store("duels").data["1"], 4)
+	eq(env.service:view("duels", {}).scope, "global")
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failed))
 if failed > 0 then
 	error("test failures")
