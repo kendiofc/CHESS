@@ -196,7 +196,9 @@ local function avatar(parent: Instance, userId: number, x: number, size: number)
 end
 
 -- One player's line: rank, avatar, name, score.
-local function row(list: Instance, order: number, board: Leaderboards.Board, entry: any, mine: boolean)
+-- On a narrow list the score column shrinks and "(you)" is left to the highlight.
+local function row(list: Instance, order: number, board: Leaderboards.Board, entry: any, mine: boolean, narrow: boolean)
+	local scoreWidth = if narrow then 80 else 110
 	local frame = make("Frame", {
 		Name = "Entry_" .. entry.rank,
 		LayoutOrder = order,
@@ -217,14 +219,14 @@ local function row(list: Instance, order: number, board: Leaderboards.Board, ent
 	avatar(frame, entry.userId, 50, 34)
 	text({
 		Name = "PlayerName",
-		Text = (entry.name or ("Player " .. entry.userId)) .. (if mine then "  (you)" else ""),
+		Text = (entry.name or ("Player " .. entry.userId)) .. (if mine and not narrow then "  (you)" else ""),
 		FontFace = Theme.FontBold,
 		TextSize = 15,
 		TextColor3 = if mine then Theme.Gold else Theme.Text,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Position = UDim2.fromOffset(94, 0),
-		Size = UDim2.new(1, -(94 + 118), 1, 0),
+		Size = UDim2.new(1, -(94 + scoreWidth + 8), 1, 0),
 		Parent = frame,
 	})
 	text({
@@ -236,7 +238,7 @@ local function row(list: Instance, order: number, board: Leaderboards.Board, ent
 		TextXAlignment = Enum.TextXAlignment.Right,
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -12, 0, 0),
-		Size = UDim2.new(0, 110, 1, 0),
+		Size = UDim2.new(0, scoreWidth, 1, 0),
 		Parent = frame,
 	})
 	return frame
@@ -322,7 +324,8 @@ function LeaderboardPage.render(menu: any)
 	local list = menu.list
 	local board = Leaderboards.get(menu.lbBoard) or Leaderboards.list[1]
 	menu.lbBoard = board.id
-	tabs(menu, list, list.AbsoluteSize.X - 8)
+	local width = list.AbsoluteSize.X - 8
+	tabs(menu, list, width)
 
 	local held = menu.lbData[board.id]
 	if not held or os.clock() - held.at >= STALE then
@@ -344,7 +347,7 @@ function LeaderboardPage.render(menu: any)
 	local myId = Players.LocalPlayer.UserId
 	for index, entry in ipairs(view.entries) do
 		if type(entry) == "table" and type(entry.userId) == "number" and type(entry.value) == "number" then
-			row(list, 10 + index, board, entry, entry.userId == myId)
+			row(list, 10 + index, board, entry, entry.userId == myId, width < 420)
 		end
 	end
 	if #view.entries == 0 then
