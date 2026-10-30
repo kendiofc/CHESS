@@ -40,7 +40,7 @@ Theme.PieceCell = 170
 Theme.PieceSheetColumns = { K = 0, Q = 1, B = 2, N = 3, R = 4, P = 5 }
 -- The big king on the Home screen (assets/hero-king.png, 512x512, made by
 -- tools/build_hero_king.py). While empty, Home uses the sheet's king instead.
-Theme.HeroKing = ""
+Theme.HeroKing = "rbxassetid://78428121298385"
 
 Theme.PieceWhite = { fill = Color3.fromRGB(250, 247, 238), outline = Color3.fromRGB(28, 30, 30) }
 Theme.PieceBlack = { fill = Color3.fromRGB(36, 38, 42), outline = Color3.fromRGB(232, 226, 210) }
