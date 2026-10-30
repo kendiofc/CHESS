@@ -28,7 +28,7 @@ local function boardFor(seed: number, n: number): any
 	local pool = PuzzleDefinitions.byDifficulty[spec.difficulty]
 	local fallback = table.clone(pool[(seed + n) % #pool + 1])
 	fallback.id = "endless-" .. n
-	fallback.name = "Board " .. n
+	fallback.name = string.format("Board %d", n)
 	fallback.number = n
 	fallback.par = nil
 	fallback.endless = true

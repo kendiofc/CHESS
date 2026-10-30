@@ -219,7 +219,9 @@ local function row(list: Instance, order: number, board: Leaderboards.Board, ent
 	avatar(frame, entry.userId, 50, 34)
 	text({
 		Name = "PlayerName",
-		Text = (entry.name or ("Player " .. entry.userId)) .. (if mine and not narrow then "  (you)" else ""),
+		Text = if mine and not narrow
+			then string.format("%s  (you)", entry.name or tostring(entry.userId))
+			else entry.name or string.format("Player %d", entry.userId),
 		FontFace = Theme.FontBold,
 		TextSize = 15,
 		TextColor3 = if mine then Theme.Gold else Theme.Text,

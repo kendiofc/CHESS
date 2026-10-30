@@ -95,7 +95,12 @@ GameConfig.DEFAULT_SETTINGS = {
 	volume = 0.7,
 	haptics = true,
 	drag = true, -- drag-to-move on top of tap-to-move
+	language = "", -- a code from LANGUAGES; "" until the player picks one
 }
+
+-- Languages the player can pick (the client's Lang module has their names
+-- and the translations). The first join asks for one.
+GameConfig.LANGUAGES = { "en", "es", "pt", "fr", "de", "id" }
 
 -- Remote rate limit per player: a bucket of BURST actions refilled at
 -- PER_SECOND tokens per second.
@@ -151,7 +156,7 @@ GameConfig.ACTIONS = {
 	Undo = "undo",
 	Restart = "restart",
 	Hint = "hint",
-	Settings = "settings", -- { sound: boolean?, volume: number?, haptics: boolean?, drag: boolean? }
+	Settings = "settings", -- { sound: boolean?, volume: number?, haptics: boolean?, drag: boolean?, language: string? }
 	Tutorial = "tutorial", -- { outcome = "completed" | "skipped" }
 	Sync = "sync", -- client asks for the current snapshot (e.g. after it loads)
 	DuelJoin = "duel_join", -- enter the duel queue

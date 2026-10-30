@@ -1232,7 +1232,7 @@ function PuzzleHUD._renderHeader(self: any, snap: any)
 	self.hintButton.BackgroundTransparency = if hintsOn then 0 else 0.6
 	self.hintButton.TextTransparency = if hintsOn then 0 else 0.5
 	self.movesValue.Text = tostring(snap.moveCount)
-	self.parLabel.Text = if run then PuzzleMenu.livesText(run.lives, run.maxLives) else "Par " .. tostring(snap.par)
+	self.parLabel.Text = if run then PuzzleMenu.livesText(run.lives, run.maxLives) else string.format("Par %d", snap.par)
 	local captured = snap.targetsTotal - snap.targetsLeft
 	self.capturedValue.Text = string.format("%d / %d", captured, snap.targetsTotal)
 	Anim.tween(self.progressFill, 0.3, { Size = UDim2.fromScale(captured / math.max(1, snap.targetsTotal), 1) })
@@ -1409,7 +1409,7 @@ function PuzzleHUD._renderMessage(self: any, snap: any)
 		color = Theme.Danger
 		Anim.shake(self.boardFrame)
 	elseif snap.event == "hint" and snap.hint then
-		text = "Hint: " .. snap.hint
+		text = string.format("Hint: %s", snap.hint)
 		color = Theme.Selected
 	elseif snap.status == "won" then
 		text = "Board cleared!"
@@ -1428,9 +1428,9 @@ function PuzzleHUD._renderMessage(self: any, snap: any)
 	elseif snap.event == "undo" then
 		text = "Move undone."
 	elseif snap.event == "move" then
-		text = "Your " .. string.lower(playerName) .. " moved."
+		text = string.format("Your %s moved.", string.lower(playerName))
 	else
-		text = snap.objective .. " Tap your piece to begin."
+		text = string.format("%s Tap your piece to begin.", snap.objective)
 	end
 	self.messageLabel.Text = text
 	self.messageLabel.TextColor3 = color
@@ -1543,7 +1543,7 @@ local function progressText(snap: any, result: any): string
 		local here = index and progress.unlocks[index]
 		local nextRow = index and progress.unlocks[index + 1]
 		if result.unlocked then
-			return result.unlocked .. " puzzles are now open in Journey."
+			return string.format("%s puzzles are now open in Journey.", result.unlocked)
 		elseif here and nextRow and not nextRow.unlocked then
 			return string.format(
 				"%s: %d/%d clears to unlock %s",
@@ -1772,7 +1772,7 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 			ColorSequenceKeypoint.new(1, Theme.GoldDeep),
 		})
 		r.stroke.Color = Theme.Gold
-		r.subtitle.Text = snap.name .. " solved." .. (if result and result.newBest then "  New best!" else "")
+		r.subtitle.Text = string.format(if result and result.newBest then "%s solved.  New best!" else "%s solved.", snap.name)
 		r.stats.Text = string.format("Moves %d (par %d)    Time %s", snap.moveCount, snap.par, formatTime(snap.elapsed))
 		r.stars.Visible = result ~= nil
 		r.detail.Visible = result ~= nil
@@ -1808,7 +1808,7 @@ function PuzzleHUD._renderResult(self: any, snap: any, previous: any)
 	end
 	r.banner.Visible = unlocked ~= nil
 	if unlocked then
-		r.banner.Text = string.upper(unlocked) .. " UNLOCKED!"
+		r.banner.Text = string.format("%s UNLOCKED!", string.upper(unlocked))
 		r.banner.BackgroundColor3 = Theme.DifficultyColors[unlocked] or Theme.Gold
 		self.menu:markUnlocked(unlocked)
 	end

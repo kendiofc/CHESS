@@ -970,7 +970,7 @@ function PlayDesk.render(self: any, snap: any, saveStatus: string?)
 	local progress = snap.progress
 	if progress then
 		local level = Progression.levelOf(progress.xp)
-		self.levelPill.Text = "Lv. " .. level.level
+		self.levelPill.Text = string.format("Lv. %d", level.level)
 		self.xpAmount.Text = string.format("%s / %s XP", HomeDashboard.commas(level.into), HomeDashboard.commas(level.needed))
 		self.xpFill.Size = UDim2.fromScale(math.clamp(level.into / level.needed, 0, 1), 1)
 		self.coinAmount.Text = HomeDashboard.commas(progress.coins)

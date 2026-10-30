@@ -10,7 +10,7 @@
 --   Shop      cosmetics for coins or gamepasses (ShopPage)
 --   Stats     the server's numbers for this player, and achievements
 --   Leaderboards  the global top players per board (LeaderboardPage)
---   Settings  sound on/off, volume, haptics, drag-to-move, replay tutorial
+--   Settings  language, sound on/off, volume, haptics, drag-to-move, replay tutorial
 --
 -- It opens on join (showing a loading state until the server's first
 -- snapshot) and from the HUD's Menu button. It only draws what the server
@@ -31,6 +31,8 @@ local Anim = require(script.Parent.Parent:WaitForChild("AnimationController"))
 local Sound = require(script.Parent.Parent:WaitForChild("SoundController"))
 local Decor = require(script.Parent:WaitForChild("Decor"))
 local HomeDashboard = require(script.Parent:WaitForChild("HomeDashboard"))
+local Lang = require(script.Parent:WaitForChild("Lang"))
+local LanguagePicker = require(script.Parent:WaitForChild("LanguagePicker"))
 local LeaderboardPage = require(script.Parent:WaitForChild("LeaderboardPage"))
 local MenuSidebar = require(script.Parent:WaitForChild("MenuSidebar"))
 local ShopPage = require(script.Parent:WaitForChild("ShopPage"))
@@ -316,18 +318,18 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 				local left = self.snapshot.nextDailyIn - (os.clock() - self.receivedAt)
 				label.Text = if left <= 0
 					then "A new puzzle is ready. Reopen the menu to load it."
-					else "Next puzzle in " .. duration(left)
+					else string.format("Next puzzle in %s", duration(left))
 			end
 			local weekly = self.weeklyCountdown
 			if self.gui.Enabled and weekly and weekly.Parent and self.snapshot and self.snapshot.nextWeeklyIn then
 				local left = self.snapshot.nextWeeklyIn - (os.clock() - self.receivedAt)
 				weekly.Text = if left <= 0
 					then "A new challenge is ready. Reopen the menu to load it."
-					else "New challenge in " .. duration(left)
+					else string.format("New challenge in %s", duration(left))
 			end
 			local queue = self.queueLabel
 			if self.gui.Enabled and queue and queue.Parent and self.queuedAt then
-				queue.Text = "Waiting " .. duration(os.clock() - self.queuedAt)
+				queue.Text = string.format("Waiting %s", duration(os.clock() - self.queuedAt))
 			end
 			local badge = self.homeTicking and self.homeTicking.weeklyBadge
 			local left = self:_weeklyLeft()
@@ -371,6 +373,9 @@ function PuzzleMenu.new(playerGui: Instance, handlers: Handlers)
 	end
 	ShopPage.init(self)
 	LeaderboardPage.init(self)
+	self.languagePicker = LanguagePicker.new(playerGui, function(code: string)
+		self:_pickLanguage(code)
+	end)
 	self:_layout()
 	return self
 end
@@ -521,6 +526,37 @@ function PuzzleMenu.show(self: any, view: string)
 	self:_render()
 end
 
+-- Uses the language saved with the player's settings, or asks for one on the
+-- first join (until one is saved).
+function PuzzleMenu._syncLanguage(self: any)
+	local settings = self.progress and self.progress.settings
+	if not settings then
+		return
+	end
+	local saved = settings.language
+	if type(saved) == "string" and saved ~= "" then
+		if not self.languageChosen and saved ~= Lang.current() then
+			Lang.set(saved)
+		end
+	elseif not self.languageChosen and not self.languageAsked then
+		self.languageAsked = true
+		self.languagePicker:open(Lang.current(), true)
+	end
+end
+
+function PuzzleMenu._pickLanguage(self: any, code: string)
+	self.languageChosen = code
+	Lang.set(code)
+	self.handlers.settings({ language = code })
+	if self.gui.Enabled and not self.closing then
+		self:_render()
+	end
+end
+
+function PuzzleMenu.openLanguagePicker(self: any)
+	self.languagePicker:open(Lang.current(), false)
+end
+
 -- A leaderboard the server sent (see LeaderboardPage).
 function PuzzleMenu.updateLeaderboard(self: any, view: any)
 	LeaderboardPage.onData(self, view)
@@ -549,6 +585,7 @@ function PuzzleMenu.update(self: any, snap: any)
 	self.progress = snap.progress
 	self.duelsAllServers = snap.duelsAllServers == true
 	self.saveStatus = snap.saveStatus
+	self:_syncLanguage()
 	ShopPage.onSnapshot(self, snap)
 	-- The Settings view already shows the player's own changes; redrawing it
 	-- when the server confirms them would rebuild buttons mid-click.
@@ -736,7 +773,7 @@ function PuzzleMenu._renderWeekly(self: any)
 		Parent = top,
 	})
 	if self.snapshot and self.snapshot.nextWeeklyIn then
-		countdown.Text = "New challenge in " .. duration(self.snapshot.nextWeeklyIn - (os.clock() - self.receivedAt))
+		countdown.Text = string.format("New challenge in %s", duration(self.snapshot.nextWeeklyIn - (os.clock() - self.receivedAt)))
 	end
 	self.weeklyCountdown = countdown
 
@@ -871,7 +908,7 @@ function PuzzleMenu._renderDuel(self: any)
 	})
 	self.queueLabel = if queued then status else nil
 	if queued and self.queuedAt then
-		status.Text = "Waiting " .. duration(os.clock() - self.queuedAt)
+		status.Text = string.format("Waiting %s", duration(os.clock() - self.queuedAt))
 	elseif self.duelError then
 		status.Text = DUEL_ERRORS[self.duelError] or "That didn't go through. Try again."
 		status.TextColor3 = Theme.Danger
@@ -1269,16 +1306,18 @@ function PuzzleMenu._renderDaily(self: any)
 	elseif streak.shieldReady then
 		shieldText = "🛡 Streak shield ready. If you miss one day, clearing the next day's puzzle keeps your streak. You get one shield every 7 days. The missed day earns no reward."
 	else
-		shieldText = string.format(
-			"🛡 Shield used%s. The next one is ready on %s.",
-			if streak.protectedDay then " to cover " .. dateOf(streak.protectedDay) else "",
-			dateOf(streak.shieldReadyDay)
-		)
+		shieldText = if streak.protectedDay
+			then string.format(
+				"🛡 Shield used to cover %s. The next one is ready on %s.",
+				dateOf(streak.protectedDay),
+				dateOf(streak.shieldReadyDay)
+			)
+			else string.format("🛡 Shield used. The next one is ready on %s.", dateOf(streak.shieldReadyDay))
 	end
 	line(2, "Shield", shieldText, 14, Theme.TextMuted)
 	local countdown = line(3, "Countdown", "", 14, Theme.Gold)
 	if self.snapshot and self.snapshot.nextDailyIn then
-		countdown.Text = "Next puzzle in " .. duration(self.snapshot.nextDailyIn - (os.clock() - self.receivedAt))
+		countdown.Text = string.format("Next puzzle in %s", duration(self.snapshot.nextDailyIn - (os.clock() - self.receivedAt)))
 	end
 	self.countdown = countdown
 end
@@ -1620,6 +1659,16 @@ function PuzzleMenu._renderSettings(self: any)
 		self.handlers.settings(values)
 		self:_render()
 	end
+
+	local languageRow = settingRow(self, 0, "LanguageSetting", "Language", "The language of every menu and puzzle")
+	local languageButton = pill(languageRow, "LanguagePick", Lang.nameOf(Lang.current()), false, true)
+	languageButton.Size = UDim2.fromOffset(140, 44)
+	languageButton.TextScaled = true
+	make("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 10, Parent = languageButton })
+	make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8), Parent = languageButton })
+	languageButton.Activated:Connect(function()
+		self:openLanguagePicker()
+	end)
 
 	local soundRow = settingRow(self, 1, "SoundSetting", "Sound effects", "Moves, captures, wins and buttons")
 	pill(soundRow, "SoundToggle", if settings.sound then "On" else "Off", settings.sound, true).Activated:Connect(function()

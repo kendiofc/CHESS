@@ -75,7 +75,7 @@ export type Endless = {
 	rewardedToday: number, -- boards that paid XP on `day`
 }
 
-export type Settings = { sound: boolean, volume: number, haptics: boolean, drag: boolean }
+export type Settings = { sound: boolean, volume: number, haptics: boolean, drag: boolean, language: string }
 
 export type Profile = {
 	version: number,
@@ -184,6 +184,9 @@ function Progression.applySettings(profile: Profile, values: { [string]: any })
 	end
 	if type(values.drag) == "boolean" then
 		profile.settings.drag = values.drag
+	end
+	if type(values.language) == "string" and table.find(GameConfig.LANGUAGES, values.language) then
+		profile.settings.language = values.language
 	end
 	if type(values.volume) == "number" and values.volume == values.volume then
 		profile.settings.volume = math.clamp(math.floor(values.volume * 20 + 0.5) / 20, 0, 1)

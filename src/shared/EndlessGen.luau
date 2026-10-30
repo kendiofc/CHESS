@@ -106,7 +106,7 @@ function EndlessGen.board(seed: number, n: number): any
 		if EndlessGen.solvable(layout) then
 			return {
 				id = "endless-" .. n,
-				name = "Board " .. n,
+				name = string.format("Board %d", n),
 				difficulty = spec.difficulty,
 				difficultyIndex = table.find(GameConfig.DIFFICULTIES, spec.difficulty) or 1,
 				number = n,

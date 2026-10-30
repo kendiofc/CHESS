@@ -1,0 +1,4338 @@
+# Echo Chess translations. Build with: python3 tools/build_translations.py
+# "= " is the English exactly as the code writes it; then one line per language.
+# Keep %d / %s in the same order, or use {1} {2} ... to reorder them.
+# "Echo" (the game's word for becoming the piece you capture) stays "Echo".
+
+# Navigation and page titles -------------------------------------------------
+= Home
+es: Inicio
+pt: Início
+fr: Accueil
+de: Start
+id: Beranda
+
+= Play
+es: Jugar
+pt: Jogar
+fr: Jouer
+de: Spielen
+id: Main
+
+= Journey
+es: Aventura
+pt: Jornada
+fr: Parcours
+de: Reise
+id: Petualangan
+
+= Practice
+es: Práctica
+pt: Treino
+fr: Entraînement
+de: Training
+id: Latihan
+
+= Daily
+es: Diario
+pt: Diário
+fr: Quotidien
+de: Täglich
+id: Harian
+
+= Daily Puzzle
+es: Puzle diario
+pt: Desafio diário
+fr: Puzzle du jour
+de: Tagesrätsel
+id: Teka-teki Harian
+
+= Weekly
+es: Semanal
+pt: Semanal
+fr: Hebdo
+de: Wöchentlich
+id: Mingguan
+
+= Weekly Challenge
+es: Reto semanal
+pt: Desafio semanal
+fr: Défi de la semaine
+de: Wochen-Challenge
+id: Tantangan Mingguan
+
+= Endless
+es: Infinito
+pt: Infinito
+fr: Sans fin
+de: Endlos
+id: Tanpa Akhir
+
+= Duel
+es: Duelo
+pt: Duelo
+fr: Duel
+de: Duell
+id: Duel
+
+= Puzzle Duel
+es: Duelo de puzles
+pt: Duelo de desafios
+fr: Duel de puzzles
+de: Rätsel-Duell
+id: Duel Teka-teki
+
+= Shop
+es: Tienda
+pt: Loja
+fr: Boutique
+de: Shop
+id: Toko
+
+= Statistics
+es: Estadísticas
+pt: Estatísticas
+fr: Statistiques
+de: Statistiken
+id: Statistik
+
+= Stats
+es: Estadísticas
+pt: Estatísticas
+fr: Stats
+de: Statistik
+id: Statistik
+
+= Leaderboards
+es: Clasificaciones
+pt: Rankings
+fr: Classements
+de: Bestenlisten
+id: Papan Peringkat
+
+= Tutorial
+es: Tutorial
+pt: Tutorial
+fr: Tutoriel
+de: Tutorial
+id: Tutorial
+
+= How to Play
+es: Cómo jugar
+pt: Como jogar
+fr: Comment jouer
+de: Spielanleitung
+id: Cara Bermain
+
+= Settings
+es: Ajustes
+pt: Configurações
+fr: Paramètres
+de: Einstellungen
+id: Pengaturan
+
+= Collapse
+es: Contraer
+pt: Recolher
+fr: Réduire
+de: Einklappen
+id: Ciutkan
+
+= Menu
+es: Menú
+pt: Menu
+fr: Menu
+de: Menü
+id: Menu
+
+= JOURNEY
+es: AVENTURA
+pt: JORNADA
+fr: PARCOURS
+de: REISE
+id: PETUALANGAN
+
+= PRACTICE
+es: PRÁCTICA
+pt: TREINO
+fr: ENTRAÎNEMENT
+de: TRAINING
+id: LATIHAN
+
+= DAILY PUZZLE
+es: PUZLE DIARIO
+pt: DESAFIO DIÁRIO
+fr: PUZZLE DU JOUR
+de: TAGESRÄTSEL
+id: TEKA-TEKI HARIAN
+
+= WEEKLY CHALLENGE
+es: RETO SEMANAL
+pt: DESAFIO SEMANAL
+fr: DÉFI DE LA SEMAINE
+de: WOCHEN-CHALLENGE
+id: TANTANGAN MINGGUAN
+
+= ENDLESS
+es: INFINITO
+pt: INFINITO
+fr: SANS FIN
+de: ENDLOS
+id: TANPA AKHIR
+
+= PUZZLE DUEL
+es: DUELO DE PUZLES
+pt: DUELO DE DESAFIOS
+fr: DUEL DE PUZZLES
+de: RÄTSEL-DUELL
+id: DUEL TEKA-TEKI
+
+= SHOP
+es: TIENDA
+pt: LOJA
+fr: BOUTIQUE
+de: SHOP
+id: TOKO
+
+= STATISTICS
+es: ESTADÍSTICAS
+pt: ESTATÍSTICAS
+fr: STATISTIQUES
+de: STATISTIKEN
+id: STATISTIK
+
+= LEADERBOARDS
+es: CLASIFICACIONES
+pt: RANKINGS
+fr: CLASSEMENTS
+de: BESTENLISTEN
+id: PAPAN PERINGKAT
+
+= SETTINGS
+es: AJUSTES
+pt: CONFIGURAÇÕES
+fr: PARAMÈTRES
+de: EINSTELLUNGEN
+id: PENGATURAN
+
+# Difficulties and pieces ----------------------------------------------------
+= Beginner
+es: Principiante
+pt: Iniciante
+fr: Débutant
+de: Anfänger
+id: Pemula
+
+= Easy
+es: Fácil
+pt: Fácil
+fr: Facile
+de: Leicht
+id: Mudah
+
+= Medium
+es: Medio
+pt: Médio
+fr: Moyen
+de: Mittel
+id: Sedang
+
+= Hard
+es: Difícil
+pt: Difícil
+fr: Difficile
+de: Schwer
+id: Sulit
+
+= Expert
+es: Experto
+pt: Especialista
+fr: Expert
+de: Experte
+id: Ahli
+
+= King
+es: Rey
+pt: Rei
+fr: Roi
+de: König
+id: Raja
+
+= Queen
+es: Dama
+pt: Dama
+fr: Dame
+de: Dame
+id: Ratu
+
+= Rook
+es: Torre
+pt: Torre
+fr: Tour
+de: Turm
+id: Benteng
+
+= Bishop
+es: Alfil
+pt: Bispo
+fr: Fou
+de: Läufer
+id: Gajah
+
+= Knight
+es: Caballo
+pt: Cavalo
+fr: Cavalier
+de: Springer
+id: Kuda
+
+= Pawn
+es: Peón
+pt: Peão
+fr: Pion
+de: Bauer
+id: Pion
+
+= king
+es: rey
+pt: rei
+fr: roi
+de: König
+id: raja
+
+= queen
+es: dama
+pt: dama
+fr: dame
+de: Dame
+id: ratu
+
+= rook
+es: torre
+pt: torre
+fr: tour
+de: Turm
+id: benteng
+
+= bishop
+es: alfil
+pt: bispo
+fr: fou
+de: Läufer
+id: gajah
+
+= knight
+es: caballo
+pt: cavalo
+fr: cavalier
+de: Springer
+id: kuda
+
+= pawn
+es: peón
+pt: peão
+fr: pion
+de: Bauer
+id: pion
+
+= piece
+es: pieza
+pt: peça
+fr: pièce
+de: Figur
+id: bidak
+
+= a King
+es: un rey
+pt: um rei
+fr: un roi
+de: ein König
+id: raja
+
+= a Queen
+es: una dama
+pt: uma dama
+fr: une dame
+de: eine Dame
+id: ratu
+
+= a Rook
+es: una torre
+pt: uma torre
+fr: une tour
+de: ein Turm
+id: benteng
+
+= a Bishop
+es: un alfil
+pt: um bispo
+fr: un fou
+de: ein Läufer
+id: gajah
+
+= a Knight
+es: un caballo
+pt: um cavalo
+fr: un cavalier
+de: ein Springer
+id: kuda
+
+= a Pawn
+es: un peón
+pt: um peão
+fr: un pion
+de: ein Bauer
+id: pion
+
+= move
+es: movimiento
+pt: jogada
+fr: coup
+de: Zug
+id: langkah
+
+= moves
+es: movimientos
+pt: jogadas
+fr: coups
+de: Züge
+id: langkah
+
+= board
+es: tablero
+pt: tabuleiro
+fr: plateau
+de: Brett
+id: papan
+
+= boards
+es: tableros
+pt: tabuleiros
+fr: plateaux
+de: Bretter
+id: papan
+
+= day
+es: día
+pt: dia
+fr: jour
+de: Tag
+id: hari
+
+= days
+es: días
+pt: dias
+fr: jours
+de: Tage
+id: hari
+
+# Home -----------------------------------------------------------------------
+= Welcome back,
+es: Bienvenido de nuevo,
+pt: Bem-vindo de volta,
+fr: Bon retour,
+de: Willkommen zurück,
+id: Selamat datang kembali,
+
+= Not saving right now
+es: Ahora no se está guardando
+pt: Não está salvando agora
+fr: Sauvegarde indisponible
+de: Speichern gerade nicht möglich
+id: Sedang tidak menyimpan
+
+= Coins
+es: Monedas
+pt: Moedas
+fr: Pièces
+de: Münzen
+id: Koin
+
+= Level
+es: Nivel
+pt: Nível
+fr: Niveau
+de: Level
+id: Level
+
+= Loading...
+es: Cargando...
+pt: Carregando...
+fr: Chargement...
+de: Lädt...
+id: Memuat...
+
+= Lv. %d
+es: Nv. %d
+pt: Nv. %d
+fr: Niv. %d
+de: Lv. %d
+id: Lv. %d
+
+= %s / %s XP
+es: %s / %s XP
+pt: %s / %s XP
+fr: %s / %s XP
+de: %s / %s XP
+id: %s / %s XP
+
+= %s XP
+es: %s XP
+pt: %s XP
+fr: %s XP
+de: %s XP
+id: %s XP
+
+= Chess Puzzles
+es: Puzles de ajedrez
+pt: Desafios de xadrez
+fr: Puzzles d'échecs
+de: Schachrätsel
+id: Teka-teki Catur
+
+= Daily Challenges
+es: Retos diarios
+pt: Desafios diários
+fr: Défis quotidiens
+de: Tägliche Challenges
+id: Tantangan Harian
+
+= Progression
+es: Progreso
+pt: Progressão
+fr: Progression
+de: Fortschritt
+id: Progres
+
+= Progress through curated puzzles
+es: Avanza por puzles seleccionados
+pt: Avance por desafios escolhidos a dedo
+fr: Progresse à travers des puzzles choisis
+de: Arbeite dich durch handverlesene Rätsel
+id: Maju lewat teka-teki pilihan
+
+= %s unlocked  ·  %d / %d
+es: %s desbloqueado  ·  %d / %d
+pt: %s desbloqueado  ·  %d / %d
+fr: %s débloqué  ·  %d / %d
+de: %s freigeschaltet  ·  %d / %d
+id: %s terbuka  ·  %d / %d
+
+= Race another player on the same puzzle
+es: Compite contra otro jugador en el mismo puzle
+pt: Dispute com outro jogador no mesmo desafio
+fr: Affronte un autre joueur sur le même puzzle
+de: Tritt im selben Rätsel gegen andere an
+id: Balapan dengan pemain lain di teka-teki yang sama
+
+= SEARCHING
+es: BUSCANDO
+pt: PROCURANDO
+fr: RECHERCHE
+de: SUCHE
+id: MENCARI
+
+= ● %d HERE
+es: ● %d AQUÍ
+pt: ● %d AQUI
+fr: ● %d ICI
+de: ● %d HIER
+id: ● %d DI SINI
+
+= ● ALL SERVERS
+es: ● TODOS LOS SERVIDORES
+pt: ● TODOS OS SERVIDORES
+fr: ● TOUS LES SERVEURS
+de: ● ALLE SERVER
+id: ● SEMUA SERVER
+
+= ● JUST YOU
+es: ● SOLO TÚ
+pt: ● SÓ VOCÊ
+fr: ● TOI SEUL
+de: ● NUR DU
+id: ● HANYA KAMU
+
+= A new puzzle every day
+es: Un puzle nuevo cada día
+pt: Um desafio novo todo dia
+fr: Un nouveau puzzle chaque jour
+de: Jeden Tag ein neues Rätsel
+id: Teka-teki baru setiap hari
+
+= Cleared today ✓
+es: Superado hoy ✓
+pt: Concluído hoje ✓
+fr: Réussi aujourd'hui ✓
+de: Heute gelöst ✓
+id: Selesai hari ini ✓
+
+= Not cleared yet
+es: Aún sin superar
+pt: Ainda não concluído
+fr: Pas encore réussi
+de: Noch nicht gelöst
+id: Belum selesai
+
+= Not cleared yet today
+es: Aún sin superar hoy
+pt: Ainda não concluído hoje
+fr: Pas encore réussi aujourd'hui
+de: Heute noch nicht gelöst
+id: Belum selesai hari ini
+
+= Complete 4 puzzles for bigger rewards
+es: Completa 4 puzles para mayores recompensas
+pt: Conclua 4 desafios para recompensas maiores
+fr: Termine 4 puzzles pour de plus grosses récompenses
+de: Löse 4 Rätsel für größere Belohnungen
+id: Selesaikan 4 teka-teki untuk hadiah lebih besar
+
+= Complete ✓
+es: Completado ✓
+pt: Concluído ✓
+fr: Terminé ✓
+de: Geschafft ✓
+id: Selesai ✓
+
+= %d / %d cleared
+es: %d / %d superados
+pt: %d / %d concluídos
+fr: %d / %d réussis
+de: %d / %d gelöst
+id: %d / %d selesai
+
+= Boards that never run out. How far can you go?
+es: Tableros que nunca se acaban. ¿Hasta dónde llegarás?
+pt: Tabuleiros que nunca acabam. Até onde você chega?
+fr: Des plateaux à l'infini. Jusqu'où iras-tu ?
+de: Bretter ohne Ende. Wie weit kommst du?
+id: Papan yang tak pernah habis. Seberapa jauh kamu bisa?
+
+= Best run: %d
+es: Mejor partida: %d
+pt: Melhor partida: %d
+fr: Meilleure partie : %d
+de: Bester Lauf: %d
+id: Rekor terbaik: %d
+
+= BOARD %d
+es: TABLERO %d
+pt: TABULEIRO %d
+fr: PLATEAU %d
+de: BRETT %d
+id: PAPAN %d
+
+= Daily Streak
+es: Racha diaria
+pt: Sequência diária
+fr: Série quotidienne
+de: Tagesserie
+id: Runtunan Harian
+
+= Duel wins
+es: Duelos ganados
+pt: Duelos vencidos
+fr: Duels gagnés
+de: Duell-Siege
+id: Duel menang
+
+= Wins (Duel)
+es: Victorias (duelo)
+pt: Vitórias (duelo)
+fr: Victoires (duel)
+de: Siege (Duell)
+id: Menang (Duel)
+
+= Solved
+es: Resueltos
+pt: Resolvidos
+fr: Résolus
+de: Gelöst
+id: Terpecahkan
+
+= Puzzles Solved
+es: Puzles resueltos
+pt: Desafios resolvidos
+fr: Puzzles résolus
+de: Gelöste Rätsel
+id: Teka-teki Terpecahkan
+
+= Stars
+es: Estrellas
+pt: Estrelas
+fr: Étoiles
+de: Sterne
+id: Bintang
+
+= Total Stars
+es: Estrellas totales
+pt: Total de estrelas
+fr: Total d'étoiles
+de: Sterne gesamt
+id: Total Bintang
+
+= This week
+es: Esta semana
+pt: Esta semana
+fr: Cette semaine
+de: Diese Woche
+id: Minggu ini
+
+= Current Week
+es: Semana actual
+pt: Semana atual
+fr: Semaine en cours
+de: Aktuelle Woche
+id: Minggu Ini
+
+= 👑 ROYAL VIP
+es: 👑 VIP REAL
+pt: 👑 VIP REAL
+fr: 👑 VIP ROYAL
+de: 👑 KÖNIGLICHER VIP
+id: 👑 VIP KERAJAAN
+
+# Play screen ----------------------------------------------------------------
+= MOVES
+es: MOVIMIENTOS
+pt: JOGADAS
+fr: COUPS
+de: ZÜGE
+id: LANGKAH
+
+= CAPTURED
+es: CAPTURADAS
+pt: CAPTURADAS
+fr: CAPTURÉES
+de: GESCHLAGEN
+id: DITANGKAP
+
+= TIME
+es: TIEMPO
+pt: TEMPO
+fr: TEMPS
+de: ZEIT
+id: WAKTU
+
+= PAR
+es: PAR
+pt: PAR
+fr: PAR
+de: PAR
+id: PAR
+
+= PUZZLE GOAL
+es: OBJETIVO
+pt: OBJETIVO
+fr: OBJECTIF
+de: ZIEL
+id: TUJUAN
+
+= DAILY STREAK
+es: RACHA DIARIA
+pt: SEQUÊNCIA DIÁRIA
+fr: SÉRIE QUOTIDIENNE
+de: TAGESSERIE
+id: RUNTUNAN HARIAN
+
+= %d day streak
+es: Racha de %d días
+pt: Sequência de %d dias
+fr: Série de %d jours
+de: %d Tage in Folge
+id: Runtunan %d hari
+
+= LIVES
+es: VIDAS
+pt: VIDAS
+fr: VIES
+de: LEBEN
+id: NYAWA
+
+= TIME LEFT
+es: TIEMPO RESTANTE
+pt: TEMPO RESTANTE
+fr: TEMPS RESTANT
+de: RESTZEIT
+id: SISA WAKTU
+
+= Capture <b>%d / %d</b> pieces
+es: Captura <b>%d / %d</b> piezas
+pt: Capture <b>%d / %d</b> peças
+fr: Capture <b>%d / %d</b> pièces
+de: Schlage <b>%d / %d</b> Figuren
+id: Tangkap <b>%d / %d</b> bidak
+
+= Score <b>%d</b>  ·  best <b>%d</b>
+es: Puntuación <b>%d</b>  ·  récord <b>%d</b>
+pt: Pontos <b>%d</b>  ·  recorde <b>%d</b>
+fr: Score <b>%d</b>  ·  record <b>%d</b>
+de: Punkte <b>%d</b>  ·  Rekord <b>%d</b>
+id: Skor <b>%d</b>  ·  terbaik <b>%d</b>
+
+= Par: <b>%d</b> moves
+es: Par: <b>%d</b> movimientos
+pt: Par: <b>%d</b> jogadas
+fr: Par : <b>%d</b> coups
+de: Par: <b>%d</b> Züge
+id: Par: <b>%d</b> langkah
+
+= Par %d
+es: Par %d
+pt: Par %d
+fr: Par %d
+de: Par %d
+id: Par %d
+
+= ↩  Undo
+es: ↩  Deshacer
+pt: ↩  Desfazer
+fr: ↩  Annuler
+de: ↩  Zurück
+id: ↩  Batal
+
+= 💡  Hint
+es: 💡  Pista
+pt: 💡  Dica
+fr: 💡  Indice
+de: 💡  Tipp
+id: 💡  Petunjuk
+
+= 💡  Hint (%d)
+es: 💡  Pista (%d)
+pt: 💡  Dica (%d)
+fr: 💡  Indice (%d)
+de: 💡  Tipp (%d)
+id: 💡  Petunjuk (%d)
+
+= 🔄  Restart
+es: 🔄  Reiniciar
+pt: 🔄  Reiniciar
+fr: 🔄  Recommencer
+de: 🔄  Neustart
+id: 🔄  Ulangi
+
+= Leave
+es: Salir
+pt: Sair
+fr: Quitter
+de: Verlassen
+id: Keluar
+
+= GO!
+es: ¡YA!
+pt: JÁ!
+fr: GO !
+de: LOS!
+id: MULAI!
+
+= Your %s can't reach that square.
+es: Tu %s no puede llegar a esa casilla.
+pt: Seu %s não alcança essa casa.
+fr: Ton %s ne peut pas atteindre cette case.
+de: Dein %s kann dieses Feld nicht erreichen.
+id: Bidak %s kamu tidak bisa mencapai petak itu.
+
+= You can only move your white piece.
+es: Solo puedes mover tu pieza blanca.
+pt: Você só pode mover sua peça branca.
+fr: Tu ne peux déplacer que ta pièce blanche.
+de: Du kannst nur deine weiße Figur bewegen.
+id: Kamu hanya bisa menggerakkan bidak putihmu.
+
+= This attempt is over. Undo or restart.
+es: Este intento ha terminado. Deshaz o reinicia.
+pt: Esta tentativa acabou. Desfaça ou reinicie.
+fr: Cette tentative est terminée. Annule ou recommence.
+de: Dieser Versuch ist vorbei. Nimm zurück oder starte neu.
+id: Percobaan ini selesai. Batalkan atau ulangi.
+
+= Too fast! Give it a moment.
+es: ¡Demasiado rápido! Espera un momento.
+pt: Rápido demais! Espere um pouco.
+fr: Trop rapide ! Attends un instant.
+de: Zu schnell! Warte einen Moment.
+id: Terlalu cepat! Tunggu sebentar.
+
+= Nothing to undo.
+es: No hay nada que deshacer.
+pt: Nada para desfazer.
+fr: Rien à annuler.
+de: Nichts zum Zurücknehmen.
+id: Tidak ada yang bisa dibatalkan.
+
+= That puzzle isn't available.
+es: Ese puzle no está disponible.
+pt: Esse desafio não está disponível.
+fr: Ce puzzle n'est pas disponible.
+de: Dieses Rätsel ist nicht verfügbar.
+id: Teka-teki itu tidak tersedia.
+
+= That move wasn't accepted.
+es: Ese movimiento no fue aceptado.
+pt: Essa jogada não foi aceita.
+fr: Ce coup n'a pas été accepté.
+de: Dieser Zug wurde nicht angenommen.
+id: Langkah itu tidak diterima.
+
+= That difficulty is still locked. Clear more puzzles to open it.
+es: Esa dificultad sigue bloqueada. Supera más puzles para abrirla.
+pt: Essa dificuldade ainda está bloqueada. Conclua mais desafios para liberá-la.
+fr: Cette difficulté est encore verrouillée. Réussis plus de puzzles pour l'ouvrir.
+de: Diese Stufe ist noch gesperrt. Löse mehr Rätsel, um sie freizuschalten.
+id: Tingkat itu masih terkunci. Selesaikan lebih banyak teka-teki untuk membukanya.
+
+= That isn't today's Daily Puzzle.
+es: Ese no es el puzle diario de hoy.
+pt: Esse não é o desafio diário de hoje.
+fr: Ce n'est pas le puzzle du jour.
+de: Das ist nicht das heutige Tagesrätsel.
+id: Itu bukan Teka-teki Harian hari ini.
+
+= That mode isn't available.
+es: Ese modo no está disponible.
+pt: Esse modo não está disponível.
+fr: Ce mode n'est pas disponible.
+de: Dieser Modus ist nicht verfügbar.
+id: Mode itu tidak tersedia.
+
+= No hints left for this puzzle.
+es: No quedan pistas para este puzle.
+pt: Não há mais dicas para este desafio.
+fr: Plus d'indices pour ce puzzle.
+de: Keine Tipps mehr für dieses Rätsel.
+id: Tidak ada petunjuk tersisa untuk teka-teki ini.
+
+= That wasn't accepted.
+es: Eso no fue aceptado.
+pt: Isso não foi aceito.
+fr: Ça n'a pas été accepté.
+de: Das wurde nicht angenommen.
+id: Itu tidak diterima.
+
+= That puzzle isn't in this week's challenge.
+es: Ese puzle no está en el reto de esta semana.
+pt: Esse desafio não faz parte do desafio semanal.
+fr: Ce puzzle ne fait pas partie du défi de la semaine.
+de: Dieses Rätsel gehört nicht zur Wochen-Challenge.
+id: Teka-teki itu tidak ada di tantangan minggu ini.
+
+= Finish or leave your duel first.
+es: Termina o abandona tu duelo primero.
+pt: Termine ou saia do seu duelo primeiro.
+fr: Termine ou quitte d'abord ton duel.
+de: Beende oder verlasse zuerst dein Duell.
+id: Selesaikan atau tinggalkan duelmu dulu.
+
+= Wait for the countdown.
+es: Espera la cuenta atrás.
+pt: Espere a contagem regressiva.
+fr: Attends le compte à rebours.
+de: Warte auf den Countdown.
+id: Tunggu hitungan mundur.
+
+= The duel is over.
+es: El duelo ha terminado.
+pt: O duelo acabou.
+fr: Le duel est terminé.
+de: Das Duell ist vorbei.
+id: Duel sudah selesai.
+
+= You're not in a duel.
+es: No estás en un duelo.
+pt: Você não está em um duelo.
+fr: Tu n'es pas en duel.
+de: Du bist in keinem Duell.
+id: Kamu tidak sedang duel.
+
+= You're already looking for an opponent.
+es: Ya estás buscando un rival.
+pt: Você já está procurando um oponente.
+fr: Tu cherches déjà un adversaire.
+de: Du suchst schon einen Gegner.
+id: Kamu sudah mencari lawan.
+
+= You're not in the duel queue.
+es: No estás en la cola de duelos.
+pt: Você não está na fila de duelos.
+fr: Tu n'es pas dans la file des duels.
+de: Du bist nicht in der Duell-Warteschlange.
+id: Kamu tidak ada di antrean duel.
+
+= That action isn't available in a duel.
+es: Esa acción no está disponible en un duelo.
+pt: Essa ação não está disponível em um duelo.
+fr: Cette action n'est pas disponible en duel.
+de: Das geht in einem Duell nicht.
+id: Aksi itu tidak tersedia saat duel.
+
+= Matching you with an opponent, one moment.
+es: Buscándote un rival, un momento.
+pt: Encontrando um oponente, só um momento.
+fr: Recherche d'un adversaire, un instant.
+de: Gegner wird gesucht, einen Moment.
+id: Mencarikan lawan, tunggu sebentar.
+
+= Couldn't move you to the match server. Try again.
+es: No se pudo llevarte al servidor de la partida. Inténtalo de nuevo.
+pt: Não foi possível te levar ao servidor da partida. Tente de novo.
+fr: Impossible de te déplacer vers le serveur du match. Réessaie.
+de: Wechsel zum Match-Server fehlgeschlagen. Versuch es nochmal.
+id: Gagal memindahkanmu ke server pertandingan. Coba lagi.
+
+= Your opponent didn't make it to the match. Try again.
+es: Tu rival no llegó a la partida. Inténtalo de nuevo.
+pt: Seu oponente não chegou à partida. Tente de novo.
+fr: Ton adversaire n'est pas arrivé au match. Réessaie.
+de: Dein Gegner ist nicht angekommen. Versuch es nochmal.
+id: Lawanmu tidak sampai ke pertandingan. Coba lagi.
+
+= No undo in Endless. A dead end costs a life instead.
+es: En Infinito no se puede deshacer. Un callejón sin salida cuesta una vida.
+pt: Não dá para desfazer no Infinito. Um beco sem saída custa uma vida.
+fr: Pas d'annulation en Sans fin. Une impasse coûte une vie.
+de: Kein Zurück im Endlos-Modus. Eine Sackgasse kostet ein Leben.
+id: Tidak bisa batal di Tanpa Akhir. Jalan buntu memakan satu nyawa.
+
+= This run is over. Tap New run to go again.
+es: Esta partida ha terminado. Toca Nueva partida para volver a jugar.
+pt: Esta partida acabou. Toque em Nova partida para jogar de novo.
+fr: Cette partie est terminée. Touche Nouvelle partie pour rejouer.
+de: Dieser Lauf ist vorbei. Tippe auf Neuer Lauf.
+id: Permainan ini selesai. Ketuk Main baru untuk mulai lagi.
+
+= Clear this board first.
+es: Supera primero este tablero.
+pt: Conclua este tabuleiro primeiro.
+fr: Termine d'abord ce plateau.
+de: Löse zuerst dieses Brett.
+id: Selesaikan papan ini dulu.
+
+= You need more coins for that.
+es: Necesitas más monedas para eso.
+pt: Você precisa de mais moedas para isso.
+fr: Il te faut plus de pièces pour ça.
+de: Dafür brauchst du mehr Münzen.
+id: Kamu butuh lebih banyak koin untuk itu.
+
+= You already own that.
+es: Ya lo tienes.
+pt: Você já tem isso.
+fr: Tu l'as déjà.
+de: Das hast du schon.
+id: Kamu sudah memilikinya.
+
+= You don't own that yet.
+es: Aún no lo tienes.
+pt: Você ainda não tem isso.
+fr: Tu ne l'as pas encore.
+de: Das hast du noch nicht.
+id: Kamu belum memilikinya.
+
+= That item comes with a gamepass.
+es: Ese objeto viene con un pase.
+pt: Esse item vem com um passe.
+fr: Cet objet est inclus dans un pass.
+de: Dieser Gegenstand gehört zu einem Gamepass.
+id: Item itu termasuk dalam gamepass.
+
+= That item isn't available.
+es: Ese objeto no está disponible.
+pt: Esse item não está disponível.
+fr: Cet objet n'est pas disponible.
+de: Dieser Gegenstand ist nicht verfügbar.
+id: Item itu tidak tersedia.
+
+= That item can't be bought with coins.
+es: Ese objeto no se puede comprar con monedas.
+pt: Esse item não pode ser comprado com moedas.
+fr: Cet objet ne s'achète pas avec des pièces.
+de: Dieser Gegenstand kann nicht mit Münzen gekauft werden.
+id: Item itu tidak bisa dibeli dengan koin.
+
+= Your progress is still loading. Try again in a moment.
+es: Tu progreso aún se está cargando. Inténtalo en un momento.
+pt: Seu progresso ainda está carregando. Tente daqui a pouco.
+fr: Ta progression charge encore. Réessaie dans un instant.
+de: Dein Fortschritt lädt noch. Versuch es gleich nochmal.
+id: Progresmu masih dimuat. Coba lagi sebentar lagi.
+
+= Purchase cancelled. Nothing was charged.
+es: Compra cancelada. No se cobró nada.
+pt: Compra cancelada. Nada foi cobrado.
+fr: Achat annulé. Rien n'a été facturé.
+de: Kauf abgebrochen. Es wurde nichts berechnet.
+id: Pembelian dibatalkan. Tidak ada yang ditagih.
+
+= Roblox hasn't confirmed that purchase yet. It will be checked again next time you join.
+es: Roblox aún no ha confirmado esa compra. Se volverá a comprobar la próxima vez que entres.
+pt: O Roblox ainda não confirmou essa compra. Ela será verificada de novo na próxima vez que você entrar.
+fr: Roblox n'a pas encore confirmé cet achat. Il sera revérifié à ta prochaine connexion.
+de: Roblox hat den Kauf noch nicht bestätigt. Er wird beim nächsten Beitritt erneut geprüft.
+id: Roblox belum mengonfirmasi pembelian itu. Akan dicek lagi saat kamu bergabung lagi.
+
+= You cleared the board first.
+es: Despejaste el tablero primero.
+pt: Você limpou o tabuleiro primeiro.
+fr: Tu as vidé le plateau en premier.
+de: Du hast das Brett zuerst geleert.
+id: Kamu membersihkan papan lebih dulu.
+
+= %s cleared the board first.
+es: %s despejó el tablero primero.
+pt: %s limpou o tabuleiro primeiro.
+fr: %s a vidé le plateau en premier.
+de: %s hat das Brett zuerst geleert.
+id: %s membersihkan papan lebih dulu.
+
+= Time's up. Nobody cleared the board.
+es: Se acabó el tiempo. Nadie despejó el tablero.
+pt: Acabou o tempo. Ninguém limpou o tabuleiro.
+fr: Temps écoulé. Personne n'a vidé le plateau.
+de: Die Zeit ist um. Niemand hat das Brett geleert.
+id: Waktu habis. Tidak ada yang membersihkan papan.
+
+= %s left the match.
+es: %s abandonó la partida.
+pt: %s saiu da partida.
+fr: %s a quitté le match.
+de: %s hat das Match verlassen.
+id: %s keluar dari pertandingan.
+
+= You left the match.
+es: Abandonaste la partida.
+pt: Você saiu da partida.
+fr: Tu as quitté le match.
+de: Du hast das Match verlassen.
+id: Kamu keluar dari pertandingan.
+
+= No reward: you already earned one against this player today.
+es: Sin recompensa: hoy ya ganaste una contra este jugador.
+pt: Sem recompensa: você já ganhou uma contra este jogador hoje.
+fr: Pas de récompense : tu en as déjà gagné une contre ce joueur aujourd'hui.
+de: Keine Belohnung: Du hast heute schon eine gegen diesen Spieler bekommen.
+id: Tanpa hadiah: kamu sudah dapat hadiah melawan pemain ini hari ini.
+
+= No reward: today's rewarded duels are used up.
+es: Sin recompensa: ya usaste los duelos con premio de hoy.
+pt: Sem recompensa: os duelos premiados de hoje acabaram.
+fr: Pas de récompense : les duels récompensés du jour sont épuisés.
+de: Keine Belohnung: Die belohnten Duelle für heute sind aufgebraucht.
+id: Tanpa hadiah: jatah duel berhadiah hari ini sudah habis.
+
+= Opponent found: %s. Same puzzle, separate boards. Get ready!
+es: Rival encontrado: %s. Mismo puzle, tableros separados. ¡Prepárate!
+pt: Oponente encontrado: %s. Mesmo desafio, tabuleiros separados. Prepare-se!
+fr: Adversaire trouvé : %s. Même puzzle, plateaux séparés. Prépare-toi !
+de: Gegner gefunden: %s. Gleiches Rätsel, getrennte Bretter. Mach dich bereit!
+id: Lawan ditemukan: %s. Teka-teki sama, papan terpisah. Bersiaplah!
+
+= vs %s  ·  %d / %d captured  ·  %d %s
+es: vs %s  ·  %d / %d capturadas  ·  %d %s
+pt: vs %s  ·  %d / %d capturadas  ·  %d %s
+fr: vs %s  ·  %d / %d capturées  ·  %d %s
+de: vs %s  ·  %d / %d geschlagen  ·  %d %s
+id: vs %s  ·  %d / %d ditangkap  ·  %d %s
+
+= That action wasn't accepted.
+es: Esa acción no fue aceptada.
+pt: Essa ação não foi aceita.
+fr: Cette action n'a pas été acceptée.
+de: Diese Aktion wurde nicht angenommen.
+id: Aksi itu tidak diterima.
+
+= Hint: %s
+es: Pista: %s
+pt: Dica: %s
+fr: Indice : %s
+de: Tipp: %s
+id: Petunjuk: %s
+
+= Board cleared!
+es: ¡Tablero despejado!
+pt: Tabuleiro limpo!
+fr: Plateau vidé !
+de: Brett geleert!
+id: Papan bersih!
+
+= No way left to clear the board.
+es: Ya no hay forma de despejar el tablero.
+pt: Não há mais como limpar o tabuleiro.
+fr: Plus aucun moyen de vider le plateau.
+de: Das Brett kann nicht mehr geleert werden.
+id: Tidak ada cara lagi untuk membersihkan papan.
+
+= You echoed into %s. %d left.
+es: Te convertiste en %s. Quedan %d.
+pt: Você virou %s. Faltam %d.
+fr: Tu es devenu %s. Encore %d.
+de: Du bist jetzt %s. Noch %d.
+id: Kamu berubah menjadi %s. Sisa %d.
+
+= Move undone.
+es: Movimiento deshecho.
+pt: Jogada desfeita.
+fr: Coup annulé.
+de: Zug zurückgenommen.
+id: Langkah dibatalkan.
+
+= Your %s moved.
+es: Tu %s se movió.
+pt: Seu %s se moveu.
+fr: Ton %s s'est déplacé.
+de: Dein %s ist gezogen.
+id: Bidak %s kamu bergerak.
+
+= %s Tap your piece to begin.
+es: %s Toca tu pieza para empezar.
+pt: %s Toque na sua peça para começar.
+fr: %s Touche ta pièce pour commencer.
+de: %s Tippe auf deine Figur, um zu beginnen.
+id: %s Ketuk bidakmu untuk mulai.
+
+= Tap your white piece first.
+es: Toca primero tu pieza blanca.
+pt: Toque primeiro na sua peça branca.
+fr: Touche d'abord ta pièce blanche.
+de: Tippe zuerst auf deine weiße Figur.
+id: Ketuk bidak putihmu dulu.
+
+= Capture every black piece. You become whatever you capture.
+es: Captura todas las piezas negras. Te conviertes en lo que capturas.
+pt: Capture todas as peças pretas. Você vira a peça que capturar.
+fr: Capture toutes les pièces noires. Tu deviens ce que tu captures.
+de: Schlage alle schwarzen Figuren. Du wirst zu der Figur, die du schlägst.
+id: Tangkap semua bidak hitam. Kamu berubah menjadi apa pun yang kamu tangkap.
+
+= Clear the board to reach the next one. A dead end or a restart costs a life.
+es: Despeja el tablero para llegar al siguiente. Un callejón sin salida o reiniciar cuesta una vida.
+pt: Limpe o tabuleiro para chegar ao próximo. Um beco sem saída ou reiniciar custa uma vida.
+fr: Vide le plateau pour passer au suivant. Une impasse ou un redémarrage coûte une vie.
+de: Leere das Brett, um zum nächsten zu kommen. Sackgasse oder Neustart kostet ein Leben.
+id: Bersihkan papan untuk lanjut ke berikutnya. Jalan buntu atau mengulang memakan satu nyawa.
+
+= Board %d
+es: Tablero %d
+pt: Tabuleiro %d
+fr: Plateau %d
+de: Brett %d
+id: Papan %d
+
+# Result cards ---------------------------------------------------------------
+= Cleared at par: top rating.
+es: Superado en el par: máxima puntuación.
+pt: Concluído no par: nota máxima.
+fr: Réussi au par : note maximale.
+de: Mit Par gelöst: Bestwertung.
+id: Selesai sesuai par: nilai tertinggi.
+
+= Clear in %d moves for 3 stars.
+es: Supéralo en %d movimientos para 3 estrellas.
+pt: Conclua em %d jogadas para 3 estrelas.
+fr: Réussis en %d coups pour 3 étoiles.
+de: Löse es in %d Zügen für 3 Sterne.
+id: Selesaikan dalam %d langkah untuk 3 bintang.
+
+= %d moves or fewer for 2 stars, %d for 3.
+es: %d movimientos o menos para 2 estrellas, %d para 3.
+pt: %d jogadas ou menos para 2 estrelas, %d para 3.
+fr: %d coups ou moins pour 2 étoiles, %d pour 3.
+de: %d Züge oder weniger für 2 Sterne, %d für 3.
+id: %d langkah atau kurang untuk 2 bintang, %d untuk 3.
+
+= Best before: %d moves.
+es: Mejor anterior: %d movimientos.
+pt: Melhor anterior: %d jogadas.
+fr: Meilleur précédent : %d coups.
+de: Bisher am besten: %d Züge.
+id: Terbaik sebelumnya: %d langkah.
+
+= Practice stars aren't saved.
+es: Las estrellas de práctica no se guardan.
+pt: Estrelas do treino não são salvas.
+fr: Les étoiles d'entraînement ne sont pas sauvegardées.
+de: Sterne im Training werden nicht gespeichert.
+id: Bintang latihan tidak disimpan.
+
+= New star record.
+es: Nuevo récord de estrellas.
+pt: Novo recorde de estrelas.
+fr: Nouveau record d'étoiles.
+de: Neuer Sterne-Rekord.
+id: Rekor bintang baru.
+
+= New star record saved.
+es: Nuevo récord de estrellas guardado.
+pt: Novo recorde de estrelas salvo.
+fr: Nouveau record d'étoiles sauvegardé.
+de: Neuer Sterne-Rekord gespeichert.
+id: Rekor bintang baru disimpan.
+
+= Achievement: %s  +%d coins
+es: Logro: %s  +%d monedas
+pt: Conquista: %s  +%d moedas
+fr: Succès : %s  +%d pièces
+de: Erfolg: %s  +%d Münzen
+id: Pencapaian: %s  +%d koin
+
+= +%d XP   +%d coins
+es: +%d XP   +%d monedas
+pt: +%d XP   +%d moedas
+fr: +%d XP   +%d pièces
+de: +%d XP   +%d Münzen
+id: +%d XP   +%d koin
+
+= +%d XP  +%d coins
+es: +%d XP  +%d monedas
+pt: +%d XP  +%d moedas
+fr: +%d XP  +%d pièces
+de: +%d XP  +%d Münzen
+id: +%d XP  +%d koin
+
+= +%d XP
+es: +%d XP
+pt: +%d XP
+fr: +%d XP
+de: +%d XP
+id: +%d XP
+
+= Practice: no rewards
+es: Práctica: sin recompensas
+pt: Treino: sem recompensas
+fr: Entraînement : pas de récompenses
+de: Training: keine Belohnungen
+id: Latihan: tanpa hadiah
+
+= Today's reward was already collected.
+es: Ya recogiste la recompensa de hoy.
+pt: A recompensa de hoje já foi coletada.
+fr: La récompense du jour a déjà été récupérée.
+de: Die heutige Belohnung wurde schon abgeholt.
+id: Hadiah hari ini sudah diambil.
+
+= No new weekly reward for this clear.
+es: No hay nueva recompensa semanal por esto.
+pt: Nenhuma nova recompensa semanal por isso.
+fr: Pas de nouvelle récompense hebdo pour cette réussite.
+de: Keine neue Wochenbelohnung dafür.
+id: Tidak ada hadiah mingguan baru untuk ini.
+
+= Reward already collected. Replays can still earn stars.
+es: Recompensa ya recogida. Repetirlo aún puede darte estrellas.
+pt: Recompensa já coletada. Jogar de novo ainda pode dar estrelas.
+fr: Récompense déjà récupérée. Rejouer peut encore rapporter des étoiles.
+de: Belohnung schon abgeholt. Wiederholungen bringen noch Sterne.
+id: Hadiah sudah diambil. Main ulang masih bisa dapat bintang.
+
+= 🔥 %d-day Daily streak
+es: 🔥 Racha diaria de %d días
+pt: 🔥 Sequência diária de %d dias
+fr: 🔥 Série quotidienne de %d jours
+de: 🔥 %d Tage Tagesserie
+id: 🔥 Runtunan harian %d hari
+
+= 🛡 Your streak shield covered the day you missed.
+es: 🛡 Tu escudo de racha cubrió el día que faltaste.
+pt: 🛡 Seu escudo de sequência cobriu o dia que você perdeu.
+fr: 🛡 Ton bouclier de série a couvert le jour manqué.
+de: 🛡 Dein Serienschild hat den verpassten Tag abgedeckt.
+id: 🛡 Perisai runtunan melindungi hari yang kamu lewatkan.
+
+= Weekly Challenge complete: %d / %d ✓
+es: Reto semanal completado: %d / %d ✓
+pt: Desafio semanal concluído: %d / %d ✓
+fr: Défi de la semaine terminé : %d / %d ✓
+de: Wochen-Challenge geschafft: %d / %d ✓
+id: Tantangan Mingguan selesai: %d / %d ✓
+
+= Weekly Challenge: %d / %d cleared
+es: Reto semanal: %d / %d superados
+pt: Desafio semanal: %d / %d concluídos
+fr: Défi de la semaine : %d / %d réussis
+de: Wochen-Challenge: %d / %d gelöst
+id: Tantangan Mingguan: %d / %d selesai
+
+= Clear %d for +%d coins.
+es: Supera %d para +%d monedas.
+pt: Conclua %d para +%d moedas.
+fr: Réussis-en %d pour +%d pièces.
+de: Löse %d für +%d Münzen.
+id: Selesaikan %d untuk +%d koin.
+
+= %s puzzles are now open in Journey.
+es: Los puzles %s ya están abiertos en Aventura.
+pt: Os desafios %s agora estão liberados na Jornada.
+fr: Les puzzles %s sont maintenant ouverts dans le Parcours.
+de: %s-Rätsel sind jetzt in der Reise offen.
+id: Teka-teki %s sekarang terbuka di Petualangan.
+
+= %s: %d/%d clears to unlock %s
+es: %s: %d/%d superados para desbloquear %s
+pt: %s: %d/%d concluídos para liberar %s
+fr: %s : %d/%d réussis pour débloquer %s
+de: %s: %d/%d gelöst, um %s freizuschalten
+id: %s: %d/%d selesai untuk membuka %s
+
+= %s: %d/%d cleared
+es: %s: %d/%d superados
+pt: %s: %d/%d concluídos
+fr: %s : %d/%d réussis
+de: %s: %d/%d gelöst
+id: %s: %d/%d selesai
+
+= VICTORY!
+es: ¡VICTORIA!
+pt: VITÓRIA!
+fr: VICTOIRE !
+de: SIEG!
+id: MENANG!
+
+= DEFEAT
+es: DERROTA
+pt: DERROTA
+fr: DÉFAITE
+de: NIEDERLAGE
+id: KALAH
+
+= DRAW
+es: EMPATE
+pt: EMPATE
+fr: ÉGALITÉ
+de: UNENTSCHIEDEN
+id: SERI
+
+= You: %d / %d captured in %d %s
+es: Tú: %d / %d capturadas en %d %s
+pt: Você: %d / %d capturadas em %d %s
+fr: Toi : %d / %d capturées en %d %s
+de: Du: %d / %d geschlagen in %d %s
+id: Kamu: %d / %d ditangkap dalam %d %s
+
+= %s: %d / %d captured in %d %s
+es: %s: %d / %d capturadas en %d %s
+pt: %s: %d / %d capturadas em %d %s
+fr: %s : %d / %d capturées en %d %s
+de: %s: %d / %d geschlagen in %d %s
+id: %s: %d / %d ditangkap dalam %d %s
+
+= No reward for a loss. The result is in your Duel stats.
+es: Sin recompensa por perder. El resultado está en tus estadísticas de duelo.
+pt: Sem recompensa por derrota. O resultado está nas suas estatísticas de duelo.
+fr: Pas de récompense pour une défaite. Le résultat est dans tes stats de duel.
+de: Keine Belohnung für eine Niederlage. Das Ergebnis steht in deiner Duell-Statistik.
+id: Tidak ada hadiah untuk kekalahan. Hasilnya ada di statistik Duel-mu.
+
+= No reward this time.
+es: Esta vez no hay recompensa.
+pt: Sem recompensa desta vez.
+fr: Pas de récompense cette fois.
+de: Diesmal keine Belohnung.
+id: Tidak ada hadiah kali ini.
+
+= Duels: %d W  ·  %d L  ·  %d D
+es: Duelos: %d V  ·  %d D  ·  %d E
+pt: Duelos: %d V  ·  %d D  ·  %d E
+fr: Duels : %d V  ·  %d D  ·  %d N
+de: Duelle: %d S  ·  %d N  ·  %d U
+id: Duel: %d M  ·  %d K  ·  %d S
+
+= Duel again
+es: Otro duelo
+pt: Duelar de novo
+fr: Rejouer un duel
+de: Nochmal duellieren
+id: Duel lagi
+
+= Back to puzzles
+es: Volver a los puzles
+pt: Voltar aos desafios
+fr: Retour aux puzzles
+de: Zurück zu den Rätseln
+id: Kembali ke teka-teki
+
+= BOARD CLEARED
+es: TABLERO DESPEJADO
+pt: TABULEIRO LIMPO
+fr: PLATEAU VIDÉ
+de: BRETT GELEERT
+id: PAPAN BERSIH
+
+= Score: %d
+es: Puntuación: %d
+pt: Pontos: %d
+fr: Score : %d
+de: Punkte: %d
+id: Skor: %d
+
+= New best!
+es: ¡Nuevo récord!
+pt: Novo recorde!
+fr: Nouveau record !
+de: Neuer Rekord!
+id: Rekor baru!
+
+= Moves %d    Time %s    Lives %s
+es: Movimientos %d    Tiempo %s    Vidas %s
+pt: Jogadas %d    Tempo %s    Vidas %s
+fr: Coups %d    Temps %s    Vies %s
+de: Züge %d    Zeit %s    Leben %s
+id: Langkah %d    Waktu %s    Nyawa %s
+
+= Boards get bigger as you go.
+es: Los tableros crecen a medida que avanzas.
+pt: Os tabuleiros crescem conforme você avança.
+fr: Les plateaux grandissent au fil de la partie.
+de: Die Bretter werden immer größer.
+id: Papan makin besar seiring kamu maju.
+
+= No XP for this board: today's Endless XP is used up. Your score still counts.
+es: Sin XP por este tablero: ya usaste el XP de Infinito de hoy. Tu puntuación sigue contando.
+pt: Sem XP neste tabuleiro: o XP do Infinito de hoje acabou. Sua pontuação ainda conta.
+fr: Pas d'XP pour ce plateau : l'XP Sans fin du jour est épuisée. Ton score compte quand même.
+de: Kein XP für dieses Brett: Das Endlos-XP für heute ist aufgebraucht. Deine Punkte zählen trotzdem.
+id: Tidak ada XP untuk papan ini: XP Tanpa Akhir hari ini sudah habis. Skormu tetap dihitung.
+
+= Next board
+es: Siguiente tablero
+pt: Próximo tabuleiro
+fr: Plateau suivant
+de: Nächstes Brett
+id: Papan berikutnya
+
+= DEAD END
+es: SIN SALIDA
+pt: BECO SEM SAÍDA
+fr: IMPASSE
+de: SACKGASSE
+id: JALAN BUNTU
+
+= That cost a life. Lives left: %s
+es: Eso costó una vida. Vidas restantes: %s
+pt: Isso custou uma vida. Vidas restantes: %s
+fr: Ça t'a coûté une vie. Vies restantes : %s
+de: Das hat ein Leben gekostet. Übrige Leben: %s
+id: Itu memakan satu nyawa. Sisa nyawa: %s
+
+= Moves %d    Captured %d / %d
+es: Movimientos %d    Capturadas %d / %d
+pt: Jogadas %d    Capturadas %d / %d
+fr: Coups %d    Capturées %d / %d
+de: Züge %d    Geschlagen %d / %d
+id: Langkah %d    Ditangkap %d / %d
+
+= Try the same board again. Think about which piece you want to become next.
+es: Vuelve a intentar el mismo tablero. Piensa en qué pieza quieres convertirte después.
+pt: Tente o mesmo tabuleiro de novo. Pense em qual peça você quer virar em seguida.
+fr: Réessaie le même plateau. Réfléchis à la pièce que tu veux devenir ensuite.
+de: Versuch dasselbe Brett nochmal. Überleg, welche Figur du als Nächstes werden willst.
+id: Coba papan yang sama lagi. Pikirkan bidak apa yang ingin kamu jadi berikutnya.
+
+= Try again
+es: Reintentar
+pt: Tentar de novo
+fr: Réessayer
+de: Nochmal
+id: Coba lagi
+
+= RUN OVER
+es: FIN DE LA PARTIDA
+pt: FIM DA PARTIDA
+fr: PARTIE TERMINÉE
+de: LAUF VORBEI
+id: PERMAINAN SELESAI
+
+= You cleared %d %s.
+es: Despejaste %d %s.
+pt: Você limpou %d %s.
+fr: Tu as vidé %d %s.
+de: Du hast %d %s geleert.
+id: Kamu membersihkan %d %s.
+
+= Reached board %d
+es: Llegaste al tablero %d
+pt: Chegou ao tabuleiro %d
+fr: Plateau %d atteint
+de: Brett %d erreicht
+id: Mencapai papan %d
+
+= That's your best run!
+es: ¡Es tu mejor partida!
+pt: É a sua melhor partida!
+fr: C'est ta meilleure partie !
+de: Das ist dein bester Lauf!
+id: Itu rekor terbaikmu!
+
+= New run
+es: Nueva partida
+pt: Nova partida
+fr: Nouvelle partie
+de: Neuer Lauf
+id: Main baru
+
+= PUZZLE CLEARED
+es: PUZLE SUPERADO
+pt: DESAFIO CONCLUÍDO
+fr: PUZZLE RÉUSSI
+de: RÄTSEL GELÖST
+id: TEKA-TEKI SELESAI
+
+= %s solved.
+es: %s resuelto.
+pt: %s resolvido.
+fr: %s résolu.
+de: %s gelöst.
+id: %s terpecahkan.
+
+= %s solved.  New best!
+es: %s resuelto.  ¡Nuevo récord!
+pt: %s resolvido.  Novo recorde!
+fr: %s résolu.  Nouveau record !
+de: %s gelöst.  Neuer Rekord!
+id: %s terpecahkan.  Rekor baru!
+
+= Moves %d (par %d)    Time %s
+es: Movimientos %d (par %d)    Tiempo %s
+pt: Jogadas %d (par %d)    Tempo %s
+fr: Coups %d (par %d)    Temps %s
+de: Züge %d (Par %d)    Zeit %s
+id: Langkah %d (par %d)    Waktu %s
+
+= Play again
+es: Jugar otra vez
+pt: Jogar de novo
+fr: Rejouer
+de: Nochmal spielen
+id: Main lagi
+
+= NO WAY THROUGH
+es: SIN SALIDA
+pt: SEM SAÍDA
+fr: AUCUNE ISSUE
+de: KEIN DURCHKOMMEN
+id: TIDAK ADA JALAN
+
+= The pieces left can't all be captured from here.
+es: Desde aquí ya no se pueden capturar todas las piezas que quedan.
+pt: Daqui não dá mais para capturar todas as peças restantes.
+fr: Les pièces restantes ne peuvent plus toutes être capturées d'ici.
+de: Von hier aus lassen sich nicht mehr alle Figuren schlagen.
+id: Dari sini, sisa bidak tidak bisa ditangkap semuanya.
+
+= Undo your last capture and try another. The clock is still running!
+es: Deshaz tu última captura y prueba otra. ¡El reloj sigue corriendo!
+pt: Desfaça sua última captura e tente outra. O relógio continua correndo!
+fr: Annule ta dernière capture et essaie autre chose. Le chrono tourne toujours !
+de: Nimm deinen letzten Schlag zurück und versuch einen anderen. Die Uhr läuft weiter!
+id: Batalkan tangkapan terakhirmu dan coba yang lain. Waktu terus berjalan!
+
+= Undo your last capture and try another, or tap Hint for a free explanation.
+es: Deshaz tu última captura y prueba otra, o toca Pista para una explicación gratis.
+pt: Desfaça sua última captura e tente outra, ou toque em Dica para uma explicação grátis.
+fr: Annule ta dernière capture et essaie autre chose, ou touche Indice pour une explication gratuite.
+de: Nimm deinen letzten Schlag zurück und versuch einen anderen, oder tippe auf Tipp für eine kostenlose Erklärung.
+id: Batalkan tangkapan terakhirmu dan coba yang lain, atau ketuk Petunjuk untuk penjelasan gratis.
+
+= Undo move
+es: Deshacer
+pt: Desfazer jogada
+fr: Annuler le coup
+de: Zug zurück
+id: Batalkan langkah
+
+= Restart
+es: Reiniciar
+pt: Reiniciar
+fr: Recommencer
+de: Neustart
+id: Ulangi
+
+= %s UNLOCKED!
+es: ¡%s DESBLOQUEADO!
+pt: %s LIBERADO!
+fr: %s DÉBLOQUÉ !
+de: %s FREIGESCHALTET!
+id: %s TERBUKA!
+
+= BEGINNER
+es: PRINCIPIANTE
+pt: INICIANTE
+fr: DÉBUTANT
+de: ANFÄNGER
+id: PEMULA
+
+= EASY
+es: FÁCIL
+pt: FÁCIL
+fr: FACILE
+de: LEICHT
+id: MUDAH
+
+= MEDIUM
+es: MEDIO
+pt: MÉDIO
+fr: MOYEN
+de: MITTEL
+id: SEDANG
+
+= HARD
+es: DIFÍCIL
+pt: DIFÍCIL
+fr: DIFFICILE
+de: SCHWER
+id: SULIT
+
+= EXPERT
+es: EXPERTO
+pt: ESPECIALISTA
+fr: EXPERT
+de: EXPERTE
+id: AHLI
+
+= Leave this puzzle?
+es: ¿Salir de este puzle?
+pt: Sair deste desafio?
+fr: Quitter ce puzzle ?
+de: Dieses Rätsel verlassen?
+id: Tinggalkan teka-teki ini?
+
+= Your %d %s on %s will be lost.
+es: Perderás tus %d %s en %s.
+pt: Suas %d %s em %s serão perdidas.
+fr: Tes %d %s sur %s seront perdus.
+de: Deine %d %s in %s gehen verloren.
+id: %d %s kamu di %s akan hilang.
+
+= Leave this duel?
+es: ¿Abandonar este duelo?
+pt: Sair deste duelo?
+fr: Quitter ce duel ?
+de: Dieses Duell verlassen?
+id: Tinggalkan duel ini?
+
+= Leaving counts as a loss, and your opponent wins.
+es: Abandonar cuenta como derrota y tu rival gana.
+pt: Sair conta como derrota, e seu oponente vence.
+fr: Partir compte comme une défaite, et ton adversaire gagne.
+de: Verlassen zählt als Niederlage, und dein Gegner gewinnt.
+id: Keluar dihitung kalah, dan lawanmu menang.
+
+= Restart this board?
+es: ¿Reiniciar este tablero?
+pt: Reiniciar este tabuleiro?
+fr: Recommencer ce plateau ?
+de: Dieses Brett neu starten?
+id: Ulangi papan ini?
+
+= It costs a life. You have %d left.
+es: Cuesta una vida. Te quedan %d.
+pt: Custa uma vida. Restam %d.
+fr: Ça coûte une vie. Il t'en reste %d.
+de: Das kostet ein Leben. Du hast noch %d.
+id: Ini memakan satu nyawa. Sisa %d.
+
+= It costs your last life and ends the run.
+es: Cuesta tu última vida y termina la partida.
+pt: Custa sua última vida e encerra a partida.
+fr: Ça coûte ta dernière vie et termine la partie.
+de: Das kostet dein letztes Leben und beendet den Lauf.
+id: Ini memakan nyawa terakhirmu dan mengakhiri permainan.
+
+= Restart puzzle?
+es: ¿Reiniciar el puzle?
+pt: Reiniciar o desafio?
+fr: Recommencer le puzzle ?
+de: Rätsel neu starten?
+id: Ulangi teka-teki?
+
+= Your %d %s on this attempt will be lost.
+es: Perderás tus %d %s de este intento.
+pt: Suas %d %s nesta tentativa serão perdidas.
+fr: Tes %d %s de cette tentative seront perdus.
+de: Deine %d %s in diesem Versuch gehen verloren.
+id: %d %s kamu di percobaan ini akan hilang.
+
+= The next difficulty is locked. Open Menu > Journey to see what unlocks it.
+es: La siguiente dificultad está bloqueada. Abre Menú > Aventura para ver cómo desbloquearla.
+pt: A próxima dificuldade está bloqueada. Abra Menu > Jornada para ver como liberá-la.
+fr: La difficulté suivante est verrouillée. Ouvre Menu > Parcours pour voir comment la débloquer.
+de: Die nächste Stufe ist gesperrt. Öffne Menü > Reise, um zu sehen, was sie freischaltet.
+id: Tingkat berikutnya terkunci. Buka Menu > Petualangan untuk melihat cara membukanya.
+
+= Next puzzle
+es: Siguiente puzle
+pt: Próximo desafio
+fr: Puzzle suivant
+de: Nächstes Rätsel
+id: Teka-teki berikutnya
+
+= Next challenge
+es: Siguiente reto
+pt: Próximo desafio
+fr: Défi suivant
+de: Nächste Challenge
+id: Tantangan berikutnya
+
+= Cancel
+es: Cancelar
+pt: Cancelar
+fr: Annuler
+de: Abbrechen
+id: Batal
+
+# Menu pages -----------------------------------------------------------------
+= A new puzzle is ready. Reopen the menu to load it.
+es: Hay un puzle nuevo. Vuelve a abrir el menú para cargarlo.
+pt: Um novo desafio está pronto. Reabra o menu para carregá-lo.
+fr: Un nouveau puzzle est prêt. Rouvre le menu pour le charger.
+de: Ein neues Rätsel ist da. Öffne das Menü erneut, um es zu laden.
+id: Teka-teki baru sudah siap. Buka ulang menu untuk memuatnya.
+
+= Next puzzle in %s
+es: Siguiente puzle en %s
+pt: Próximo desafio em %s
+fr: Prochain puzzle dans %s
+de: Nächstes Rätsel in %s
+id: Teka-teki berikutnya dalam %s
+
+= A new challenge is ready. Reopen the menu to load it.
+es: Hay un reto nuevo. Vuelve a abrir el menú para cargarlo.
+pt: Um novo desafio está pronto. Reabra o menu para carregá-lo.
+fr: Un nouveau défi est prêt. Rouvre le menu pour le charger.
+de: Eine neue Challenge ist da. Öffne das Menü erneut, um sie zu laden.
+id: Tantangan baru sudah siap. Buka ulang menu untuk memuatnya.
+
+= New challenge in %s
+es: Nuevo reto en %s
+pt: Novo desafio em %s
+fr: Nouveau défi dans %s
+de: Neue Challenge in %s
+id: Tantangan baru dalam %s
+
+= Waiting %s
+es: Esperando %s
+pt: Esperando %s
+fr: Attente %s
+de: Wartezeit %s
+id: Menunggu %s
+
+= %dd %02dh
+es: %dd %02dh
+pt: %dd %02dh
+fr: %dj %02dh
+de: %dT %02dh
+id: %dh %02dj
+
+= %dh %02dm
+es: %dh %02dm
+pt: %dh %02dm
+fr: %dh %02dm
+de: %dh %02dm
+id: %dj %02dm
+
+= %dm %02ds
+es: %dm %02ds
+pt: %dm %02ds
+fr: %dm %02ds
+de: %dm %02ds
+id: %dm %02dd
+
+= Loading this week's challenge...
+es: Cargando el reto de esta semana...
+pt: Carregando o desafio desta semana...
+fr: Chargement du défi de la semaine...
+de: Wochen-Challenge wird geladen...
+id: Memuat tantangan minggu ini...
+
+= THIS WEEK  ·  %s – %s
+es: ESTA SEMANA  ·  %s – %s
+pt: ESTA SEMANA  ·  %s – %s
+fr: CETTE SEMAINE  ·  %s – %s
+de: DIESE WOCHE  ·  %s – %s
+id: MINGGU INI  ·  %s – %s
+
+= Challenge complete ✓
+es: Reto completado ✓
+pt: Desafio concluído ✓
+fr: Défi terminé ✓
+de: Challenge geschafft ✓
+id: Tantangan selesai ✓
+
+= Clear all %d
+es: Supera los %d
+pt: Conclua os %d
+fr: Réussis les %d
+de: Löse alle %d
+id: Selesaikan semua %d
+
+= Clear %d puzzles
+es: Supera %d puzles
+pt: Conclua %d desafios
+fr: Réussis %d puzzles
+de: Löse %d Rätsel
+id: Selesaikan %d teka-teki
+
+= ✓ Collected
+es: ✓ Recogida
+pt: ✓ Coletada
+fr: ✓ Récupérée
+de: ✓ Abgeholt
+id: ✓ Diambil
+
+= %s  ·  par %d  ·  %s
+es: %s  ·  par %d  ·  %s
+pt: %s  ·  par %d  ·  %s
+fr: %s  ·  par %d  ·  %s
+de: %s  ·  Par %d  ·  %s
+id: %s  ·  par %d  ·  %s
+
+= cleared ✓
+es: superado ✓
+pt: concluído ✓
+fr: réussi ✓
+de: gelöst ✓
+id: selesai ✓
+
+= not cleared
+es: sin superar
+pt: não concluído
+fr: pas réussi
+de: nicht gelöst
+id: belum selesai
+
+= You're already in the queue.
+es: Ya estás en la cola.
+pt: Você já está na fila.
+fr: Tu es déjà dans la file.
+de: Du bist schon in der Warteschlange.
+id: Kamu sudah ada di antrean.
+
+= Your opponent didn't make it. Try again.
+es: Tu rival no llegó. Inténtalo de nuevo.
+pt: Seu oponente não chegou. Tente de novo.
+fr: Ton adversaire n'est pas arrivé. Réessaie.
+de: Dein Gegner ist nicht angekommen. Versuch es nochmal.
+id: Lawanmu tidak datang. Coba lagi.
+
+= RACE ANOTHER PLAYER
+es: COMPITE CONTRA OTRO JUGADOR
+pt: DISPUTE COM OUTRO JOGADOR
+fr: AFFRONTE UN AUTRE JOUEUR
+de: TRITT GEGEN ANDERE AN
+id: BALAPAN DENGAN PEMAIN LAIN
+
+= OPPONENT FOUND
+es: RIVAL ENCONTRADO
+pt: OPONENTE ENCONTRADO
+fr: ADVERSAIRE TROUVÉ
+de: GEGNER GEFUNDEN
+id: LAWAN DITEMUKAN
+
+= SEARCHING ALL SERVERS...
+es: BUSCANDO EN TODOS LOS SERVIDORES...
+pt: PROCURANDO EM TODOS OS SERVIDORES...
+fr: RECHERCHE SUR TOUS LES SERVEURS...
+de: SUCHE AUF ALLEN SERVERN...
+id: MENCARI DI SEMUA SERVER...
+
+= SEARCHING FOR AN OPPONENT...
+es: BUSCANDO UN RIVAL...
+pt: PROCURANDO UM OPONENTE...
+fr: RECHERCHE D'UN ADVERSAIRE...
+de: SUCHE EINEN GEGNER...
+id: MENCARI LAWAN...
+
+= Waiting for %s to arrive. The countdown starts as soon as you're both here.
+es: Esperando a que llegue %s. La cuenta atrás empieza cuando estéis los dos.
+pt: Esperando %s chegar. A contagem começa assim que os dois estiverem aqui.
+fr: En attente de %s. Le compte à rebours démarre dès que vous êtes là tous les deux.
+de: Warte auf %s. Der Countdown startet, sobald ihr beide da seid.
+id: Menunggu %s datang. Hitungan mundur dimulai begitu kalian berdua di sini.
+
+= You'll race %s from another server. Moving you both to a match server now...
+es: Competirás contra %s de otro servidor. Moviéndoos a un servidor de partida...
+pt: Você vai disputar com %s de outro servidor. Levando vocês dois a um servidor de partida...
+fr: Tu vas affronter %s d'un autre serveur. Transfert vers un serveur de match...
+de: Du trittst gegen %s von einem anderen Server an. Ihr werdet auf einen Match-Server verschoben...
+id: Kamu akan balapan dengan %s dari server lain. Memindahkan kalian ke server pertandingan...
+
+= Looking for an opponent here and on every other server. When one is found, you'll both get the same puzzle after a short countdown.
+es: Buscando un rival aquí y en todos los demás servidores. Cuando aparezca uno, recibiréis el mismo puzle tras una breve cuenta atrás.
+pt: Procurando um oponente aqui e em todos os outros servidores. Quando um for encontrado, vocês dois recebem o mesmo desafio após uma contagem curta.
+fr: Recherche d'un adversaire ici et sur tous les autres serveurs. Quand il est trouvé, vous recevez le même puzzle après un court compte à rebours.
+de: Suche nach einem Gegner hier und auf allen anderen Servern. Sobald einer gefunden ist, bekommt ihr nach einem kurzen Countdown dasselbe Rätsel.
+id: Mencari lawan di sini dan di semua server lain. Saat ditemukan, kalian berdua mendapat teka-teki yang sama setelah hitungan mundur singkat.
+
+= You're in the queue%s. When someone else in this server joins, you'll both get the same puzzle after a short countdown.
+es: Estás en la cola%s. Cuando otra persona de este servidor se una, recibiréis el mismo puzle tras una breve cuenta atrás.
+pt: Você está na fila%s. Quando outra pessoa deste servidor entrar, vocês dois recebem o mesmo desafio após uma contagem curta.
+fr: Tu es dans la file%s. Quand quelqu'un d'autre de ce serveur rejoint, vous recevez le même puzzle après un court compte à rebours.
+de: Du bist in der Warteschlange%s. Wenn jemand anderes auf diesem Server beitritt, bekommt ihr nach einem kurzen Countdown dasselbe Rätsel.
+id: Kamu ada di antrean%s. Saat orang lain di server ini bergabung, kalian berdua mendapat teka-teki yang sama setelah hitungan mundur singkat.
+
+= (%d waiting)
+es: (%d esperando)
+pt: (%d esperando)
+fr: (%d en attente)
+de: (%d warten)
+id: (%d menunggu)
+
+= Same puzzle, separate boards. The first player to clear their board wins. If nobody clears it in 3 minutes, it's a draw.
+es: Mismo puzle, tableros separados. Gana quien despeje antes su tablero. Si nadie lo hace en 3 minutos, es empate.
+pt: Mesmo desafio, tabuleiros separados. Vence quem limpar o tabuleiro primeiro. Se ninguém limpar em 3 minutos, é empate.
+fr: Même puzzle, plateaux séparés. Le premier à vider son plateau gagne. Si personne n'y arrive en 3 minutes, c'est une égalité.
+de: Gleiches Rätsel, getrennte Bretter. Wer zuerst sein Brett leert, gewinnt. Schafft es keiner in 3 Minuten, ist es unentschieden.
+id: Teka-teki sama, papan terpisah. Yang pertama membersihkan papannya menang. Jika tidak ada dalam 3 menit, hasilnya seri.
+
+= That didn't go through. Try again.
+es: Eso no funcionó. Inténtalo de nuevo.
+pt: Isso não funcionou. Tente de novo.
+fr: Ça n'a pas marché. Réessaie.
+de: Das hat nicht geklappt. Versuch es nochmal.
+id: Itu gagal. Coba lagi.
+
+= Joining match...
+es: Uniéndose a la partida...
+pt: Entrando na partida...
+fr: Connexion au match...
+de: Match wird betreten...
+id: Bergabung ke pertandingan...
+
+= Find opponent
+es: Buscar rival
+pt: Procurar oponente
+fr: Trouver un adversaire
+de: Gegner suchen
+id: Cari lawan
+
+= YOUR DUELS
+es: TUS DUELOS
+pt: SEUS DUELOS
+fr: TES DUELS
+de: DEINE DUELLE
+id: DUEL KAMU
+
+= Record
+es: Historial
+pt: Histórico
+fr: Bilan
+de: Bilanz
+id: Rekor
+
+= %d W  ·  %d L  ·  %d D   (%d played)
+es: %d V  ·  %d D  ·  %d E   (%d jugados)
+pt: %d V  ·  %d D  ·  %d E   (%d jogados)
+fr: %d V  ·  %d D  ·  %d N   (%d joués)
+de: %d S  ·  %d N  ·  %d U   (%d gespielt)
+id: %d M  ·  %d K  ·  %d S   (%d dimainkan)
+
+= Rewards
+es: Recompensas
+pt: Recompensas
+fr: Récompenses
+de: Belohnungen
+id: Hadiah
+
+= Win +%d coins, draw +%d. Rewarded duels left today: %d of %d, one per opponent.
+es: Victoria +%d monedas, empate +%d. Duelos con premio hoy: %d de %d, uno por rival.
+pt: Vitória +%d moedas, empate +%d. Duelos premiados restantes hoje: %d de %d, um por oponente.
+fr: Victoire +%d pièces, égalité +%d. Duels récompensés restants aujourd'hui : %d sur %d, un par adversaire.
+de: Sieg +%d Münzen, Unentschieden +%d. Belohnte Duelle heute übrig: %d von %d, eins pro Gegner.
+id: Menang +%d koin, seri +%d. Sisa duel berhadiah hari ini: %d dari %d, satu per lawan.
+
+= Loading your progress...
+es: Cargando tu progreso...
+pt: Carregando seu progresso...
+fr: Chargement de ta progression...
+de: Dein Fortschritt wird geladen...
+id: Memuat progresmu...
+
+= One moment.
+es: Un momento.
+pt: Só um momento.
+fr: Un instant.
+de: Einen Moment.
+id: Sebentar.
+
+= Continue
+es: Continuar
+pt: Continuar
+fr: Continuer
+de: Weiter
+id: Lanjutkan
+
+= Resume
+es: Reanudar
+pt: Retomar
+fr: Reprendre
+de: Fortsetzen
+id: Lanjutkan
+
+= %s  •  %s  •  %d %s in
+es: %s  •  %s  •  %d %s hechos
+pt: %s  •  %s  •  %d %s feitas
+fr: %s  •  %s  •  %d %s joués
+de: %s  •  %s  •  %d %s gespielt
+id: %s  •  %s  •  %d %s dimainkan
+
+= Start Journey
+es: Empezar Aventura
+pt: Começar Jornada
+fr: Commencer le Parcours
+de: Reise starten
+id: Mulai Petualangan
+
+= Continue Journey
+es: Continuar Aventura
+pt: Continuar Jornada
+fr: Continuer le Parcours
+de: Reise fortsetzen
+id: Lanjutkan Petualangan
+
+= Start
+es: Empezar
+pt: Começar
+fr: Commencer
+de: Start
+id: Mulai
+
+= Journey complete
+es: Aventura completada
+pt: Jornada concluída
+fr: Parcours terminé
+de: Reise abgeschlossen
+id: Petualangan selesai
+
+= Every puzzle cleared. Replay any for more stars.
+es: Todos los puzles superados. Repite cualquiera para conseguir más estrellas.
+pt: Todos os desafios concluídos. Jogue qualquer um de novo para mais estrelas.
+fr: Tous les puzzles réussis. Rejoue-les pour plus d'étoiles.
+de: Alle Rätsel gelöst. Spiel sie erneut für mehr Sterne.
+id: Semua teka-teki selesai. Main ulang untuk bintang lebih banyak.
+
+= View
+es: Ver
+pt: Ver
+fr: Voir
+de: Ansehen
+id: Lihat
+
+= NEW!
+es: ¡NUEVO!
+pt: NOVO!
+fr: NOUVEAU !
+de: NEU!
+id: BARU!
+
+= Locked
+es: Bloqueado
+pt: Bloqueado
+fr: Verrouillé
+de: Gesperrt
+id: Terkunci
+
+= %d/%d cleared  ·  %d/%d★
+es: %d/%d superados  ·  %d/%d★
+pt: %d/%d concluídos  ·  %d/%d★
+fr: %d/%d réussis  ·  %d/%d★
+de: %d/%d gelöst  ·  %d/%d★
+id: %d/%d selesai  ·  %d/%d★
+
+= Clear %d %s puzzles to unlock  (%d/%d)
+es: Supera %d puzles %s para desbloquear  (%d/%d)
+pt: Conclua %d desafios %s para liberar  (%d/%d)
+fr: Réussis %d puzzles %s pour débloquer  (%d/%d)
+de: Löse %d %s-Rätsel zum Freischalten  (%d/%d)
+id: Selesaikan %d teka-teki %s untuk membuka  (%d/%d)
+
+= Loading today's puzzle...
+es: Cargando el puzle de hoy...
+pt: Carregando o desafio de hoje...
+fr: Chargement du puzzle du jour...
+de: Heutiges Rätsel wird geladen...
+id: Memuat teka-teki hari ini...
+
+= TODAY'S PUZZLE
+es: PUZLE DE HOY
+pt: DESAFIO DE HOJE
+fr: PUZZLE DU JOUR
+de: HEUTIGES RÄTSEL
+id: TEKA-TEKI HARI INI
+
+= hint used
+es: pista usada
+pt: dica usada
+fr: indice utilisé
+de: Tipp benutzt
+id: petunjuk terpakai
+
+= 1 free hint
+es: 1 pista gratis
+pt: 1 dica grátis
+fr: 1 indice gratuit
+de: 1 Gratis-Tipp
+id: 1 petunjuk gratis
+
+= cleared today ✓
+es: superado hoy ✓
+pt: concluído hoje ✓
+fr: réussi aujourd'hui ✓
+de: heute gelöst ✓
+id: selesai hari ini ✓
+
+= not cleared yet
+es: aún sin superar
+pt: ainda não concluído
+fr: pas encore réussi
+de: noch nicht gelöst
+id: belum selesai
+
+= Play again (no reward)
+es: Jugar otra vez (sin recompensa)
+pt: Jogar de novo (sem recompensa)
+fr: Rejouer (sans récompense)
+de: Nochmal spielen (keine Belohnung)
+id: Main lagi (tanpa hadiah)
+
+= 🔥 %d-day streak  (best %d)
+es: 🔥 Racha de %d días  (récord %d)
+pt: 🔥 Sequência de %d dias  (recorde %d)
+fr: 🔥 Série de %d jours  (record %d)
+de: 🔥 %d Tage in Folge  (Rekord %d)
+id: 🔥 Runtunan %d hari  (terbaik %d)
+
+= 🔥 No streak right now  (best %d)
+es: 🔥 Sin racha ahora mismo  (récord %d)
+pt: 🔥 Sem sequência agora  (recorde %d)
+fr: 🔥 Pas de série en cours  (record %d)
+de: 🔥 Gerade keine Serie  (Rekord %d)
+id: 🔥 Belum ada runtunan  (terbaik %d)
+
+= 🛡 You missed yesterday. Clear today's puzzle and your shield keeps your %d-day streak.
+es: 🛡 Ayer no jugaste. Supera el puzle de hoy y tu escudo mantendrá tu racha de %d días.
+pt: 🛡 Você perdeu ontem. Conclua o desafio de hoje e seu escudo mantém sua sequência de %d dias.
+fr: 🛡 Tu as manqué hier. Réussis le puzzle du jour et ton bouclier garde ta série de %d jours.
+de: 🛡 Du hast gestern verpasst. Löse das heutige Rätsel und dein Schild rettet deine Serie von %d Tagen.
+id: 🛡 Kamu melewatkan kemarin. Selesaikan teka-teki hari ini dan perisaimu menjaga runtunan %d harimu.
+
+= 🛡 Streak shield ready. If you miss one day, clearing the next day's puzzle keeps your streak. You get one shield every 7 days. The missed day earns no reward.
+es: 🛡 Escudo de racha listo. Si faltas un día, superar el puzle del día siguiente mantiene tu racha. Recibes un escudo cada 7 días. El día perdido no da recompensa.
+pt: 🛡 Escudo de sequência pronto. Se você perder um dia, concluir o desafio do dia seguinte mantém sua sequência. Você ganha um escudo a cada 7 dias. O dia perdido não dá recompensa.
+fr: 🛡 Bouclier de série prêt. Si tu manques un jour, réussir le puzzle du lendemain garde ta série. Tu reçois un bouclier tous les 7 jours. Le jour manqué ne rapporte rien.
+de: 🛡 Serienschild bereit. Verpasst du einen Tag, rettet das Lösen des nächsten Tagesrätsels deine Serie. Du bekommst alle 7 Tage ein Schild. Der verpasste Tag bringt keine Belohnung.
+id: 🛡 Perisai runtunan siap. Jika kamu melewatkan satu hari, menyelesaikan teka-teki hari berikutnya menjaga runtunanmu. Kamu dapat satu perisai tiap 7 hari. Hari yang terlewat tidak memberi hadiah.
+
+= 🛡 Shield used to cover %s. The next one is ready on %s.
+es: 🛡 Escudo usado para cubrir el %s. El siguiente estará listo el %s.
+pt: 🛡 Escudo usado para cobrir %s. O próximo fica pronto em %s.
+fr: 🛡 Bouclier utilisé pour couvrir le %s. Le prochain sera prêt le %s.
+de: 🛡 Schild für den %s benutzt. Das nächste ist am %s bereit.
+id: 🛡 Perisai dipakai untuk %s. Berikutnya siap pada %s.
+
+= 🛡 Shield used. The next one is ready on %s.
+es: 🛡 Escudo usado. El siguiente estará listo el %s.
+pt: 🛡 Escudo usado. O próximo fica pronto em %s.
+fr: 🛡 Bouclier utilisé. Le prochain sera prêt le %s.
+de: 🛡 Schild benutzt. Das nächste ist am %s bereit.
+id: 🛡 Perisai terpakai. Berikutnya siap pada %s.
+
+= RUN IN PROGRESS
+es: PARTIDA EN CURSO
+pt: PARTIDA EM ANDAMENTO
+fr: PARTIE EN COURS
+de: LAUF LÄUFT
+id: PERMAINAN BERJALAN
+
+= HOW FAR CAN YOU GO?
+es: ¿HASTA DÓNDE LLEGARÁS?
+pt: ATÉ ONDE VOCÊ CHEGA?
+fr: JUSQU'OÙ IRAS-TU ?
+de: WIE WEIT KOMMST DU?
+id: SEBERAPA JAUH KAMU BISA?
+
+= Board %d  ·  %s
+es: Tablero %d  ·  %s
+pt: Tabuleiro %d  ·  %s
+fr: Plateau %d  ·  %s
+de: Brett %d  ·  %s
+id: Papan %d  ·  %s
+
+= Best run: %d %s
+es: Mejor partida: %d %s
+pt: Melhor partida: %d %s
+fr: Meilleure partie : %d %s
+de: Bester Lauf: %d %s
+id: Rekor terbaik: %d %s
+
+= You start with %d lives. Every board is new and solvable, and they get bigger as you go. Your score is the boards you clear.
+es: Empiezas con %d vidas. Cada tablero es nuevo y tiene solución, y crecen a medida que avanzas. Tu puntuación son los tableros que despejas.
+pt: Você começa com %d vidas. Cada tabuleiro é novo e tem solução, e eles crescem conforme você avança. Sua pontuação é o número de tabuleiros que você limpa.
+fr: Tu commences avec %d vies. Chaque plateau est nouveau et faisable, et ils grandissent au fil de la partie. Ton score, c'est le nombre de plateaux vidés.
+de: Du startest mit %d Leben. Jedes Brett ist neu und lösbar und sie werden immer größer. Deine Punkte sind die geleerten Bretter.
+id: Kamu mulai dengan %d nyawa. Setiap papan baru dan bisa diselesaikan, dan makin besar seiring kamu maju. Skormu adalah jumlah papan yang kamu bersihkan.
+
+= Start run
+es: Empezar partida
+pt: Começar partida
+fr: Lancer une partie
+de: Lauf starten
+id: Mulai main
+
+= YOUR ENDLESS RUNS
+es: TUS PARTIDAS INFINITAS
+pt: SUAS PARTIDAS NO INFINITO
+fr: TES PARTIES SANS FIN
+de: DEINE ENDLOS-LÄUFE
+id: PERMAINAN TANPA AKHIR-MU
+
+= Best %d  ·  Runs %d  ·  Boards cleared %d
+es: Récord %d  ·  Partidas %d  ·  Tableros despejados %d
+pt: Recorde %d  ·  Partidas %d  ·  Tabuleiros limpos %d
+fr: Record %d  ·  Parties %d  ·  Plateaux vidés %d
+de: Rekord %d  ·  Läufe %d  ·  Bretter geleert %d
+id: Terbaik %d  ·  Main %d  ·  Papan bersih %d
+
+= +%d XP a board, for %d boards a day (%d left today). Clear 10 and 25 boards in one run for achievement coins.
+es: +%d XP por tablero, hasta %d tableros al día (quedan %d hoy). Despeja 10 y 25 tableros en una partida para ganar monedas de logros.
+pt: +%d XP por tabuleiro, até %d tabuleiros por dia (restam %d hoje). Limpe 10 e 25 tabuleiros numa partida para moedas de conquista.
+fr: +%d XP par plateau, jusqu'à %d plateaux par jour (encore %d aujourd'hui). Vide 10 et 25 plateaux en une partie pour des pièces de succès.
+de: +%d XP pro Brett, für %d Bretter am Tag (heute noch %d). Leere 10 und 25 Bretter in einem Lauf für Erfolgsmünzen.
+id: +%d XP per papan, untuk %d papan sehari (sisa %d hari ini). Bersihkan 10 dan 25 papan dalam satu permainan untuk koin pencapaian.
+
+= Loading your statistics...
+es: Cargando tus estadísticas...
+pt: Carregando suas estatísticas...
+fr: Chargement de tes statistiques...
+de: Deine Statistiken werden geladen...
+id: Memuat statistikmu...
+
+= Puzzles cleared
+es: Puzles superados
+pt: Desafios concluídos
+fr: Puzzles réussis
+de: Gelöste Rätsel
+id: Teka-teki selesai
+
+= 3-star clears
+es: Superados con 3 estrellas
+pt: Concluídos com 3 estrelas
+fr: Réussites 3 étoiles
+de: 3-Sterne-Lösungen
+id: Selesai bintang 3
+
+= Daily streak
+es: Racha diaria
+pt: Sequência diária
+fr: Série quotidienne
+de: Tagesserie
+id: Runtunan harian
+
+= %d  (best %d)
+es: %d  (récord %d)
+pt: %d  (recorde %d)
+fr: %d  (record %d)
+de: %d  (Rekord %d)
+id: %d  (terbaik %d)
+
+= Dailies cleared
+es: Diarios superados
+pt: Diários concluídos
+fr: Puzzles du jour réussis
+de: Tagesrätsel gelöst
+id: Harian selesai
+
+= Weekly challenges
+es: Retos semanales
+pt: Desafios semanais
+fr: Défis de la semaine
+de: Wochen-Challenges
+id: Tantangan mingguan
+
+= Best Endless run
+es: Mejor partida en Infinito
+pt: Melhor partida no Infinito
+fr: Meilleure partie Sans fin
+de: Bester Endlos-Lauf
+id: Rekor Tanpa Akhir terbaik
+
+= %d boards
+es: %d tableros
+pt: %d tabuleiros
+fr: %d plateaux
+de: %d Bretter
+id: %d papan
+
+= Duels W / L / D
+es: Duelos V / D / E
+pt: Duelos V / D / E
+fr: Duels V / D / N
+de: Duelle S / N / U
+id: Duel M / K / S
+
+= Solves
+es: Resoluciones
+pt: Resoluções
+fr: Résolutions
+de: Lösungen
+id: Penyelesaian
+
+= Dead ends
+es: Sin salida
+pt: Becos sem saída
+fr: Impasses
+de: Sackgassen
+id: Jalan buntu
+
+= Restarts
+es: Reinicios
+pt: Reinícios
+fr: Redémarrages
+de: Neustarts
+id: Pengulangan
+
+= Hints used
+es: Pistas usadas
+pt: Dicas usadas
+fr: Indices utilisés
+de: Benutzte Tipps
+id: Petunjuk terpakai
+
+= Moves played
+es: Movimientos jugados
+pt: Jogadas feitas
+fr: Coups joués
+de: Gespielte Züge
+id: Langkah dimainkan
+
+= Play time
+es: Tiempo de juego
+pt: Tempo de jogo
+fr: Temps de jeu
+de: Spielzeit
+id: Waktu bermain
+
+= XP
+es: XP
+pt: XP
+fr: XP
+de: XP
+id: XP
+
+= ACHIEVEMENTS
+es: LOGROS
+pt: CONQUISTAS
+fr: SUCCÈS
+de: ERFOLGE
+id: PENCAPAIAN
+
+= %d coins
+es: %d monedas
+pt: %d moedas
+fr: %d pièces
+de: %d Münzen
+id: %d koin
+
+= +%d coins
+es: +%d monedas
+pt: +%d moedas
+fr: +%d pièces
+de: +%d Münzen
+id: +%d koin
+
+= Spend coins in the Shop on board themes, chess skins and capture effects. They are cosmetic only and coins can't be bought.
+es: Gasta monedas en la Tienda en temas de tablero, aspectos de piezas y efectos de captura. Son solo estéticos y las monedas no se pueden comprar.
+pt: Gaste moedas na Loja em temas de tabuleiro, visuais de peças e efeitos de captura. São só visuais e moedas não podem ser compradas.
+fr: Dépense tes pièces dans la Boutique en thèmes de plateau, skins de pièces et effets de capture. C'est purement cosmétique et les pièces ne s'achètent pas.
+de: Gib Münzen im Shop für Brett-Designs, Figuren-Skins und Schlag-Effekte aus. Alles ist rein kosmetisch und Münzen kann man nicht kaufen.
+id: Belanjakan koin di Toko untuk tema papan, skin bidak, dan efek tangkapan. Semuanya hanya kosmetik dan koin tidak bisa dibeli.
+
+= Language
+es: Idioma
+pt: Idioma
+fr: Langue
+de: Sprache
+id: Bahasa
+
+= The language of every menu and puzzle
+es: El idioma de todos los menús y puzles
+pt: O idioma de todos os menus e desafios
+fr: La langue de tous les menus et puzzles
+de: Die Sprache aller Menüs und Rätsel
+id: Bahasa semua menu dan teka-teki
+
+= Sound effects
+es: Efectos de sonido
+pt: Efeitos sonoros
+fr: Effets sonores
+de: Soundeffekte
+id: Efek suara
+
+= Moves, captures, wins and buttons
+es: Movimientos, capturas, victorias y botones
+pt: Jogadas, capturas, vitórias e botões
+fr: Coups, captures, victoires et boutons
+de: Züge, Schläge, Siege und Buttons
+id: Langkah, tangkapan, kemenangan, dan tombol
+
+= On
+es: Sí
+pt: Lig.
+fr: Oui
+de: An
+id: Aktif
+
+= Off
+es: No
+pt: Desl.
+fr: Non
+de: Aus
+id: Mati
+
+= Volume
+es: Volumen
+pt: Volume
+fr: Volume
+de: Lautstärke
+id: Volume
+
+= Vibration
+es: Vibración
+pt: Vibração
+fr: Vibration
+de: Vibration
+id: Getaran
+
+= Short buzz on captures, wins and invalid moves
+es: Vibración corta en capturas, victorias y movimientos no válidos
+pt: Vibração curta em capturas, vitórias e jogadas inválidas
+fr: Courte vibration aux captures, victoires et coups invalides
+de: Kurzes Vibrieren bei Schlägen, Siegen und ungültigen Zügen
+id: Getaran singkat saat menangkap, menang, dan langkah salah
+
+= Not supported on this device
+es: No compatible con este dispositivo
+pt: Não suportado neste dispositivo
+fr: Non pris en charge sur cet appareil
+de: Auf diesem Gerät nicht unterstützt
+id: Tidak didukung di perangkat ini
+
+= N/A
+es: N/D
+pt: N/D
+fr: N/D
+de: k. A.
+id: T/A
+
+= Drag to move
+es: Arrastrar para mover
+pt: Arrastar para mover
+fr: Glisser pour jouer
+de: Ziehen zum Bewegen
+id: Seret untuk bergerak
+
+= Drag your piece onto a square. Tapping always works.
+es: Arrastra tu pieza a una casilla. Tocar siempre funciona.
+pt: Arraste sua peça até uma casa. Tocar sempre funciona.
+fr: Fais glisser ta pièce sur une case. Toucher marche toujours.
+de: Zieh deine Figur auf ein Feld. Tippen funktioniert immer.
+id: Seret bidakmu ke petak. Mengetuk selalu bisa.
+
+= Replay the guided first puzzle
+es: Repite el primer puzle guiado
+pt: Jogue de novo o primeiro desafio guiado
+fr: Rejoue le premier puzzle guidé
+de: Spiel das geführte erste Rätsel erneut
+id: Ulangi teka-teki pertama yang dipandu
+
+= Settings are saved with your progress.
+es: Los ajustes se guardan con tu progreso.
+pt: As configurações são salvas com seu progresso.
+fr: Les paramètres sont sauvegardés avec ta progression.
+de: Einstellungen werden mit deinem Fortschritt gespeichert.
+id: Pengaturan disimpan bersama progresmu.
+
+= Clear %d puzzles of a difficulty to unlock the next. First clears earn XP and coins. Clear within par for 3 stars.
+es: Supera %d puzles de una dificultad para desbloquear la siguiente. Superarlos por primera vez da XP y monedas. Hazlo dentro del par para 3 estrellas.
+pt: Conclua %d desafios de uma dificuldade para liberar a próxima. A primeira conclusão dá XP e moedas. Conclua dentro do par para 3 estrelas.
+fr: Réussis %d puzzles d'une difficulté pour débloquer la suivante. Les premières réussites rapportent XP et pièces. Réussis dans le par pour 3 étoiles.
+de: Löse %d Rätsel einer Stufe, um die nächste freizuschalten. Erste Lösungen bringen XP und Münzen. Innerhalb des Par gibt es 3 Sterne.
+id: Selesaikan %d teka-teki di satu tingkat untuk membuka tingkat berikutnya. Penyelesaian pertama memberi XP dan koin. Selesaikan dalam par untuk 3 bintang.
+
+= Play any puzzle at any difficulty. Hints are free. Practice earns no rewards or stars and doesn't unlock difficulties.
+es: Juega cualquier puzle en cualquier dificultad. Las pistas son gratis. La práctica no da recompensas ni estrellas y no desbloquea dificultades.
+pt: Jogue qualquer desafio em qualquer dificuldade. Dicas são grátis. O treino não dá recompensas nem estrelas e não libera dificuldades.
+fr: Joue n'importe quel puzzle à n'importe quelle difficulté. Les indices sont gratuits. L'entraînement ne rapporte ni récompenses ni étoiles et ne débloque rien.
+de: Spiel jedes Rätsel in jeder Stufe. Tipps sind gratis. Training bringt keine Belohnungen oder Sterne und schaltet keine Stufen frei.
+id: Mainkan teka-teki apa pun di tingkat mana pun. Petunjuk gratis. Latihan tidak memberi hadiah atau bintang dan tidak membuka tingkat.
+
+= A new puzzle every day at 00:00 UTC. One free hint and one reward per day.
+es: Un puzle nuevo cada día a las 00:00 UTC. Una pista gratis y una recompensa al día.
+pt: Um desafio novo todo dia às 00:00 UTC. Uma dica grátis e uma recompensa por dia.
+fr: Un nouveau puzzle chaque jour à 00:00 UTC. Un indice gratuit et une récompense par jour.
+de: Jeden Tag um 00:00 UTC ein neues Rätsel. Ein Gratis-Tipp und eine Belohnung pro Tag.
+id: Teka-teki baru setiap hari pukul 00:00 UTC. Satu petunjuk gratis dan satu hadiah per hari.
+
+= Four puzzles, the same for everyone, new every Monday 00:00 UTC. One hint per attempt. Each reward is paid once.
+es: Cuatro puzles, iguales para todos, nuevos cada lunes a las 00:00 UTC. Una pista por intento. Cada recompensa se da una vez.
+pt: Quatro desafios, iguais para todos, novos toda segunda às 00:00 UTC. Uma dica por tentativa. Cada recompensa é paga uma vez.
+fr: Quatre puzzles, les mêmes pour tous, renouvelés chaque lundi à 00:00 UTC. Un indice par tentative. Chaque récompense est versée une fois.
+de: Vier Rätsel, für alle gleich, jeden Montag um 00:00 UTC neu. Ein Tipp pro Versuch. Jede Belohnung gibt es einmal.
+id: Empat teka-teki, sama untuk semua, baru setiap Senin pukul 00:00 UTC. Satu petunjuk per percobaan. Tiap hadiah dibayar sekali.
+
+= Generated boards, one after another, getting harder as you go. No undo or hints. A dead end or a restart costs a life.
+es: Tableros generados, uno tras otro, cada vez más difíciles. Sin deshacer ni pistas. Un callejón sin salida o reiniciar cuesta una vida.
+pt: Tabuleiros gerados, um após o outro, cada vez mais difíceis. Sem desfazer nem dicas. Um beco sem saída ou reiniciar custa uma vida.
+fr: Des plateaux générés, l'un après l'autre, de plus en plus durs. Pas d'annulation ni d'indices. Une impasse ou un redémarrage coûte une vie.
+de: Generierte Bretter, eins nach dem anderen, immer schwerer. Kein Zurück, keine Tipps. Sackgasse oder Neustart kostet ein Leben.
+id: Papan acak, satu demi satu, makin sulit. Tanpa batal atau petunjuk. Jalan buntu atau mengulang memakan satu nyawa.
+
+= Opponents come from this server first, then from any server. Leaving a duel counts as a loss.
+es: Los rivales vienen primero de este servidor y luego de cualquiera. Abandonar un duelo cuenta como derrota.
+pt: Os oponentes vêm primeiro deste servidor, depois de qualquer servidor. Sair de um duelo conta como derrota.
+fr: Les adversaires viennent d'abord de ce serveur, puis de n'importe quel serveur. Quitter un duel compte comme une défaite.
+de: Gegner kommen zuerst von diesem Server, dann von allen Servern. Ein Duell zu verlassen zählt als Niederlage.
+id: Lawan dicari dari server ini dulu, lalu dari server mana pun. Keluar dari duel dihitung kalah.
+
+= Cosmetics only. Nothing here changes puzzles, hints, timers, rewards or duels.
+es: Solo estética. Nada de aquí cambia puzles, pistas, tiempos, recompensas ni duelos.
+pt: Só visual. Nada aqui muda desafios, dicas, tempos, recompensas ou duelos.
+fr: Purement cosmétique. Rien ici ne change les puzzles, indices, chronos, récompenses ou duels.
+de: Nur Optik. Nichts hier ändert Rätsel, Tipps, Zeiten, Belohnungen oder Duelle.
+id: Hanya kosmetik. Tidak ada yang mengubah teka-teki, petunjuk, waktu, hadiah, atau duel.
+
+= Your numbers, as the server has them.
+es: Tus números, tal como los tiene el servidor.
+pt: Seus números, como o servidor registra.
+fr: Tes chiffres, tels que le serveur les connaît.
+de: Deine Zahlen, wie der Server sie kennt.
+id: Angka-angkamu, sesuai catatan server.
+
+= Loading progress...
+es: Cargando progreso...
+pt: Carregando progresso...
+fr: Chargement...
+de: Fortschritt lädt...
+id: Memuat progres...
+
+= %d XP  ·  %d coins
+es: %d XP  ·  %d monedas
+pt: %d XP  ·  %d moedas
+fr: %d XP  ·  %d pièces
+de: %d XP  ·  %d Münzen
+id: %d XP  ·  %d koin
+
+= offline
+es: sin conexión
+pt: offline
+fr: hors ligne
+de: offline
+id: offline
+
+= not saving
+es: sin guardar
+pt: sem salvar
+fr: pas de sauvegarde
+de: speichert nicht
+id: tidak menyimpan
+
+= Choose your language
+es: Elige tu idioma
+pt: Escolha seu idioma
+fr: Choisis ta langue
+de: Wähle deine Sprache
+id: Pilih bahasamu
+
+= You can change it any time in Settings.
+es: Puedes cambiarlo cuando quieras en Ajustes.
+pt: Você pode mudar quando quiser em Configurações.
+fr: Tu peux la changer à tout moment dans Paramètres.
+de: Du kannst sie jederzeit in den Einstellungen ändern.
+id: Kamu bisa mengubahnya kapan saja di Pengaturan.
+
+= Suggested
+es: Sugerido
+pt: Sugerido
+fr: Suggérée
+de: Empfohlen
+id: Disarankan
+
+= Jan
+es: ene
+pt: jan
+fr: janv.
+de: Jan.
+id: Jan
+
+= Feb
+es: feb
+pt: fev
+fr: févr.
+de: Feb.
+id: Feb
+
+= Mar
+es: mar
+pt: mar
+fr: mars
+de: März
+id: Mar
+
+= Apr
+es: abr
+pt: abr
+fr: avr.
+de: Apr.
+id: Apr
+
+= May
+es: may
+pt: mai
+fr: mai
+de: Mai
+id: Mei
+
+= Jun
+es: jun
+pt: jun
+fr: juin
+de: Juni
+id: Jun
+
+= Jul
+es: jul
+pt: jul
+fr: juil.
+de: Juli
+id: Jul
+
+= Aug
+es: ago
+pt: ago
+fr: août
+de: Aug.
+id: Agu
+
+= Sep
+es: sept
+pt: set
+fr: sept.
+de: Sep.
+id: Sep
+
+= Oct
+es: oct
+pt: out
+fr: oct.
+de: Okt.
+id: Okt
+
+= Nov
+es: nov
+pt: nov
+fr: nov.
+de: Nov.
+id: Nov
+
+= Dec
+es: dic
+pt: dez
+fr: déc.
+de: Dez.
+id: Des
+
+# ---- Shop -------------------------------------------------------------------
+
+= Featured
+es: Destacados
+pt: Destaques
+fr: À la une
+de: Empfohlen
+id: Unggulan
+
+= Gamepasses
+es: Pases
+pt: Passes
+fr: Passes
+de: Gamepässe
+id: Gamepass
+
+= Chess Skins
+es: Aspectos de piezas
+pt: Visuais de peças
+fr: Skins de pièces
+de: Figuren-Skins
+id: Skin Bidak
+
+= Board Themes
+es: Temas de tablero
+pt: Temas de tabuleiro
+fr: Thèmes de plateau
+de: Brett-Designs
+id: Tema Papan
+
+= Effects
+es: Efectos
+pt: Efeitos
+fr: Effets
+de: Effekte
+id: Efek
+
+= FEATURED ITEMS
+es: ARTÍCULOS DESTACADOS
+pt: ITENS EM DESTAQUE
+fr: ARTICLES À LA UNE
+de: EMPFOHLENE ARTIKEL
+id: ITEM UNGGULAN
+
+= You don't have enough coins for that yet.
+es: Todavía no tienes suficientes monedas.
+pt: Você ainda não tem moedas suficientes.
+fr: Tu n'as pas encore assez de pièces.
+de: Dafür hast du noch nicht genug Münzen.
+id: Koinmu belum cukup untuk itu.
+
+= That item comes with a gamepass you don't have.
+es: Ese artículo viene con un pase que no tienes.
+pt: Esse item vem com um passe que você não tem.
+fr: Cet article est inclus dans un pass que tu n'as pas.
+de: Dieser Artikel gehört zu einem Gamepass, den du nicht hast.
+id: Item itu termasuk gamepass yang belum kamu miliki.
+
+= Purchase cancelled. Nothing was charged and nothing changed.
+es: Compra cancelada. No se cobró nada y nada cambió.
+pt: Compra cancelada. Nada foi cobrado e nada mudou.
+fr: Achat annulé. Rien n'a été facturé et rien n'a changé.
+de: Kauf abgebrochen. Nichts wurde berechnet und nichts geändert.
+id: Pembelian dibatalkan. Tidak ada biaya dan tidak ada yang berubah.
+
+= Roblox hasn't confirmed that purchase yet, so nothing is unlocked. It's checked again every time you join.
+es: Roblox aún no ha confirmado esa compra, así que no se desbloqueó nada. Se vuelve a comprobar cada vez que entras.
+pt: O Roblox ainda não confirmou essa compra, então nada foi desbloqueado. Ela é verificada de novo sempre que você entra.
+fr: Roblox n'a pas encore confirmé cet achat, donc rien n'est débloqué. Il est revérifié à chaque connexion.
+de: Roblox hat den Kauf noch nicht bestätigt, daher ist nichts freigeschaltet. Er wird bei jedem Beitritt erneut geprüft.
+id: Roblox belum mengonfirmasi pembelian itu, jadi belum ada yang terbuka. Akan dicek lagi setiap kali kamu masuk.
+
+= Saving is unavailable right now, so this isn't saved yet. The game keeps trying.
+es: Ahora mismo no se puede guardar, así que esto aún no está guardado. El juego lo sigue intentando.
+pt: Não é possível salvar agora, então isso ainda não foi salvo. O jogo continua tentando.
+fr: La sauvegarde est indisponible pour le moment, donc ce n'est pas encore enregistré. Le jeu continue d'essayer.
+de: Speichern ist gerade nicht möglich, daher ist das noch nicht gespeichert. Das Spiel versucht es weiter.
+id: Penyimpanan sedang tidak tersedia, jadi ini belum tersimpan. Game terus mencoba.
+
+= Checking your purchase with Roblox...
+es: Comprobando tu compra con Roblox...
+pt: Verificando sua compra com o Roblox...
+fr: Vérification de ton achat auprès de Roblox...
+de: Dein Kauf wird bei Roblox geprüft...
+id: Memeriksa pembelianmu dengan Roblox...
+
+= %s is unlocked. Thank you for supporting Echo Chess!
+es: %s desbloqueado. ¡Gracias por apoyar Echo Chess!
+pt: %s desbloqueado. Obrigado por apoiar o Echo Chess!
+fr: %s est débloqué. Merci de soutenir Echo Chess !
+de: %s ist freigeschaltet. Danke, dass du Echo Chess unterstützt!
+id: %s terbuka. Terima kasih sudah mendukung Echo Chess!
+
+= Bought %s and put it on.
+es: Compraste %s y te lo pusiste.
+pt: Você comprou %s e já está usando.
+fr: %s acheté et équipé.
+de: %s gekauft und ausgerüstet.
+id: %s dibeli dan langsung dipakai.
+
+= %s equipped.
+es: %s equipado.
+pt: %s equipado.
+fr: %s équipé.
+de: %s ausgerüstet.
+id: %s dipakai.
+
+= No answer from the server. Nothing changed; try again.
+es: El servidor no respondió. Nada cambió; inténtalo de nuevo.
+pt: O servidor não respondeu. Nada mudou; tente de novo.
+fr: Pas de réponse du serveur. Rien n'a changé ; réessaie.
+de: Keine Antwort vom Server. Nichts geändert, versuch es nochmal.
+id: Server tidak menjawab. Tidak ada yang berubah; coba lagi.
+
+= Couldn't open the Roblox purchase window. Try again in a moment.
+es: No se pudo abrir la ventana de compra de Roblox. Inténtalo en un momento.
+pt: Não foi possível abrir a janela de compra do Roblox. Tente de novo em instantes.
+fr: Impossible d'ouvrir la fenêtre d'achat Roblox. Réessaie dans un instant.
+de: Das Roblox-Kauffenster ließ sich nicht öffnen. Versuch es gleich nochmal.
+id: Jendela pembelian Roblox tidak bisa dibuka. Coba lagi sebentar lagi.
+
+= Buying...
+es: Comprando...
+pt: Comprando...
+fr: Achat...
+de: Wird gekauft...
+id: Membeli...
+
+= Equipping...
+es: Equipando...
+pt: Equipando...
+fr: Équipement...
+de: Wird ausgerüstet...
+id: Memakai...
+
+= Finish or close the Roblox purchase window to continue.
+es: Termina o cierra la ventana de compra de Roblox para continuar.
+pt: Conclua ou feche a janela de compra do Roblox para continuar.
+fr: Termine ou ferme la fenêtre d'achat Roblox pour continuer.
+de: Schließ das Roblox-Kauffenster ab oder schließe es, um fortzufahren.
+id: Selesaikan atau tutup jendela pembelian Roblox untuk lanjut.
+
+= Equip
+es: Equipar
+pt: Equipar
+fr: Équiper
+de: Ausrüsten
+id: Pakai
+
+= Equipped ✓
+es: Equipado ✓
+pt: Equipado ✓
+fr: Équipé ✓
+de: Ausgerüstet ✓
+id: Dipakai ✓
+
+= Tap to confirm
+es: Toca para confirmar
+pt: Toque para confirmar
+fr: Touche pour confirmer
+de: Zum Bestätigen tippen
+id: Ketuk untuk konfirmasi
+
+= Buy
+es: Comprar
+pt: Comprar
+fr: Acheter
+de: Kaufen
+id: Beli
+
+= Need %d more coins
+es: Faltan %d monedas
+pt: Faltam %d moedas
+fr: Encore %d pièces
+de: Noch %d Münzen nötig
+id: Kurang %d koin
+
+= View pass
+es: Ver pase
+pt: Ver passe
+fr: Voir le pass
+de: Pass ansehen
+id: Lihat pass
+
+= Unavailable
+es: No disponible
+pt: Indisponível
+fr: Indisponible
+de: Nicht verfügbar
+id: Tidak tersedia
+
+= OWNED
+es: TUYO
+pt: SEU
+fr: POSSÉDÉ
+de: GEHÖRT DIR
+id: DIMILIKI
+
+= Owned ✓
+es: Tuyo ✓
+pt: Seu ✓
+fr: Possédé ✓
+de: Gehört dir ✓
+id: Dimiliki ✓
+
+= Free
+es: Gratis
+pt: Grátis
+fr: Gratuit
+de: Gratis
+id: Gratis
+
+= Gamepass
+es: Pase
+pt: Passe
+fr: Pass
+de: Gamepass
+id: Gamepass
+
+= Not available yet
+es: Aún no disponible
+pt: Ainda não disponível
+fr: Pas encore disponible
+de: Noch nicht verfügbar
+id: Belum tersedia
+
+= Waiting for Roblox...
+es: Esperando a Roblox...
+pt: Aguardando o Roblox...
+fr: En attente de Roblox...
+de: Warte auf Roblox...
+id: Menunggu Roblox...
+
+= Not on sale
+es: No está a la venta
+pt: Não está à venda
+fr: Pas en vente
+de: Nicht im Verkauf
+id: Tidak dijual
+
+= Buy with Robux
+es: Comprar con Robux
+pt: Comprar com Robux
+fr: Acheter avec des Robux
+de: Mit Robux kaufen
+id: Beli dengan Robux
+
+= You own this pass
+es: Tienes este pase
+pt: Você tem este passe
+fr: Tu possèdes ce pass
+de: Dieser Pass gehört dir
+id: Kamu memiliki pass ini
+
+= R$ %d  ·  suggested price, not on sale yet
+es: R$ %d  ·  precio sugerido, aún no está a la venta
+pt: R$ %d  ·  preço sugerido, ainda não está à venda
+fr: R$ %d  ·  prix suggéré, pas encore en vente
+de: R$ %d  ·  Preisvorschlag, noch nicht im Verkauf
+id: R$ %d  ·  harga saran, belum dijual
+
+= Price from Roblox
+es: Precio de Roblox
+pt: Preço do Roblox
+fr: Prix fourni par Roblox
+de: Preis von Roblox
+id: Harga dari Roblox
+
+= Coin items are bought once with coins you earn by playing. R$ items come with a gamepass. Everything here is cosmetic.
+es: Los artículos con monedas se compran una vez con las monedas que ganas jugando. Los de R$ vienen con un pase. Todo aquí es cosmético.
+pt: Itens de moedas são comprados uma vez com moedas que você ganha jogando. Itens em R$ vêm com um passe. Tudo aqui é cosmético.
+fr: Les articles en pièces s'achètent une fois avec les pièces gagnées en jouant. Les articles en R$ viennent avec un pass. Tout ici est cosmétique.
+de: Münz-Artikel kaufst du einmal mit Münzen, die du beim Spielen verdienst. R$-Artikel gehören zu einem Gamepass. Alles hier ist rein kosmetisch.
+id: Item koin dibeli sekali dengan koin yang kamu dapat dari bermain. Item R$ termasuk gamepass. Semua di sini hanya kosmetik.
+
+= Loading the Shop...
+es: Cargando la tienda...
+pt: Carregando a loja...
+fr: Chargement de la boutique...
+de: Shop wird geladen...
+id: Memuat toko...
+
+= Gamepasses aren't on sale yet. Prices shown are suggestions only.
+es: Los pases aún no están a la venta. Los precios son solo sugerencias.
+pt: Os passes ainda não estão à venda. Os preços são apenas sugestões.
+fr: Les passes ne sont pas encore en vente. Les prix affichés sont indicatifs.
+de: Gamepässe sind noch nicht im Verkauf. Die Preise sind nur Vorschläge.
+id: Gamepass belum dijual. Harga yang tampil hanya saran.
+
+= Passes are cosmetic: they never change puzzles, hints, timers, rewards or duels. Purchases are made in Roblox's own window and unlock once Roblox confirms them.
+es: Los pases son cosméticos: nunca cambian puzles, pistas, tiempos, recompensas ni duelos. Las compras se hacen en la ventana de Roblox y se desbloquean cuando Roblox las confirma.
+pt: Os passes são cosméticos: nunca mudam desafios, dicas, tempos, recompensas ou duelos. As compras são feitas na janela do próprio Roblox e são liberadas quando o Roblox as confirma.
+fr: Les passes sont cosmétiques : ils ne changent jamais les puzzles, indices, chronos, récompenses ou duels. Les achats se font dans la fenêtre de Roblox et se débloquent dès que Roblox les confirme.
+de: Pässe sind rein kosmetisch: Sie ändern nie Rätsel, Tipps, Timer, Belohnungen oder Duelle. Gekauft wird im Roblox-Fenster, freigeschaltet wird, sobald Roblox den Kauf bestätigt.
+id: Pass hanya kosmetik: tidak pernah mengubah teka-teki, petunjuk, waktu, hadiah, atau duel. Pembelian dilakukan di jendela Roblox sendiri dan terbuka setelah Roblox mengonfirmasinya.
+
+# Shop items (ShopCatalog)
+
+= Classic Walnut
+es: Nogal clásico
+pt: Nogueira clássica
+fr: Noyer classique
+de: Klassisches Nussholz
+id: Kenari Klasik
+
+= The warm wooden board.
+es: El cálido tablero de madera.
+pt: O tabuleiro de madeira aconchegante.
+fr: Le chaleureux plateau en bois.
+de: Das warme Holzbrett.
+id: Papan kayu yang hangat.
+
+= Marble Hall
+es: Salón de mármol
+pt: Salão de mármore
+fr: Salle de marbre
+de: Marmorsaal
+id: Aula Marmer
+
+= Cool white and grey stone.
+es: Piedra blanca y gris.
+pt: Pedra branca e cinza.
+fr: Pierre blanche et grise.
+de: Kühler weißer und grauer Stein.
+id: Batu putih dan abu-abu yang sejuk.
+
+= Emerald Garden
+es: Jardín esmeralda
+pt: Jardim esmeralda
+fr: Jardin d'émeraude
+de: Smaragdgarten
+id: Taman Zamrud
+
+= Soft green squares.
+es: Casillas verde suave.
+pt: Casas verde-claro.
+fr: Des cases vert tendre.
+de: Sanfte grüne Felder.
+id: Kotak hijau lembut.
+
+= Royal Purple
+es: Púrpura real
+pt: Roxo real
+fr: Pourpre royal
+de: Königliches Violett
+id: Ungu Kerajaan
+
+= Lavender and deep violet.
+es: Lavanda y violeta intenso.
+pt: Lavanda e violeta escuro.
+fr: Lavande et violet profond.
+de: Lavendel und tiefes Violett.
+id: Lavender dan ungu tua.
+
+= Golden
+es: Dorado
+pt: Dourado
+fr: Doré
+de: Golden
+id: Emas
+
+= Polished gold leaf.
+es: Pan de oro pulido.
+pt: Folha de ouro polida.
+fr: Feuille d'or polie.
+de: Poliertes Blattgold.
+id: Lapisan emas mengilap.
+
+= Ice
+es: Hielo
+pt: Gelo
+fr: Glace
+de: Eis
+id: Es
+
+= Frosted glass blues.
+es: Azules de cristal escarchado.
+pt: Azuis de vidro fosco.
+fr: Bleus de verre givré.
+de: Blau wie Milchglas.
+id: Biru kaca beku.
+
+= Shadow
+es: Sombra
+pt: Sombra
+fr: Ombre
+de: Schatten
+id: Bayangan
+
+= Smoke and slate.
+es: Humo y pizarra.
+pt: Fumaça e ardósia.
+fr: Fumée et ardoise.
+de: Rauch und Schiefer.
+id: Asap dan batu tulis.
+
+= Royal Throne
+es: Trono real
+pt: Trono real
+fr: Trône royal
+de: Königsthron
+id: Takhta Kerajaan
+
+= Cream and crimson, for VIPs only.
+es: Crema y carmesí, solo para VIP.
+pt: Creme e carmesim, só para VIPs.
+fr: Crème et cramoisi, réservé aux VIP.
+de: Creme und Karmesin, nur für VIPs.
+id: Krem dan merah tua, khusus VIP.
+
+= Classic
+es: Clásico
+pt: Clássico
+fr: Classique
+de: Klassisch
+id: Klasik
+
+= Ivory pieces with a gold glow.
+es: Piezas de marfil con brillo dorado.
+pt: Peças de marfim com brilho dourado.
+fr: Pièces d'ivoire à l'éclat doré.
+de: Elfenbeinfiguren mit goldenem Schein.
+id: Bidak gading dengan cahaya emas.
+
+= Ruby
+es: Rubí
+pt: Rubi
+fr: Rubis
+de: Rubin
+id: Rubi
+
+= A rose-red piece with a crimson glow.
+es: Una pieza rojo rosa con brillo carmesí.
+pt: Uma peça vermelho-rosa com brilho carmesim.
+fr: Une pièce rouge rosé à l'éclat cramoisi.
+de: Eine rosenrote Figur mit karmesinrotem Schein.
+id: Bidak merah mawar dengan cahaya merah tua.
+
+= Gold
+es: Oro
+pt: Ouro
+fr: Or
+de: Gold
+id: Emas
+
+= Solid gold, as it should be.
+es: Oro macizo, como debe ser.
+pt: Ouro maciço, como deve ser.
+fr: En or massif, comme il se doit.
+de: Massives Gold, wie es sich gehört.
+id: Emas murni, seperti seharusnya.
+
+= Obsidian
+es: Obsidiana
+pt: Obsidiana
+fr: Obsidienne
+de: Obsidian
+id: Obsidian
+
+= Volcanic violet glass.
+es: Cristal volcánico violeta.
+pt: Vidro vulcânico violeta.
+fr: Verre volcanique violet.
+de: Violettes Vulkanglas.
+id: Kaca vulkanik ungu.
+
+= Crystal
+es: Cristal
+pt: Cristal
+fr: Cristal
+de: Kristall
+id: Kristal
+
+= Clear as ice, with a cyan shimmer.
+es: Transparente como el hielo, con un brillo cian.
+pt: Transparente como gelo, com um brilho ciano.
+fr: Clair comme la glace, avec un reflet cyan.
+de: Klar wie Eis, mit cyanfarbenem Schimmer.
+id: Bening seperti es, dengan kilau sian.
+
+= Echo Ripple
+es: Onda de eco
+pt: Onda de eco
+fr: Onde d'écho
+de: Echo-Welle
+id: Riak Gema
+
+= The standard golden ripple.
+es: La onda dorada de siempre.
+pt: A onda dourada padrão.
+fr: L'onde dorée de base.
+de: Die goldene Standardwelle.
+id: Riak emas standar.
+
+= Stardust
+es: Polvo de estrellas
+pt: Poeira estelar
+fr: Poussière d'étoiles
+de: Sternenstaub
+id: Debu Bintang
+
+= Lilac rings and a few stars.
+es: Anillos lila y algunas estrellas.
+pt: Anéis lilás e algumas estrelas.
+fr: Des anneaux lilas et quelques étoiles.
+de: Fliederfarbene Ringe und ein paar Sterne.
+id: Cincin ungu muda dan beberapa bintang.
+
+= Verdant Wave
+es: Ola verde
+pt: Onda verdejante
+fr: Vague verdoyante
+de: Grüne Welle
+id: Gelombang Hijau
+
+= A green echo.
+es: Un eco verde.
+pt: Um eco verde.
+fr: Un écho vert.
+de: Ein grünes Echo.
+id: Gema hijau.
+
+= Golden Sparks
+es: Chispas doradas
+pt: Faíscas douradas
+fr: Étincelles dorées
+de: Goldene Funken
+id: Percikan Emas
+
+= Gold rings and a burst of sparks.
+es: Anillos dorados y un estallido de chispas.
+pt: Anéis dourados e uma explosão de faíscas.
+fr: Des anneaux dorés et une gerbe d'étincelles.
+de: Goldene Ringe und ein Funkenregen.
+id: Cincin emas dan ledakan percikan.
+
+= Crystal Shards
+es: Fragmentos de cristal
+pt: Fragmentos de cristal
+fr: Éclats de cristal
+de: Kristallsplitter
+id: Serpihan Kristal
+
+= Icy rings and glittering shards.
+es: Anillos helados y fragmentos brillantes.
+pt: Anéis gelados e fragmentos cintilantes.
+fr: Des anneaux glacés et des éclats scintillants.
+de: Eisige Ringe und glitzernde Splitter.
+id: Cincin es dan serpihan berkilau.
+
+# Gamepasses (GamePassConfig)
+
+= Royal VIP
+es: VIP Real
+pt: VIP Real
+fr: VIP Royal
+de: Royal VIP
+id: VIP Kerajaan
+
+= The full royal treatment
+es: El trato real completo
+pt: O tratamento real completo
+fr: Le grand traitement royal
+de: Die volle königliche Behandlung
+id: Perlakuan kerajaan sepenuhnya
+
+= Gold VIP frame on your profile
+es: Marco VIP dorado en tu perfil
+pt: Moldura VIP dourada no seu perfil
+fr: Cadre VIP doré sur ton profil
+de: Goldener VIP-Rahmen in deinem Profil
+id: Bingkai VIP emas di profilmu
+
+= VIP title next to your name
+es: Título VIP junto a tu nombre
+pt: Título VIP ao lado do seu nome
+fr: Titre VIP à côté de ton nom
+de: VIP-Titel neben deinem Namen
+id: Gelar VIP di samping namamu
+
+= Crown shower when you clear a puzzle
+es: Lluvia de coronas al resolver un puzle
+pt: Chuva de coroas ao concluir um desafio
+fr: Pluie de couronnes quand tu réussis un puzzle
+de: Kronenregen, wenn du ein Rätsel löst
+id: Hujan mahkota saat kamu menyelesaikan teka-teki
+
+= Exclusive Royal Throne board
+es: Tablero exclusivo Trono real
+pt: Tabuleiro exclusivo Trono real
+fr: Plateau exclusif Trône royal
+de: Exklusives Brett Königsthron
+id: Papan eksklusif Takhta Kerajaan
+
+= Legendary Chess Skins
+es: Aspectos legendarios
+pt: Visuais lendários
+fr: Skins légendaires
+de: Legendäre Figuren-Skins
+id: Skin Bidak Legendaris
+
+= Gold, Obsidian and Crystal pieces
+es: Piezas de oro, obsidiana y cristal
+pt: Peças de ouro, obsidiana e cristal
+fr: Pièces en or, obsidienne et cristal
+de: Figuren aus Gold, Obsidian und Kristall
+id: Bidak Emas, Obsidian, dan Kristal
+
+= Gold, Obsidian and Crystal piece skins
+es: Aspectos de piezas de oro, obsidiana y cristal
+pt: Visuais de peças de ouro, obsidiana e cristal
+fr: Skins de pièces or, obsidienne et cristal
+de: Figuren-Skins Gold, Obsidian und Kristall
+id: Skin bidak Emas, Obsidian, dan Kristal
+
+= Golden Sparks and Crystal Shards capture effects
+es: Efectos de captura Chispas doradas y Fragmentos de cristal
+pt: Efeitos de captura Faíscas douradas e Fragmentos de cristal
+fr: Effets de capture Étincelles dorées et Éclats de cristal
+de: Schlag-Effekte Goldene Funken und Kristallsplitter
+id: Efek tangkap Percikan Emas dan Serpihan Kristal
+
+= Royal Board Collection
+es: Colección de tableros reales
+pt: Coleção de tabuleiros reais
+fr: Collection de plateaux royaux
+de: Königliche Brett-Kollektion
+id: Koleksi Papan Kerajaan
+
+= Four premium boards
+es: Cuatro tableros premium
+pt: Quatro tabuleiros premium
+fr: Quatre plateaux premium
+de: Vier Premium-Bretter
+id: Empat papan premium
+
+= Royal Purple, Golden, Ice and Shadow boards
+es: Tableros Púrpura real, Dorado, Hielo y Sombra
+pt: Tabuleiros Roxo real, Dourado, Gelo e Sombra
+fr: Plateaux Pourpre royal, Doré, Glace et Ombre
+de: Bretter Königliches Violett, Golden, Eis und Schatten
+id: Papan Ungu Kerajaan, Emas, Es, dan Bayangan
+
+# ---- Leaderboards -----------------------------------------------------------
+
+= Best Endless Run
+es: Mejor partida infinita
+pt: Melhor partida infinita
+fr: Meilleure partie sans fin
+de: Bester Endlos-Lauf
+id: Run Tanpa Akhir Terbaik
+
+= Play Time
+es: Tiempo de juego
+pt: Tempo de jogo
+fr: Temps de jeu
+de: Spielzeit
+id: Waktu Bermain
+
+= Total XP
+es: XP total
+pt: XP total
+fr: XP total
+de: Gesamt-XP
+id: Total XP
+
+= Longest Daily Streak
+es: Racha diaria más larga
+pt: Maior sequência diária
+fr: Plus longue série quotidienne
+de: Längste Tagesserie
+id: Runtunan Harian Terpanjang
+
+= Duel Wins
+es: Victorias en duelos
+pt: Vitórias em duelos
+fr: Victoires en duel
+de: Duell-Siege
+id: Kemenangan Duel
+
+= Duels
+es: Duelos
+pt: Duelos
+fr: Duels
+de: Duelle
+id: Duel
+
+= %s boards
+es: %s tableros
+pt: %s tabuleiros
+fr: %s plateaux
+de: %s Bretter
+id: %s papan
+
+= %s puzzles
+es: %s puzles
+pt: %s desafios
+fr: %s puzzles
+de: %s Rätsel
+id: %s teka-teki
+
+= %s days
+es: %s días
+pt: %s dias
+fr: %s jours
+de: %s Tage
+id: %s hari
+
+= %s wins
+es: %s victorias
+pt: %s vitórias
+fr: %s victoires
+de: %s Siege
+id: %s kemenangan
+
+= %s  (you)
+es: %s  (tú)
+pt: %s  (você)
+fr: %s  (toi)
+de: %s  (du)
+id: %s  (kamu)
+
+= Player %d
+es: Jugador %d
+pt: Jogador %d
+fr: Joueur %d
+de: Spieler %d
+id: Pemain %d
+
+= Not ranked yet
+es: Aún sin puesto
+pt: Ainda sem posição
+fr: Pas encore classé
+de: Noch nicht platziert
+id: Belum masuk peringkat
+
+= Outside the top %d
+es: Fuera del top %d
+pt: Fora do top %d
+fr: Hors du top %d
+de: Nicht in den Top %d
+id: Di luar %d besar
+
+= Loading the leaderboard...
+es: Cargando la clasificación...
+pt: Carregando o ranking...
+fr: Chargement du classement...
+de: Bestenliste wird geladen...
+id: Memuat papan peringkat...
+
+= No scores yet. Be the first!
+es: Aún no hay puntuaciones. ¡Sé el primero!
+pt: Ainda não há pontuações. Seja o primeiro!
+fr: Aucun score pour l'instant. Sois le premier !
+de: Noch keine Punkte. Sei der Erste!
+id: Belum ada skor. Jadilah yang pertama!
+
+= The top %d players on every server. Scores are added as your progress saves, and the board refreshes every few minutes.
+es: Los %d mejores jugadores de todos los servidores. Las puntuaciones se suman cuando se guarda tu progreso y la tabla se actualiza cada pocos minutos.
+pt: Os %d melhores jogadores de todos os servidores. As pontuações entram quando seu progresso é salvo, e o ranking atualiza a cada poucos minutos.
+fr: Les %d meilleurs joueurs de tous les serveurs. Les scores sont ajoutés quand ta progression est sauvegardée, et le classement se met à jour toutes les quelques minutes.
+de: Die besten %d Spieler aller Server. Punkte kommen dazu, wenn dein Fortschritt gespeichert wird, und die Liste aktualisiert sich alle paar Minuten.
+id: %d pemain teratas di semua server. Skor ditambahkan saat progresmu tersimpan, dan papan diperbarui setiap beberapa menit.
+
+= The global leaderboards can't be reached right now, so this shows the players on this server.
+es: Ahora mismo no se puede acceder a las clasificaciones globales, así que se muestran los jugadores de este servidor.
+pt: Os rankings globais estão fora do ar agora, então aqui aparecem os jogadores deste servidor.
+fr: Les classements mondiaux sont injoignables pour le moment, voici donc les joueurs de ce serveur.
+de: Die globalen Bestenlisten sind gerade nicht erreichbar, daher siehst du die Spieler auf diesem Server.
+id: Papan peringkat global sedang tidak bisa dijangkau, jadi ini menampilkan pemain di server ini.
+
+# ---- Achievements -----------------------------------------------------------
+
+= %s Complete
+es: %s completado
+pt: %s concluído
+fr: %s terminé
+de: %s abgeschlossen
+id: %s Tuntas
+
+= Clear all %s puzzles in Journey.
+es: Resuelve todos los puzles %s de la Aventura.
+pt: Conclua todos os desafios %s da Jornada.
+fr: Réussis tous les puzzles %s du Parcours.
+de: Löse alle %s-Rätsel der Reise.
+id: Selesaikan semua teka-teki %s di Petualangan.
+
+= Earn %d stars.
+es: Consigue %d estrellas.
+pt: Ganhe %d estrelas.
+fr: Gagne %d étoiles.
+de: Sammle %d Sterne.
+id: Kumpulkan %d bintang.
+
+= Rising Echo
+es: Eco creciente
+pt: Eco crescente
+fr: Écho montant
+de: Steigendes Echo
+id: Gema Naik
+
+= Bright Echo
+es: Eco brillante
+pt: Eco brilhante
+fr: Écho brillant
+de: Helles Echo
+id: Gema Terang
+
+= Perfect Echo
+es: Eco perfecto
+pt: Eco perfeito
+fr: Écho parfait
+de: Perfektes Echo
+id: Gema Sempurna
+
+= Par Breaker
+es: Rompepar
+pt: Quebra-par
+fr: Briseur de par
+de: Par-Brecher
+id: Pemecah Par
+
+= Get 3 stars on 10 puzzles.
+es: Consigue 3 estrellas en 10 puzles.
+pt: Ganhe 3 estrelas em 10 desafios.
+fr: Obtiens 3 étoiles sur 10 puzzles.
+de: Hol 3 Sterne in 10 Rätseln.
+id: Dapatkan 3 bintang di 10 teka-teki.
+
+= Reach a %d-day Daily streak.
+es: Alcanza una racha diaria de %d días.
+pt: Alcance uma sequência diária de %d dias.
+fr: Atteins une série quotidienne de %d jours.
+de: Erreiche eine Tagesserie von %d Tagen.
+id: Capai runtunan harian %d hari.
+
+= Three in a Row
+es: Tres seguidos
+pt: Três seguidos
+fr: Trois d'affilée
+de: Drei in Folge
+id: Tiga Beruntun
+
+= Week of Echoes
+es: Semana de ecos
+pt: Semana de ecos
+fr: Semaine d'échos
+de: Woche der Echos
+id: Seminggu Gema
+
+= Daily Regular
+es: Habitual diario
+pt: Presença diária
+fr: Habitué du jour
+de: Stammgast
+id: Pemain Harian
+
+= Clear 10 Daily Puzzles.
+es: Resuelve 10 puzles diarios.
+pt: Conclua 10 desafios diários.
+fr: Réussis 10 puzzles du jour.
+de: Löse 10 Tagesrätsel.
+id: Selesaikan 10 Teka-teki Harian.
+
+= Clear %d boards in one Endless run.
+es: Supera %d tableros en una partida infinita.
+pt: Conclua %d tabuleiros em uma partida infinita.
+fr: Réussis %d plateaux en une partie sans fin.
+de: Schaffe %d Bretter in einem Endlos-Lauf.
+id: Selesaikan %d papan dalam satu run Tanpa Akhir.
+
+= Still Echoing
+es: Sigue resonando
+pt: Ainda ecoando
+fr: Toujours en écho
+de: Hallt noch nach
+id: Masih Bergema
+
+= Endless Echo
+es: Eco infinito
+pt: Eco infinito
+fr: Écho sans fin
+de: Endloses Echo
+id: Gema Tanpa Akhir
+
+# ---- Tutorial and hints -----------------------------------------------------
+
+= 📖  HOW TO PLAY  ·  %d/%d
+es: 📖  CÓMO JUGAR  ·  %d/%d
+pt: 📖  COMO JOGAR  ·  %d/%d
+fr: 📖  COMMENT JOUER  ·  %d/%d
+de: 📖  SO WIRD GESPIELT  ·  %d/%d
+id: 📖  CARA BERMAIN  ·  %d/%d
+
+= Next
+es: Siguiente
+pt: Próximo
+fr: Suivant
+de: Weiter
+id: Lanjut
+
+= Skip
+es: Saltar
+pt: Pular
+fr: Passer
+de: Überspringen
+id: Lewati
+
+= Tap your white piece to select it. You can also drag it.
+es: Toca tu pieza blanca para seleccionarla. También puedes arrastrarla.
+pt: Toque na sua peça branca para selecioná-la. Você também pode arrastá-la.
+fr: Touche ta pièce blanche pour la sélectionner. Tu peux aussi la faire glisser.
+de: Tippe auf deine weiße Figur, um sie auszuwählen. Du kannst sie auch ziehen.
+id: Ketuk bidak putihmu untuk memilihnya. Kamu juga bisa menyeretnya.
+
+= Dots show moves and rings show captures. Tap or drag onto a ringed piece.
+es: Los puntos muestran movimientos y los anillos, capturas. Toca o arrastra sobre una pieza con anillo.
+pt: Os pontos mostram movimentos e os anéis, capturas. Toque ou arraste até uma peça com anel.
+fr: Les points montrent les coups, les anneaux les prises. Touche ou glisse sur une pièce entourée.
+de: Punkte zeigen Züge, Ringe zeigen Schläge. Tippe auf eine Figur mit Ring oder zieh dorthin.
+id: Titik menunjukkan langkah dan cincin menunjukkan tangkapan. Ketuk atau seret ke bidak bercincin.
+
+= Echo! You became the piece you took and now move like it. Black never moves.
+es: ¡Eco! Te convertiste en la pieza que capturaste y ahora te mueves como ella. Las negras nunca se mueven.
+pt: Eco! Você virou a peça que capturou e agora se move como ela. As pretas nunca se mexem.
+fr: Écho ! Tu es devenu la pièce prise et tu te déplaces comme elle. Les noirs ne bougent jamais.
+de: Echo! Du bist zur geschlagenen Figur geworden und ziehst jetzt wie sie. Schwarz zieht nie.
+id: Gema! Kamu menjadi bidak yang kamu tangkap dan kini bergerak seperti bidak itu. Hitam tidak pernah bergerak.
+
+= Stuck? Tap Hint. Hints are free in Journey and Practice.
+es: ¿Atascado? Toca Pista. Las pistas son gratis en Aventura y Práctica.
+pt: Travou? Toque em Dica. As dicas são grátis na Jornada e no Treino.
+fr: Bloqué ? Touche Indice. Les indices sont gratuits en Parcours et en Entraînement.
+de: Feststeckt? Tippe auf Tipp. Tipps sind in Reise und Training gratis.
+id: Buntu? Ketuk Petunjuk. Petunjuk gratis di Petualangan dan Latihan.
+
+= Capture every black piece to clear the board. Undo takes back a move.
+es: Captura todas las piezas negras para limpiar el tablero. Deshacer anula un movimiento.
+pt: Capture todas as peças pretas para limpar o tabuleiro. Desfazer volta um movimento.
+fr: Prends toutes les pièces noires pour vider le plateau. Annuler revient d'un coup.
+de: Schlag alle schwarzen Figuren, um das Brett zu räumen. Rückgängig nimmt einen Zug zurück.
+id: Tangkap semua bidak hitam untuk membersihkan papan. Urungkan membatalkan satu langkah.
+
+= This position can't be cleared any more. Undo your last capture and try another.
+es: Esta posición ya no se puede resolver. Deshaz tu última captura y prueba otra.
+pt: Esta posição não tem mais solução. Desfaça sua última captura e tente outra.
+fr: Cette position ne peut plus être résolue. Annule ta dernière prise et essaie autre chose.
+de: Diese Stellung ist nicht mehr lösbar. Nimm deinen letzten Schlag zurück und versuch einen anderen.
+id: Posisi ini sudah tidak bisa diselesaikan. Urungkan tangkapan terakhirmu dan coba yang lain.
+
+= Capture the %s on %s next.
+es: Siguiente captura: %s en %s.
+pt: Próxima captura: %s em %s.
+fr: Prochaine prise : %s en %s.
+de: Als Nächstes schlagen: %s auf %s.
+id: Tangkapan berikutnya: %s di %s.
+
+# ---- Misc -------------------------------------------------------------------
+
+= are you sure?
+es: ¿seguro?
+pt: tem certeza?
+fr: tu es sûr ?
+de: bist du sicher?
+id: yakin?
+
+# ---- Puzzle names and hints (PuzzleDefinitions) ---------------------------
+
+= Capture the knight on d3 first.
+es: Captura primero el caballo en d3.
+pt: Capture primeiro o cavalo em d3.
+fr: Prends d'abord le cavalier en d3.
+de: Schlag zuerst den Springer auf d3.
+id: Tangkap kuda di d3 lebih dulu.
+
+= Take the rook on c4 first.
+es: Captura primero la torre en c4.
+pt: Capture primeiro a torre em c4.
+fr: Prends d'abord la tour en c4.
+de: Schlag zuerst den Turm auf c4.
+id: Tangkap benteng di c4 lebih dulu.
+
+= Start with the queen on b1.
+es: Empieza por la dama en b1.
+pt: Comece pela dama em b1.
+fr: Commence par la dame en b1.
+de: Beginne mit der Dame auf b1.
+id: Mulai dengan ratu di b1.
+
+= Capture the pawn on c4 first.
+es: Captura primero el peón en c4.
+pt: Capture primeiro o peão em c4.
+fr: Prends d'abord le pion en c4.
+de: Schlag zuerst den Bauern auf c4.
+id: Tangkap pion di c4 lebih dulu.
+
+= The pawn on a3 has to be your last capture.
+es: El peón en a3 debe ser tu última captura.
+pt: O peão em a3 tem que ser sua última captura.
+fr: Le pion en a3 doit être ta dernière prise.
+de: Der Bauer auf a3 muss als Letztes geschlagen werden.
+id: Pion di a3 harus jadi tangkapan terakhirmu.
+
+= Take the queen on d3 first.
+es: Captura primero la dama en d3.
+pt: Capture primeiro a dama em d3.
+fr: Prends d'abord la dame en d3.
+de: Schlag zuerst die Dame auf d3.
+id: Tangkap ratu di d3 lebih dulu.
+
+= Start with the pawn on a1, while there is room to climb.
+es: Empieza por el peón en a1, mientras aún hay sitio para subir.
+pt: Comece pelo peão em a1, enquanto ainda há espaço para subir.
+fr: Commence par le pion en a1, tant qu'il reste de la place pour monter.
+de: Beginne mit dem Bauern auf a1, solange noch Platz nach oben ist.
+id: Mulai dengan pion di a1, selagi masih ada ruang untuk naik.
+
+= The pawn on d1 must be the last capture.
+es: El peón en d1 debe ser tu última captura.
+pt: O peão em d1 tem que ser sua última captura.
+fr: Le pion en d1 doit être ta dernière prise.
+de: Der Bauer auf d1 muss als Letztes geschlagen werden.
+id: Pion di d1 harus jadi tangkapan terakhirmu.
+
+= Start with the bishop on a2.
+es: Empieza por el alfil en a2.
+pt: Comece pelo bispo em a2.
+fr: Commence par le fou en a2.
+de: Beginne mit dem Läufer auf a2.
+id: Mulai dengan gajah di a2.
+
+= Only one first capture works, and the pawn on c2 comes last.
+es: Solo funciona una primera captura, y el peón en c2 va al final.
+pt: Só uma primeira captura funciona, e o peão em c2 fica por último.
+fr: Une seule première prise fonctionne, et le pion en c2 vient en dernier.
+de: Nur ein erster Schlag funktioniert, und der Bauer auf c2 kommt zuletzt.
+id: Hanya satu tangkapan pertama yang berhasil, dan pion di c2 paling akhir.
+
+= Begin with the bishop on c5.
+es: Empieza por el alfil en c5.
+pt: Comece pelo bispo em c5.
+fr: Commence par le fou en c5.
+de: Beginne mit dem Läufer auf c5.
+id: Mulai dengan gajah di c5.
+
+= Capture the bishop on e3 first.
+es: Captura primero el alfil en e3.
+pt: Capture primeiro o bispo em e3.
+fr: Prends d'abord le fou en e3.
+de: Schlag zuerst den Läufer auf e3.
+id: Tangkap gajah di e3 lebih dulu.
+
+= The pawn on e5 must be the last capture.
+es: El peón en e5 debe ser tu última captura.
+pt: O peão em e5 tem que ser sua última captura.
+fr: Le pion en e5 doit être ta dernière prise.
+de: Der Bauer auf e5 muss als Letztes geschlagen werden.
+id: Pion di e5 harus jadi tangkapan terakhirmu.
+
+= Start with the pawn on a4, while there is room to climb.
+es: Empieza por el peón en a4, mientras aún hay sitio para subir.
+pt: Comece pelo peão em a4, enquanto ainda há espaço para subir.
+fr: Commence par le pion en a4, tant qu'il reste de la place pour monter.
+de: Beginne mit dem Bauern auf a4, solange noch Platz nach oben ist.
+id: Mulai dengan pion di a4, selagi masih ada ruang untuk naik.
+
+= Capture the knight on d2 first.
+es: Captura primero el caballo en d2.
+pt: Capture primeiro o cavalo em d2.
+fr: Prends d'abord le cavalier en d2.
+de: Schlag zuerst den Springer auf d2.
+id: Tangkap kuda di d2 lebih dulu.
+
+= Only two orders work. The pawn on c6 is the last capture.
+es: Solo funcionan dos órdenes. El peón en c6 va al final.
+pt: Só duas ordens funcionam. O peão em c6 fica por último.
+fr: Seuls deux ordres fonctionnent. Le pion en c6 vient en dernier.
+de: Nur zwei Reihenfolgen klappen. Der Bauer auf c6 kommt zuletzt.
+id: Hanya dua urutan yang berhasil. Pion di c6 paling akhir.
+
+= Start with the pawn on d4.
+es: Empieza por el peón en d4.
+pt: Comece pelo peão em d4.
+fr: Commence par le pion en d4.
+de: Beginne mit dem Bauern auf d4.
+id: Mulai dengan pion di d4.
+
+= There is only one good first capture. The pawn on f7 comes last.
+es: Solo hay una buena primera captura. El peón en f7 va al final.
+pt: Só há uma boa primeira captura. O peão em f7 fica por último.
+fr: Il n'y a qu'une bonne première prise. Le pion en f7 vient en dernier.
+de: Es gibt nur einen guten ersten Schlag. Der Bauer auf f7 kommt zuletzt.
+id: Hanya ada satu tangkapan pertama yang bagus. Pion di f7 paling akhir.
+
+= Take the rook on e3 first.
+es: Captura primero la torre en e3.
+pt: Capture primeiro a torre em e3.
+fr: Prends d'abord la tour en e3.
+de: Schlag zuerst den Turm auf e3.
+id: Tangkap benteng di e3 lebih dulu.
+
+= Begin with the queen on c2.
+es: Empieza por la dama en c2.
+pt: Comece pela dama em c2.
+fr: Commence par la dame en c2.
+de: Beginne mit der Dame auf c2.
+id: Mulai dengan ratu di c2.
+
+= Keep the pawn on f5 for last.
+es: Deja el peón en f5 para el final.
+pt: Deixe o peão em f5 para o fim.
+fr: Garde le pion en f5 pour la fin.
+de: Heb dir den Bauern auf f5 bis zum Schluss auf.
+id: Simpan pion di f5 untuk terakhir.
+
+= Capture the bishop on e1 first.
+es: Captura primero el alfil en e1.
+pt: Capture primeiro o bispo em e1.
+fr: Prends d'abord le fou en e1.
+de: Schlag zuerst den Läufer auf e1.
+id: Tangkap gajah di e1 lebih dulu.
+
+= Capture the pawn on b1 first.
+es: Captura primero el peón en b1.
+pt: Capture primeiro o peão em b1.
+fr: Prends d'abord le pion en b1.
+de: Schlag zuerst den Bauern auf b1.
+id: Tangkap pion di b1 lebih dulu.
+
+= Take the bishop on f5 first.
+es: Captura primero el alfil en f5.
+pt: Capture primeiro o bispo em f5.
+fr: Prends d'abord le fou en f5.
+de: Schlag zuerst den Läufer auf f5.
+id: Tangkap gajah di f5 lebih dulu.
+
+= Only one first capture works. The pawn on g7 comes last.
+es: Solo funciona una primera captura, y el peón en g7 va al final.
+pt: Só uma primeira captura funciona, e o peão em g7 fica por último.
+fr: Une seule première prise fonctionne, et le pion en g7 vient en dernier.
+de: Nur ein erster Schlag funktioniert, und der Bauer auf g7 kommt zuletzt.
+id: Hanya satu tangkapan pertama yang berhasil, dan pion di g7 paling akhir.
+
+= Capture the queen on b2 first.
+es: Captura primero la dama en b2.
+pt: Capture primeiro a dama em b2.
+fr: Prends d'abord la dame en b2.
+de: Schlag zuerst die Dame auf b2.
+id: Tangkap ratu di b2 lebih dulu.
+
+= The pawn on b5 must be your final capture.
+es: El peón en b5 debe ser tu última captura.
+pt: O peão em b5 tem que ser sua última captura.
+fr: Le pion en b5 doit être ta dernière prise.
+de: Der Bauer auf b5 muss als Letztes geschlagen werden.
+id: Pion di b5 harus jadi tangkapan terakhirmu.
+
+= Starting with the pawn on e4 works.
+es: Empezar por el peón en e4 funciona.
+pt: Começar pelo peão em e4 funciona.
+fr: Commencer par le pion en e4 fonctionne.
+de: Mit dem Bauern auf e4 zu beginnen klappt.
+id: Mulai dengan pion di e4 berhasil.
+
+= The pawn on c4 must be the last capture.
+es: El peón en c4 debe ser tu última captura.
+pt: O peão em c4 tem que ser sua última captura.
+fr: Le pion en c4 doit être ta dernière prise.
+de: Der Bauer auf c4 muss als Letztes geschlagen werden.
+id: Pion di c4 harus jadi tangkapan terakhirmu.
+
+= Starting with the pawn on a2 works.
+es: Empezar por el peón en a2 funciona.
+pt: Começar pelo peão em a2 funciona.
+fr: Commencer par le pion en a2 fonctionne.
+de: Mit dem Bauern auf a2 zu beginnen klappt.
+id: Mulai dengan pion di a2 berhasil.
+
+= Save the pawn on f6 for last.
+es: Deja el peón en f6 para el final.
+pt: Deixe o peão em f6 para o fim.
+fr: Garde le pion en f6 pour la fin.
+de: Heb dir den Bauern auf f6 bis zum Schluss auf.
+id: Simpan pion di f6 untuk terakhir.
+
+= Starting with the bishop on c7 works.
+es: Empezar por el alfil en c7 funciona.
+pt: Começar pelo bispo em c7 funciona.
+fr: Commencer par le fou en c7 fonctionne.
+de: Mit dem Läufer auf c7 zu beginnen klappt.
+id: Mulai dengan gajah di c7 berhasil.
+
+= Only one first capture works, and the pawn on c1 comes last.
+es: Solo funciona una primera captura, y el peón en c1 va al final.
+pt: Só uma primeira captura funciona, e o peão em c1 fica por último.
+fr: Une seule première prise fonctionne, et le pion en c1 vient en dernier.
+de: Nur ein erster Schlag funktioniert, und der Bauer auf c1 kommt zuletzt.
+id: Hanya satu tangkapan pertama yang berhasil, dan pion di c1 paling akhir.
+
+= Capture the bishop on e5 first.
+es: Captura primero el alfil en e5.
+pt: Capture primeiro o bispo em e5.
+fr: Prends d'abord le fou en e5.
+de: Schlag zuerst den Läufer auf e5.
+id: Tangkap gajah di e5 lebih dulu.
+
+= Only four orders clear this board. The pawn on a8 is last.
+es: Solo funcionan cuatro órdenes. El peón en a8 va al final.
+pt: Só quatro ordens funcionam. O peão em a8 fica por último.
+fr: Seuls quatre ordres fonctionnent. Le pion en a8 vient en dernier.
+de: Nur vier Reihenfolgen klappen. Der Bauer auf a8 kommt zuletzt.
+id: Hanya empat urutan yang berhasil. Pion di a8 paling akhir.
+
+= Take the pawn on d6 first.
+es: Captura primero el peón en d6.
+pt: Capture primeiro o peão em d6.
+fr: Prends d'abord le pion en d6.
+de: Schlag zuerst den Bauern auf d6.
+id: Tangkap pion di d6 lebih dulu.
+
+= Only four orders clear this board. The pawn on f6 is last.
+es: Solo funcionan cuatro órdenes. El peón en f6 va al final.
+pt: Só quatro ordens funcionam. O peão em f6 fica por último.
+fr: Seuls quatre ordres fonctionnent. Le pion en f6 vient en dernier.
+de: Nur vier Reihenfolgen klappen. Der Bauer auf f6 kommt zuletzt.
+id: Hanya empat urutan yang berhasil. Pion di f6 paling akhir.
+
+= Capture the bishop on c8 first.
+es: Captura primero el alfil en c8.
+pt: Capture primeiro o bispo em c8.
+fr: Prends d'abord le fou en c8.
+de: Schlag zuerst den Läufer auf c8.
+id: Tangkap gajah di c8 lebih dulu.
+
+= Open Door
+es: Puerta abierta
+pt: Porta aberta
+fr: Porte ouverte
+de: Offene Tür
+id: Pintu Terbuka
+
+= Every order works here. Capture everything you can reach.
+es: Aquí vale cualquier orden. Captura todo lo que alcances.
+pt: Aqui qualquer ordem funciona. Capture tudo o que alcançar.
+fr: Ici, tous les ordres marchent. Prends tout ce que tu peux atteindre.
+de: Hier klappt jede Reihenfolge. Schlag alles, was du erreichst.
+id: Urutan apa pun berhasil di sini. Tangkap semua yang bisa kamu jangkau.
+
+= The king right next to you is a fine first capture.
+es: El rey que tienes al lado es una buena primera captura.
+pt: O rei bem ao seu lado é uma ótima primeira captura.
+fr: Le roi juste à côté de toi est une bonne première prise.
+de: Der König direkt neben dir ist ein guter erster Schlag.
+id: Raja tepat di sebelahmu adalah tangkapan pertama yang bagus.
+
+= Two Steps
+es: Dos pasos
+pt: Dois passos
+fr: Deux étapes
+de: Zwei Schritte
+id: Dua Langkah
+
+= Your bishop can't reach the queen yet. Become something that can.
+es: Tu alfil aún no alcanza a la dama. Conviértete en algo que pueda.
+pt: Seu bispo ainda não alcança a dama. Vire algo que alcance.
+fr: Ton fou ne peut pas encore atteindre la dame. Deviens une pièce qui le peut.
+de: Dein Läufer erreicht die Dame noch nicht. Werde zu etwas, das es kann.
+id: Gajahmu belum bisa mencapai ratu. Jadilah bidak yang bisa.
+
+= Order Matters
+es: El orden importa
+pt: A ordem importa
+fr: L'ordre compte
+de: Reihenfolge zählt
+id: Urutan Itu Penting
+
+= A pawn only moves up. Don't become one while there is still work to do.
+es: Un peón solo avanza hacia arriba. No te conviertas en uno mientras quede trabajo.
+pt: Um peão só anda para cima. Não vire um enquanto ainda houver trabalho.
+fr: Un pion ne fait que monter. N'en deviens pas un tant qu'il reste du travail.
+de: Ein Bauer zieht nur nach oben. Werde keiner, solange noch Arbeit übrig ist.
+id: Pion hanya bergerak ke atas. Jangan jadi pion selagi masih ada tugas.
+
+= First Echo
+es: Primer eco
+pt: Primeiro eco
+fr: Premier écho
+de: Erstes Echo
+id: Gema Pertama
+
+= Your queen can reach all three pieces. Think about what you become after each capture.
+es: Tu dama alcanza las tres piezas. Piensa en qué te conviertes tras cada captura.
+pt: Sua dama alcança as três peças. Pense no que você vira após cada captura.
+fr: Ta dame peut atteindre les trois pièces. Pense à ce que tu deviens après chaque prise.
+de: Deine Dame erreicht alle drei Figuren. Überleg, was du nach jedem Schlag wirst.
+id: Ratumu bisa mencapai ketiga bidak. Pikirkan kamu jadi apa setelah tiap tangkapan.
+
+= If you take the bishop first, take the rook straight after it.
+es: Si capturas primero el alfil, captura la torre justo después.
+pt: Se capturar o bispo primeiro, capture a torre logo depois.
+fr: Si tu prends le fou en premier, prends la tour juste après.
+de: Wenn du zuerst den Läufer schlägst, schlag direkt danach den Turm.
+id: Kalau kamu menangkap gajah dulu, langsung tangkap benteng setelahnya.
+
+= Long Way Round
+es: El camino largo
+pt: O caminho longo
+fr: Le long détour
+de: Der lange Umweg
+id: Jalan Memutar
+
+= Quiet moves are free. Walk your piece to where it needs to be.
+es: Los movimientos sin captura son gratis. Lleva tu pieza a donde tenga que estar.
+pt: Movimentos sem captura são livres. Leve sua peça até onde ela precisa estar.
+fr: Les coups sans prise sont gratuits. Amène ta pièce là où elle doit être.
+de: Ruhige Züge sind frei. Bring deine Figur dorthin, wo sie hinmuss.
+id: Langkah tanpa tangkapan itu bebas. Bawa bidakmu ke tempat yang dibutuhkan.
+
+= Becoming the rook on b1 lets you sweep the bottom row.
+es: Convertirte en la torre de b1 te deja barrer la fila de abajo.
+pt: Virar a torre em b1 permite varrer a fileira de baixo.
+fr: Devenir la tour en b1 te permet de balayer la rangée du bas.
+de: Wirst du zum Turm auf b1, kannst du die unterste Reihe abräumen.
+id: Menjadi benteng di b1 membuatmu bisa menyapu baris bawah.
+
+= Pawn Last
+es: Peón al final
+pt: Peão por último
+fr: Le pion en dernier
+de: Bauer zuletzt
+id: Pion Terakhir
+
+= Once you become the pawn you can only move up. Save it for last.
+es: Cuando te conviertes en el peón solo puedes subir. Déjalo para el final.
+pt: Depois de virar o peão você só sobe. Deixe-o para o fim.
+fr: Une fois devenu le pion, tu ne peux que monter. Garde-le pour la fin.
+de: Als Bauer kannst du nur noch nach oben. Heb ihn dir bis zum Schluss auf.
+id: Setelah jadi pion, kamu hanya bisa naik. Simpan untuk terakhir.
+
+= Narrow Gate
+es: Puerta estrecha
+pt: Portão estreito
+fr: Porte étroite
+de: Enges Tor
+id: Gerbang Sempit
+
+= The walls split the board. Work out which piece gets you past them.
+es: Los muros dividen el tablero. Descubre qué pieza te deja cruzarlos.
+pt: Os muros dividem o tabuleiro. Descubra qual peça faz você passar.
+fr: Les murs coupent le plateau. Trouve quelle pièce te permet de les franchir.
+de: Die Mauern teilen das Brett. Finde heraus, welche Figur dich vorbeibringt.
+id: Dinding membelah papan. Cari tahu bidak mana yang bisa melewatinya.
+
+= Queen's Court
+es: La corte de la dama
+pt: A corte da dama
+fr: La cour de la dame
+de: Hof der Dame
+id: Istana Ratu
+
+= Crowded Row
+es: Fila abarrotada
+pt: Fileira lotada
+fr: Rangée bondée
+de: Volle Reihe
+id: Baris Padat
+
+= Five pieces stand together. Pick an order that never leaves you stranded.
+es: Cinco piezas están juntas. Elige un orden que nunca te deje atrapado.
+pt: Cinco peças estão juntas. Escolha uma ordem que nunca te deixe preso.
+fr: Cinq pièces sont côte à côte. Choisis un ordre qui ne te laisse jamais coincé.
+de: Fünf Figuren stehen zusammen. Wähle eine Reihenfolge, die dich nie festsitzen lässt.
+id: Lima bidak berdiri berdekatan. Pilih urutan yang tidak pernah membuatmu terjebak.
+
+= Corner Knight
+es: Caballo en la esquina
+pt: Cavalo no canto
+fr: Cavalier dans le coin
+de: Springer in der Ecke
+id: Kuda di Sudut
+
+= Capture the knight in the corner first.
+es: Captura primero el caballo de la esquina.
+pt: Capture primeiro o cavalo do canto.
+fr: Prends d'abord le cavalier dans le coin.
+de: Schlag zuerst den Springer in der Ecke.
+id: Tangkap kuda di sudut lebih dulu.
+
+= Two Bishops
+es: Dos alfiles
+pt: Dois bispos
+fr: Deux fous
+de: Zwei Läufer
+id: Dua Gajah
+
+= Finish on the pawn on a1 or the bishop on b5.
+es: Termina con el peón en a1 o el alfil en b5.
+pt: Termine no peão em a1 ou no bispo em b5.
+fr: Termine sur le pion en a1 ou le fou en b5.
+de: Ende mit dem Bauern auf a1 oder dem Läufer auf b5.
+id: Akhiri di pion a1 atau gajah b5.
+
+= Wall Garden
+es: Jardín amurallado
+pt: Jardim murado
+fr: Jardin clos
+de: Mauergarten
+id: Taman Berdinding
+
+= The bishop in the middle should be your final capture.
+es: El alfil del centro debería ser tu última captura.
+pt: O bispo do meio deve ser sua última captura.
+fr: Le fou au centre devrait être ta dernière prise.
+de: Der Läufer in der Mitte sollte dein letzter Schlag sein.
+id: Gajah di tengah sebaiknya jadi tangkapan terakhirmu.
+
+= Once you are a pawn, the queen is your only way out.
+es: Cuando seas un peón, la dama es tu única salida.
+pt: Quando você virar peão, a dama é sua única saída.
+fr: Une fois pion, la dame est ta seule issue.
+de: Bist du ein Bauer, ist die Dame dein einziger Ausweg.
+id: Begitu kamu jadi pion, ratu adalah satu-satunya jalan keluar.
+
+= Bishop Line
+es: Línea del alfil
+pt: Linha do bispo
+fr: Ligne du fou
+de: Läuferlinie
+id: Garis Gajah
+
+= Six Voices
+es: Seis voces
+pt: Seis vozes
+fr: Six voix
+de: Sechs Stimmen
+id: Enam Suara
+
+= Start with the knight.
+es: Empieza por el caballo.
+pt: Comece pelo cavalo.
+fr: Commence par le cavalier.
+de: Beginne mit dem Springer.
+id: Mulai dengan kuda.
+
+= Becoming the pawn early leaves you stuck. Take it last.
+es: Convertirte pronto en el peón te deja atascado. Captúralo al final.
+pt: Virar o peão cedo te deixa preso. Capture-o por último.
+fr: Devenir le pion trop tôt te bloque. Prends-le en dernier.
+de: Wirst du zu früh zum Bauern, steckst du fest. Schlag ihn zuletzt.
+id: Jadi pion terlalu cepat membuatmu terjebak. Tangkap paling akhir.
+
+= Royal Escort
+es: Escolta real
+pt: Escolta real
+fr: Escorte royale
+de: Königliche Eskorte
+id: Pengawal Kerajaan
+
+= Kings are slow, but they can step anywhere. Use them to reposition.
+es: Los reyes son lentos, pero pueden ir en cualquier dirección. Úsalos para recolocarte.
+pt: Reis são lentos, mas andam para qualquer lado. Use-os para se reposicionar.
+fr: Les rois sont lents, mais vont dans toutes les directions. Sers-t'en pour te replacer.
+de: Könige sind langsam, können aber in jede Richtung. Nutze sie zum Umstellen.
+id: Raja itu lambat, tapi bisa melangkah ke mana saja. Gunakan untuk berpindah posisi.
+
+= Far Corner
+es: Esquina lejana
+pt: Canto distante
+fr: Coin éloigné
+de: Ferne Ecke
+id: Sudut Jauh
+
+= Knight School
+es: Escuela de caballos
+pt: Escola de cavalos
+fr: École des cavaliers
+de: Springerschule
+id: Sekolah Kuda
+
+= Knights jump over walls. Use them to cross the board.
+es: Los caballos saltan los muros. Úsalos para cruzar el tablero.
+pt: Cavalos pulam muros. Use-os para atravessar o tabuleiro.
+fr: Les cavaliers sautent par-dessus les murs. Sers-t'en pour traverser le plateau.
+de: Springer springen über Mauern. Nutze sie, um das Brett zu überqueren.
+id: Kuda bisa melompati dinding. Gunakan untuk menyeberangi papan.
+
+= Last Light
+es: Última luz
+pt: Última luz
+fr: Dernière lueur
+de: Letztes Licht
+id: Cahaya Terakhir
+
+= Rook Gate
+es: Puerta de la torre
+pt: Portão da torre
+fr: Porte de la tour
+de: Turmtor
+id: Gerbang Benteng
+
+= Queen's Descent
+es: El descenso de la dama
+pt: A descida da dama
+fr: La descente de la dame
+de: Abstieg der Dame
+id: Turunnya Ratu
+
+= The pawn on a7 is on the top rank, so it must be last.
+es: El peón en a7 está en la fila de arriba, así que debe ser el último.
+pt: O peão em a7 está na fileira de cima, então deve ser o último.
+fr: Le pion en a7 est sur la rangée du haut, il doit donc être le dernier.
+de: Der Bauer auf a7 steht in der obersten Reihe, also muss er zuletzt kommen.
+id: Pion di a7 ada di baris teratas, jadi harus paling akhir.
+
+= Knight Fork
+es: Horquilla de caballo
+pt: Garfo de cavalo
+fr: Fourchette de cavalier
+de: Springergabel
+id: Garpu Kuda
+
+= Pawn Storm
+es: Tormenta de peones
+pt: Tempestade de peões
+fr: Tempête de pions
+de: Bauernsturm
+id: Badai Pion
+
+= You have to become a pawn straight away. Plan where it climbs.
+es: Tienes que convertirte en peón enseguida. Planea por dónde sube.
+pt: Você precisa virar um peão logo de cara. Planeje por onde ele sobe.
+fr: Tu dois devenir un pion tout de suite. Prévois où il monte.
+de: Du musst sofort zum Bauern werden. Plane, wo er hochzieht.
+id: Kamu harus langsung jadi pion. Rencanakan ke mana ia naik.
+
+= Bishop's Gambit
+es: Gambito de alfil
+pt: Gambito do bispo
+fr: Gambit du fou
+de: Läufergambit
+id: Gambit Gajah
+
+= The pawn on g7 can't move once you become it. Leave it for the end.
+es: El peón en g7 no puede moverse una vez que te conviertes en él. Déjalo para el final.
+pt: O peão em g7 não se move depois que você vira ele. Deixe-o para o fim.
+fr: Le pion en g7 ne peut plus bouger une fois que tu le deviens. Garde-le pour la fin.
+de: Der Bauer auf g7 kann nicht mehr ziehen, sobald du er bist. Heb ihn dir bis zum Ende auf.
+id: Pion di g7 tidak bisa bergerak setelah kamu menjadi pion itu. Simpan untuk akhir.
+
+= Long Diagonal
+es: Diagonal larga
+pt: Diagonal longa
+fr: Longue diagonale
+de: Lange Diagonale
+id: Diagonal Panjang
+
+= Watchtower
+es: Atalaya
+pt: Torre de vigia
+fr: Tour de guet
+de: Wachturm
+id: Menara Pengawas
+
+= Crossroads
+es: Encrucijada
+pt: Encruzilhada
+fr: Carrefour
+de: Kreuzung
+id: Persimpangan
+
+= Kingsway
+es: Camino del rey
+pt: Caminho do rei
+fr: Chemin du roi
+de: Königsweg
+id: Jalan Raja
+
+= Stone Garden
+es: Jardín de piedra
+pt: Jardim de pedra
+fr: Jardin de pierre
+de: Steingarten
+id: Taman Batu
+
+= Narrow Path
+es: Sendero estrecho
+pt: Caminho estreito
+fr: Sentier étroit
+de: Schmaler Pfad
+id: Jalan Sempit
+
+= Echo Chamber
+es: Cámara de eco
+pt: Câmara de eco
+fr: Chambre d'écho
+de: Echokammer
+id: Ruang Gema

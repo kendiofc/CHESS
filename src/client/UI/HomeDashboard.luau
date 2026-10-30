@@ -468,11 +468,11 @@ function HomeDashboard.render(holder: ScrollingFrame, width: number, height: num
 		if not loading then
 			if HomeDashboard.SHOW_LEVEL then
 				local level = Progression.levelOf(progress.xp)
-				levelText = "Lv. " .. level.level
+				levelText = string.format("Lv. %d", level.level)
 				amountText = string.format("%s / %s XP", commas(level.into), commas(level.needed))
 				fraction = level.into / level.needed
 			else
-				amountText = commas(progress.xp) .. " XP"
+				amountText = string.format("%s XP", commas(progress.xp))
 			end
 		end
 		local pill = text({

@@ -101,7 +101,7 @@ end
 
 local function coinsText(amount: number): string
 	-- Plain text: the UI font has no coin emoji.
-	return tostring(amount) .. " coins"
+	return string.format("%d coins", amount)
 end
 
 -- A card button. `style` is "gold" (buy), "accent" (equip), "done" (equipped
@@ -387,7 +387,7 @@ function ShopPage.onSnapshot(menu: any, snap: any)
 		local passes = menu.shopState and menu.shopState.passes or {}
 		for _, key in ipairs(GamePassConfig.ORDER) do
 			if passes[key] and not before[key] then
-				setNotice(menu, GamePassConfig.PASSES[key].name .. " is unlocked. Thank you for supporting Echo Chess!", "good")
+				setNotice(menu, string.format("%s is unlocked. Thank you for supporting Echo Chess!", GamePassConfig.PASSES[key].name), "good")
 				menu.shopCelebrate = "Pass_" .. key
 				Sound.play("unlock")
 				Sound.haptic("medium")

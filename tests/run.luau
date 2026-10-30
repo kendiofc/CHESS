@@ -2997,6 +2997,22 @@ test("shop: cosmetics never touch duel puzzles or rules", function()
 end)
 
 
+test("settings: language is one of the offered codes and survives saving", function()
+	local profile = Progression.newProfile()
+	eq(profile.settings.language, "", "unpicked until the player chooses")
+	Progression.apply(profile, { id = "lang1", kind = "settings", settings = { language = "es" } })
+	eq(profile.settings.language, "es")
+	Progression.apply(profile, { id = "lang2", kind = "settings", settings = { language = "xx" } })
+	Progression.apply(profile, { id = "lang3", kind = "settings", settings = { language = 5 } })
+	eq(profile.settings.language, "es", "unknown codes are ignored")
+	eq(Progression.normalize(profile).settings.language, "es")
+	eq(Progression.normalize({ settings = { language = "<script>" } }).settings.language, "")
+	eq(Progression.summary(profile, 20000).settings.language, "es")
+	for _, code in ipairs(GameConfig.LANGUAGES) do
+		assert(#code == 2, code)
+	end
+end)
+
 -- Leaderboards ---------------------------------------------------------------------------
 
 local Leaderboards = require(Shared.Leaderboards)

@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
+local Lang = require(script.Parent:WaitForChild("UI"):WaitForChild("Lang"))
 local PuzzleHUD = require(script.Parent:WaitForChild("UI"):WaitForChild("PuzzleHUD"))
 
 local ACTIONS = GameConfig.ACTIONS
@@ -16,6 +17,20 @@ local stateRemote = remotes:WaitForChild(GameConfig.REMOTES.State) :: RemoteEven
 local leaderboardRemote = remotes:WaitForChild(GameConfig.REMOTES.Leaderboard) :: RemoteEvent
 
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Every screen of the game is shown in the player's language (see Lang).
+-- Until their saved choice arrives, that is their Roblox language if the
+-- game has it.
+Lang.set(Lang.suggested())
+local function watchScreen(child: Instance)
+	if child:IsA("ScreenGui") and string.sub(child.Name, 1, 9) == "EchoChess" then
+		Lang.watch(child)
+	end
+end
+for _, child in ipairs(playerGui:GetChildren()) do
+	watchScreen(child)
+end
+playerGui.ChildAdded:Connect(watchScreen)
 
 -- The game is played entirely in the GUI for now, so hide the mobile
 -- thumbstick/jump buttons; they sat on top of Undo/Restart. (ServerMain keeps

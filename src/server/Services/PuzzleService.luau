@@ -669,7 +669,7 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 	elseif action == ACTIONS.Settings then
 		-- Progression.applySettings keeps only valid values; nothing else is read.
 		local values = {}
-		for _, key in ipairs({ "sound", "volume", "haptics", "drag" }) do
+		for _, key in ipairs({ "sound", "volume", "haptics", "drag", "language" }) do
 			values[key] = data[key]
 		end
 		record(player, { kind = "settings", settings = values })
