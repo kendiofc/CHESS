@@ -193,6 +193,17 @@ local function flushPlaytime(userId: number, minimum: number)
 	end
 end
 
+-- A player's score on a board right now: play time includes the seconds not
+-- recorded yet.
+local function liveScore(board: Leaderboards.Board, userId: number, profile: any): number
+	local score = Leaderboards.score(board, profile)
+	local since = playClock[userId]
+	if board.id == "playtime" and since then
+		score += math.floor(os.clock() - since)
+	end
+	return score
+end
+
 -- Puts a player's scores on the leaderboards. Only profiles that loaded from
 -- the DataStore count: an offline one starts from zero.
 local function submitScores(userId: number)
@@ -361,7 +372,7 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 					if profile then
 						table.insert(live, {
 							userId = other.UserId,
-							value = Leaderboards.score(board, profile),
+							value = liveScore(board, other.UserId, profile),
 							name = other.DisplayName,
 						})
 					end
@@ -377,7 +388,7 @@ local function onAction(player: Player, action: unknown, payload: unknown)
 						break
 					end
 				end
-				view.me = { value = Leaderboards.score(board, profileOf(player)), rank = rank }
+				view.me = { value = liveScore(board, userId, profileOf(player)), rank = rank }
 				leaderboardRemote:FireClient(player, view)
 			end)
 		end
