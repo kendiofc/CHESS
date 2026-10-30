@@ -2759,14 +2759,18 @@ test("shop: every item is well formed and every slot has its free default", func
 	eq(ShopCatalog.get("nope", "classic"), nil)
 end)
 
-test("shop: passes stay unconfigured until real IDs are set", function()
+test("shop: every pass has a real, distinct ID and maps back to its key", function()
+	local seen = {}
 	for _, key in ipairs(GamePassConfig.ORDER) do
-		eq(GamePassConfig.PASSES[key].id, nil, key .. " has no invented ID")
-		eq(GamePassConfig.isConfigured(key), false)
+		local id = GamePassConfig.PASSES[key].id
+		eq(GamePassConfig.isConfigured(key), true, key .. " is configured")
+		eq(seen[id], nil, "IDs are distinct")
+		seen[id] = true
+		eq(GamePassConfig.keyForId(id), key)
+		eq(GamePassConfig.keyForId(tostring(id)), nil, "string IDs are not trusted")
 	end
 	eq(GamePassConfig.keyForId(0), nil)
 	eq(GamePassConfig.keyForId(123), nil)
-	eq(GamePassConfig.keyForId("123"), nil)
 end)
 
 test("shop: buying with coins charges once and needs enough coins", function()

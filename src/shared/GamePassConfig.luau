@@ -1,13 +1,11 @@
 --!strict
 -- GamePassConfig: the one place to set Echo Chess's gamepass IDs.
 --
--- Every pass below is UNCONFIGURED: its `id` is nil, so the Shop shows it as
+-- Each pass's `id` is its numeric ID from the Creator Dashboard (Monetization
+-- > Passes). A pass with `id = nil` is UNCONFIGURED: the Shop shows it as
 -- "Not available yet", never prompts a purchase, and the server never checks
--- or grants it. To turn a pass on:
---   1. Create the pass on the Creator Dashboard (Monetization > Passes).
---   2. Paste its numeric ID as `id` below (e.g. `id = 123456789`).
---   3. Set its price on the dashboard. The Shop reads the live price from
---      Roblox; `suggestedPrice` is only shown while it can't.
+-- or grants it. The Shop reads each pass's price from Roblox; `suggestedPrice`
+-- is only shown while it can't.
 -- Never put an ID here that isn't a real pass of this experience.
 --
 -- Everything a pass gives is cosmetic. No pass may change puzzles, moves,
@@ -28,7 +26,7 @@ export type Pass = {
 GamePassConfig.PASSES = {
 	RoyalVIP = {
 		key = "RoyalVIP",
-		id = nil, -- UNCONFIGURED
+		id = 2062481267,
 		name = "Royal VIP",
 		icon = "👑",
 		suggestedPrice = 299,
@@ -42,7 +40,7 @@ GamePassConfig.PASSES = {
 	},
 	LegendarySkins = {
 		key = "LegendarySkins",
-		id = nil, -- UNCONFIGURED
+		id = 2060238963,
 		name = "Legendary Chess Skins",
 		icon = "💎",
 		suggestedPrice = 149,
@@ -54,7 +52,7 @@ GamePassConfig.PASSES = {
 	},
 	RoyalBoards = {
 		key = "RoyalBoards",
-		id = nil, -- UNCONFIGURED
+		id = 2060364254,
 		name = "Royal Board Collection",
 		icon = "🏰",
 		suggestedPrice = 99,
