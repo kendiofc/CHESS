@@ -645,7 +645,7 @@ local function itemCard(menu: any, grid: Instance, order: number, item: ShopCata
 	local stage = make("Frame", {
 		Name = "Stage",
 		Position = UDim2.fromOffset(10, 10),
-		Size = UDim2.new(1, -20, 0, 84),
+		Size = UDim2.new(1, -20, 0, 112),
 		BackgroundColor3 = PURPLE_DEEP,
 		Parent = card,
 	}, { corner(10) })
@@ -672,7 +672,7 @@ local function itemCard(menu: any, grid: Instance, order: number, item: ShopCata
 		Name = "ItemName",
 		Text = item.name,
 		FontFace = Theme.FontBold,
-		Position = UDim2.fromOffset(10, 100),
+		Position = UDim2.fromOffset(10, 128),
 		Size = UDim2.new(1, -20, 0, 18),
 		Parent = card,
 	})
@@ -684,7 +684,7 @@ local function itemCard(menu: any, grid: Instance, order: number, item: ShopCata
 		TextColor3 = Theme.TextMuted,
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
-		Position = UDim2.fromOffset(10, 120),
+		Position = UDim2.fromOffset(10, 148),
 		Size = UDim2.new(1, -20, 0, 30),
 		Parent = card,
 	})
@@ -702,7 +702,7 @@ local function itemCard(menu: any, grid: Instance, order: number, item: ShopCata
 		Text = source,
 		FontFace = Theme.FontBold,
 		TextColor3 = sourceColor,
-		Position = UDim2.fromOffset(10, 152),
+		Position = UDim2.fromOffset(10, 180),
 		Size = UDim2.new(1, -20, 0, 16),
 		Parent = card,
 	})
@@ -713,7 +713,7 @@ end
 
 local function itemGrid(menu: any, list: Instance, order: number, items: { ShopCatalog.Item }, ctx: any, width: number)
 	local columns = if width >= 520 then 3 else 2
-	local cellHeight = 214
+	local cellHeight = 242
 	local rows = math.ceil(#items / columns)
 	local grid = make("Frame", {
 		Name = "Grid",
