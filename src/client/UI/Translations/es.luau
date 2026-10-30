@@ -618,4 +618,5 @@ return {
 	["Stone Garden"] = "Jardín de piedra",
 	["Narrow Path"] = "Sendero estrecho",
 	["Echo Chamber"] = "Cámara de eco",
+	["%s %d/%d"] = "%s %d/%d",
 }

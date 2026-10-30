@@ -4336,3 +4336,10 @@ pt: Câmara de eco
 fr: Chambre d'écho
 de: Echokammer
 id: Ruang Gema
+
+= %s %d/%d
+es: %s %d/%d
+pt: %s %d/%d
+fr: %s %d/%d
+de: %s %d/%d
+id: %s %d/%d

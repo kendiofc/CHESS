@@ -137,6 +137,27 @@ function Lang.upper(text: string): string
 	return out
 end
 
+-- Upper-cases a format string without touching its %d / %s / {1}.
+local function upperFormat(source: string): string
+	local out = {}
+	local i = 1
+	while i <= #source do
+		local s, e = string.find(source, "%%[%d]*[ds]", i)
+		local b1, b2 = string.find(source, "{%d}", i)
+		if b1 and (not s or b1 < s) then
+			s, e = b1, b2
+		end
+		if not s then
+			table.insert(out, Lang.upper(string.sub(source, i)))
+			break
+		end
+		table.insert(out, Lang.upper(string.sub(source, i, s - 1)))
+		table.insert(out, string.sub(source, s, e))
+		i = (e :: number) + 1
+	end
+	return table.concat(out)
+end
+
 local function lookup(text: string): string?
 	local found = exact[text]
 	if found then
@@ -164,6 +185,9 @@ local function lookup(text: string): string?
 	return nil
 end
 
+-- Marks the UI puts after a word ("Continue  ▶").
+local TRAILING = { "  ▶", " ▶", "  ▸", " ▸", "  ›", " ›" }
+
 local function translateUncached(text: string): string
 	local found = lookup(text)
 	if found then
@@ -187,8 +211,16 @@ local function translateUncached(text: string): string
 			return table.concat(parts, separator)
 		end
 	end
-	-- Leading symbols, emoji or spaces, and trailing spaces.
+	-- Leading symbols, emoji or spaces, and trailing spaces or arrows.
 	local head, core, tail = string.match(text, "^([^%w]*)(.-)(%s*)$")
+	if core and core ~= "" then
+		for _, mark in ipairs(TRAILING) do
+			if #core > #mark and string.sub(core, -#mark) == mark then
+				core, tail = string.sub(core, 1, -#mark - 1), mark .. (tail :: string)
+				break
+			end
+		end
+	end
 	if core and core ~= text and core ~= "" then
 		local inner = lookup(core)
 		if inner then
@@ -230,6 +262,11 @@ function Lang.set(code: string)
 		for source, out in pairs(data) do
 			if string.find(source, "%%[%d]*[ds]") then
 				table.insert(patterns, { pattern = compile(source), out = out, length = #source } :: any)
+				-- The same format in capitals ("HARD %d/%d").
+				local upperSource = upperFormat(source)
+				if upperSource ~= source then
+					table.insert(patterns, { pattern = compile(upperSource), out = upperFormat(out), length = #source } :: any)
+				end
 			else
 				exact[source] = out
 				capitals[string.upper(source)] = Lang.upper(out)
