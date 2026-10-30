@@ -619,4 +619,5 @@ return {
 	["Narrow Path"] = "Sendero estrecho",
 	["Echo Chamber"] = "Cámara de eco",
 	["%s %d/%d"] = "%s %d/%d",
+	["Streak"] = "Racha",
 }

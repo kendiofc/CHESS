@@ -211,8 +211,9 @@ local function translateUncached(text: string): string
 			return table.concat(parts, separator)
 		end
 	end
-	-- Leading symbols, emoji or spaces, and trailing spaces or arrows.
-	local head, core, tail = string.match(text, "^([^%w]*)(.-)(%s*)$")
+	-- Leading numbers, symbols, emoji or spaces ("1.  ", "🔥 "), and trailing
+	-- spaces or arrows.
+	local head, core, tail = string.match(text, "^([^%a]*)(.-)(%s*)$")
 	if core and core ~= "" then
 		for _, mark in ipairs(TRAILING) do
 			if #core > #mark and string.sub(core, -#mark) == mark then
