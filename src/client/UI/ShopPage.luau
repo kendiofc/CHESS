@@ -177,43 +177,95 @@ local function boardPreview(parent: Instance, item: ShopCatalog.Item)
 	end
 end
 
+local function mix(a: Color3, b: Color3, t: number): Color3
+	return a:Lerp(b, t)
+end
+
+-- A chess skin: the queen lit from above, on a glowing pedestal. The tint is a
+-- top-to-bottom gradient (light to deep) so the piece reads as polished
+-- metal or stone rather than flat paint. Pass skins get a few sparkles.
 local function piecesPreview(parent: Instance, item: ShopCatalog.Item)
 	local glow = Cosmetics.color(item.glow, Theme.Gold)
-	local disc = make("Frame", {
+	local tint = Cosmetics.color(item.tint, Color3.new(1, 1, 1))
+	local holder = make("Frame", {
 		Name = "Preview",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.9, 0.9),
-		BackgroundColor3 = PURPLE_DEEP,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
 		Parent = parent,
+	}, { make("UICorner", { CornerRadius = UDim.new(0, 10) }) })
+	-- Soft light behind the piece: stacked circles, faintest outside.
+	for index, scale in ipairs({ 1.15, 0.85, 0.55 }) do
+		make("Frame", {
+			Name = "Glow" .. index,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.48),
+			Size = UDim2.fromScale(scale, scale),
+			SizeConstraint = Enum.SizeConstraint.RelativeYY,
+			BackgroundColor3 = glow,
+			BackgroundTransparency = 0.9 - index * 0.06,
+			BorderSizePixel = 0,
+			Parent = holder,
+		}, { make("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
+	end
+	-- Pedestal: a lit ellipse with a darker rim.
+	make("Frame", {
+		Name = "Pedestal",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.86),
+		Size = UDim2.fromScale(0.62, 0.14),
+		SizeConstraint = Enum.SizeConstraint.RelativeYY,
+		BackgroundColor3 = mix(glow, Color3.new(0, 0, 0), 0.35),
+		BorderSizePixel = 0,
+		Parent = holder,
 	}, {
 		make("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
-		make("UIAspectRatioConstraint", { AspectRatio = 1 }),
-		make("UIStroke", { Color = glow, Thickness = 2.5, Transparency = 0.1 }),
+		make("UIStroke", { Color = glow, Thickness = 1.5, Transparency = 0.2 }),
+		make("UIGradient", {
+			Color = ColorSequence.new(mix(glow, Color3.new(1, 1, 1), 0.3), mix(glow, Color3.new(0, 0, 0), 0.6)),
+			Rotation = 90,
+		}),
 	})
-	make("Frame", {
-		Name = "Glow",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.8, 0.8),
-		BackgroundColor3 = glow,
-		BackgroundTransparency = 0.75,
-		Parent = disc,
-	}, { make("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
 	if Theme.PieceSheet ~= "" then
-		make("ImageLabel", {
+		local piece = make("ImageLabel", {
 			Name = "Piece",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(0.78, 0.78),
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.fromScale(0.5, 0.9),
+			Size = UDim2.fromScale(0.82, 0.82),
+			SizeConstraint = Enum.SizeConstraint.RelativeYY,
 			BackgroundTransparency = 1,
 			Image = Theme.PieceSheet,
 			ImageRectSize = Vector2.new(Theme.PieceCell, Theme.PieceCell),
 			ImageRectOffset = Vector2.new(Theme.PieceSheetColumns.Q * Theme.PieceCell, 0),
-			ImageColor3 = Cosmetics.color(item.tint, Color3.new(1, 1, 1)),
 			ScaleType = Enum.ScaleType.Fit,
-			Parent = disc,
+			ZIndex = 2,
+			Parent = holder,
 		})
+		make("UIGradient", {
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, mix(tint, Color3.new(1, 1, 1), 0.55)),
+				ColorSequenceKeypoint.new(0.45, tint),
+				ColorSequenceKeypoint.new(1, mix(tint, Color3.new(0, 0, 0), 0.3)),
+			}),
+			Rotation = 90,
+			Parent = piece,
+		})
+	end
+	if item.pass then
+		-- Sparkles: small diamonds around the piece.
+		for index, spot in ipairs({ { 0.24, 0.24, 7 }, { 0.78, 0.34, 5 }, { 0.7, 0.14, 4 } }) do
+			make("Frame", {
+				Name = "Sparkle" .. index,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(spot[1], spot[2]),
+				Size = UDim2.fromOffset(spot[3], spot[3]),
+				Rotation = 45,
+				BackgroundColor3 = mix(glow, Color3.new(1, 1, 1), 0.6),
+				BorderSizePixel = 0,
+				ZIndex = 3,
+				Parent = holder,
+			})
+		end
 	end
 end
 
