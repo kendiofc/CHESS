@@ -229,7 +229,7 @@ local function row(list: Instance, order: number, board: Leaderboards.Board, ent
 		Size = UDim2.new(1, -(94 + scoreWidth + 8), 1, 0),
 		Parent = frame,
 	})
-	text({
+	local score = text({
 		Name = "Score",
 		Text = Leaderboards.format(board, entry.value),
 		FontFace = Theme.FontBold,
@@ -241,6 +241,9 @@ local function row(list: Instance, order: number, board: Leaderboards.Board, ent
 		Size = UDim2.new(0, scoreWidth, 1, 0),
 		Parent = frame,
 	})
+	-- Shrinks a long score to its column instead of running into the name.
+	score.TextScaled = true
+	make("UITextSizeConstraint", { MaxTextSize = 15, MinTextSize = 8, Parent = score })
 	return frame
 end
 
@@ -290,7 +293,7 @@ local function standing(list: Instance, board: Leaderboards.Board, view: any)
 		Size = UDim2.new(1, -190, 0, 32),
 		Parent = frame,
 	})
-	text({
+	local yours = text({
 		Name = "Yours",
 		Text = Leaderboards.format(board, me.value or 0),
 		FontFace = Theme.FontHeavy,
@@ -303,6 +306,8 @@ local function standing(list: Instance, board: Leaderboards.Board, view: any)
 		Size = UDim2.fromOffset(110, 26),
 		Parent = frame,
 	})
+	yours.TextScaled = true
+	make("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 9, Parent = yours })
 end
 
 local function note(list: Instance, order: number, message: string)
